@@ -30,7 +30,12 @@ When given a task, follow this flow automatically. The workflow IS the skill rou
 
 1. **Understand.** Read repo AGENTS.md, relevant files, existing patterns. Search memory for relevant context. If ambiguous, ask ONE clarifying question. If clear, proceed.
 2. **Brainstorm (new features).** Before building anything new → `brainstorming` skill: explore context, ask questions one at a time, propose approaches, present design, get user approval.
-3. **Plan (big tasks).** >3 files or new feature → `/to-spec` then `/to-tickets`. Enormous fog-of-war → `/wayfinder`. Uncertain design → `prototype` or `grill-with-docs` to stress-test. Bug fix or small change → skip to step 4.
+3. **Plan (big tasks only).** Pick based on the situation:
+   - **You know what to build** (>3 files, new feature) → `/to-spec` then `/to-tickets`.
+   - **You don't know what to build** (fog of war, loose idea) → `/wayfinder`.
+   - **Design question answerable by building** → `prototype` (throwaway, answer the question, discard).
+   - **Design question answerable by thinking** → `grill-with-docs` (relentless interview to stress-test the plan).
+   - Bug fix or small change → skip to step 4.
 4. **Build.** Implement following existing patterns. Don't over-engineer. Python → use `uv` (not pip/venv). LSP runs on every edit via pi-lens — fix type errors immediately.
 5. **Test.** Run relevant tests. No tests for changed code → write them (`tdd` skill: test first, see fail, implement, see pass). Tests fail → `diagnosing-bugs` skill (build feedback loop, root cause, not symptom).
 6. **Review.** Spawn reviewer subagent: "Use reviewer to review this diff." Critical code → `code-review` skill (parallel standards + spec). Receiving feedback → `receiving-code-review` skill (verify before implementing, push back if wrong). Architecture issues found → `improve-codebase-architecture` skill.
