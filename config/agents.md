@@ -40,7 +40,13 @@ When given a task, follow this flow automatically. The workflow IS the skill rou
 5. **Test.** Run relevant tests. No tests for changed code → write them (`tdd` skill: test first, see fail, implement, see pass). Tests fail → `diagnosing-bugs` skill (build feedback loop, root cause, not symptom).
 6. **Review.** Spawn reviewer subagent: "Use reviewer to review this diff." Critical code → `code-review` skill (parallel standards + spec). Receiving feedback → `receiving-code-review` skill (verify before implementing, push back if wrong). Architecture issues found → `improve-codebase-architecture` skill.
 7. **Verify + commit.** Before claiming done → `verification-before-completion` skill: run verification command, read full output, confirm. Evidence before claims. Then use `commit` skill for clean conventional commits.
-8. **Document.** Durable contract, API, workflow, or gotcha changed → update repo AGENTS.md. User-facing change → update CHANGELOG. Don't create new doc files unless significant.
+8. **Document.** Prevent unstructured docs — no random markdown files, no duplicating what the code says.
+   - Durable gotcha/workflow change → update repo AGENTS.md.
+   - Domain term resolved → update `CONTEXT.md` (`domain-modeling` skill).
+   - Architecture decision made → write ADR in `docs/adr/` (`domain-modeling` skill).
+   - User-facing change → update CHANGELOG.
+   - Specs and tickets → GitHub Issues (`/to-spec`, `/to-tickets`), NOT repo filesystem.
+   - Create files lazily — only when you have something non-inferable to write.
 9. **Remember.** Save decisions, gotchas, failures, corrections to memory. Don't save obvious things — save what you'd want to know next time. If memory contradicts current code, trust the code.
 10. **Handoff.** Session getting long → `compact-safe` skill to preserve constraints, or `/handoff` to create continuation doc. Don't lose context.
 
