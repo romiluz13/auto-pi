@@ -1,5 +1,5 @@
 {
-  "defaultThinkingLevel": "high",
+  "defaultThinkingLevel": "xhigh",
   "compaction": {
     "enabled": true,
     "reserveTokens": 16384,
@@ -17,5 +17,34 @@
     "npm:pi-btw",
     "npm:@juicesharp/rpiv-ask-user-question",
     "npm:pi-rewind"
-  ]
+  ],
+  "defaultProjectTrust": "always",
+  "subagents": {
+    "agentOverrides": {
+      "worker": {
+        "thinking": "xhigh"
+      },
+      "planner": {
+        "thinking": "xhigh"
+      },
+      "oracle": {
+        "thinking": "xhigh"
+      },
+      "reviewer": {
+        "thinking": "xhigh"
+      },
+      "researcher": {
+        "thinking": "xhigh"
+      },
+      "context-builder": {
+        "thinking": "xhigh"
+      },
+      "scout": {
+        "thinking": "xhigh"
+      },
+      "delegate": {
+        "thinking": "xhigh"
+      }
+    }
+  }
 }
