@@ -1,6 +1,6 @@
 # Global AI Agent Rules
 
-Single source of truth for every AI coding tool on this machine (Claude Code, Codex, Cursor, Copilot, Gemini CLI, Pi).
+Single source of truth for every AI coding tool on this machine (Pi, Claude Code, Codex).
 
 - Keep this file under 200 lines total — every line is a token cost on every session.
 - Append only what the agent gets wrong without being told. If an instruction is obvious from the code, delete it.
@@ -9,20 +9,8 @@ Single source of truth for every AI coding tool on this machine (Claude Code, Co
 ## Environment
 
 - macOS, zsh shell. Node via `mise`.
-- AWS profile `ai-prod-llm`; Bedrock is the Claude Code backend.
-- Canonical file: `~/.ai/AGENTS.md`. `~/.claude/CLAUDE.md` imports it via `@~/.ai/AGENTS.md`. `~/.codex/AGENTS.md` is a symlink here.
-- Personal skills: edit ONLY in `~/Dev/ux-skills/`. Install to `~/.claude/skills/` ONLY via `~/Dev/ux-skills/scripts/install-symlinks.sh`.
-- `~/.agents/skills/` is for third-party `npx skills` installs only, not personal skills.
-- cc10x is installed (`cc10x@cc10x`, v12.1.0). Do not remove or reinstall without explicit user request.
-
-## Pi
-
-- Pi config: `~/.pi/agent/settings.json`. Provider: Grove (OpenAI-compatible). Default model: FW-GLM-5.2. Thinking: high. Compaction: 30k recent tokens.
-- 10 packages: pi-hermes-memory, pi-subagents, pi-lens, pi-context-prune (enabled), @narumitw/pi-statusline, pi-intercom, pi-prompt-template-model, pi-btw, @juicesharp/rpiv-ask-user-question, pi-rewind.
-- Web access: `bdata` CLI (Bright Data). Auth via `bdata login`. Free tier: 5,000 credits/month.
-- Code research: `npx octocode` CLI (14 tools: search, AST, LSP, GitHub, npm, binary, OQL).
-- Memory: pi-hermes-memory. Policy-only injection — agent calls `memory_search` when needed. One-time: `/memory-interview`, `/memory-index-sessions`, `/learn-memory-tool`.
-- `/rewind` for undo. `/btw` for side questions. `/handoff` for session continuation.
+- This file is the single source of truth. Each agent loads it differently (Pi: `~/.pi/agent/AGENTS.md` symlink, Claude Code: `@~/.ai/AGENTS.md` import, Codex: `~/.codex/AGENTS.md` symlink).
+- `~/.agents/skills/` is for third-party skill installs, shared across all agents.
 
 ## Autonomous workflow
 
@@ -37,7 +25,7 @@ When given a task, follow this flow automatically. The workflow IS the skill rou
    - **Design question answerable by thinking** → `grill-with-docs` (relentless interview to stress-test the plan).
    - **Need evidence from primary sources** → `research` or `octocode-research` skill (background agent, cited markdown).
    - Bug fix or small change → skip to step 4.
-4. **Build.** Use `/implement` as the execution wrapper (drives TDD + code-review + commit). Follow existing patterns. Don't over-engineer. Python → use `uv` (not pip/venv). LSP runs on every edit via pi-lens — fix type errors immediately.
+4. **Build.** Use `/implement` as the execution wrapper (drives TDD + code-review + commit). Follow existing patterns. Don't over-engineer. Python → use `uv` (not pip/venv). Fix type/LSP errors immediately when detected.
 5. **Test.** Run relevant tests. No tests for changed code → write them (`tdd` skill: test first, see fail, implement, see pass). Exit 1 from import/syntax error is NOT a real RED — a genuine RED is a behavioral failure. Tests fail → `diagnosing-bugs` skill (build feedback loop, root cause, not symptom) → fix → return to step 5.
 6. **Review.** Fan out 2-3 reviewer subagents with different focuses (standards, spec, security). Give reviewers fresh context — only the diff, not the builder's reasoning (anti-anchored review). Critical code → `code-review` skill. Receiving feedback → `receiving-code-review` skill (verify before implementing, push back if wrong). Grep changed files for swallowed errors: empty catches, discarded promises, TODO/FIXME, debug logging left in. Architecture issues → `improve-codebase-architecture` skill → return to step 4.
 7. **Verify + commit.** You are an independent auditor — a passing test or green build is never sufficient by itself. Before verifying, list every claim from prior steps, mark each UNVERIFIED, then independently check each. Before claiming done → `verification-before-completion` skill: run the project's test/lint/typecheck command, read full output, confirm. Then use `commit` skill for clean conventional commits. Use `github` skill for PRs, issues, and CI via `gh` CLI. CI fails → `diagnosing-bugs` → fix → return to step 5.
@@ -71,8 +59,8 @@ Fan out for read-only work. Stay solo for write work. Context is everything — 
   - Independent file changes (different modules, no shared deps): parallel OK with `worktree: true`, then merge.
   - Always verify merge has no conflicts before proceeding.
 - **Safety rules:**
-  - pi-rewind does NOT checkpoint subagent file changes — run `git status` after subagent writes to trigger a checkpoint.
-  - pi-intercom allows one pending outbound ask per session. Parent can receive multiple inbound asks from children — handle replies sequentially using `pending` + `reply`.
+  - Run `git status` after subagent writes to trigger a checkpoint (rewind tools may not auto-checkpoint subagent changes).
+  - Intercom allows one pending outbound ask per session. Parent can receive multiple inbound asks from children — handle replies sequentially using `pending` + `reply`.
   - Always `wait()` for async workers to finish before launching reviewers.
 
 Default: fan out research, build solo, review in parallel.
@@ -105,7 +93,7 @@ Any time the project pulls in an external technology (framework, SDK, hosted ser
 Steps:
 
 1. Check installed version (`package.json`, `node_modules/<pkg>/package.json`).
-2. Validate against current docs: Pi uses `bdata search` + `bdata scrape`, or `npx octocode` for GitHub/npm.
+2. Validate against current docs: `bdata search` + `bdata scrape`, or `npx octocode` for GitHub/npm.
 3. Run `find-skills` for that tech — if a skill exists (e.g. vercel-react-best-practices), use it.
 4. Read local docs if shipped (`node_modules/<pkg>/dist/docs/`, README, CHANGELOG).
 
@@ -122,12 +110,11 @@ Skip only for: pure utility libs with stable APIs (date-fns, zod, lodash). When 
 
 - Respect existing patterns over introducing new ones.
 - Prefer editing an existing file over creating a new one.
-- `CLAUDE.md` in a repo overrides these global rules for that repo.
+- Repo-level `AGENTS.md` or `CLAUDE.md` overrides these global rules for that repo.
 - Complex repos get ONE lean root `AGENTS.md` holding only non-inferable facts: gotchas, deploy mechanics, project-specific overrides.
 
 ## Hygiene
 
-- Monthly: `/memory-insights`, `/memory-consolidate` in Pi. `/doctor`, `/memory`, `/context` in Claude Code. Check `bdata zones` for credit usage.
-- Memory hygiene: review and prune stale memory entries monthly. If memory contradicts current code, trust the code.
-- Matt Pocock skills repo at `~/Dev/pi-optimize/mattpocock-skills`. Update with `git pull` and re-copy.
+- Monthly: review memory, prune stale entries. Check `bdata zones` for credit usage.
+- Memory hygiene: if memory contradicts current code, trust the code.
 - `~/.agents/skills/` should contain only skills that earn their place in the system prompt.
