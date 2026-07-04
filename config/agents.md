@@ -35,11 +35,12 @@ When given a task, follow this flow automatically. The workflow IS the skill rou
    - **You don't know what to build** (fog of war, loose idea) → `/wayfinder`.
    - **Design question answerable by building** → `prototype` (throwaway, answer the question, discard).
    - **Design question answerable by thinking** → `grill-with-docs` (relentless interview to stress-test the plan).
+   - **Need evidence from primary sources** → `research` or `octocode-research` skill (background agent, cited markdown).
    - Bug fix or small change → skip to step 4.
 4. **Build.** Implement following existing patterns. Don't over-engineer. Python → use `uv` (not pip/venv). LSP runs on every edit via pi-lens — fix type errors immediately.
 5. **Test.** Run relevant tests. No tests for changed code → write them (`tdd` skill: test first, see fail, implement, see pass). Tests fail → `diagnosing-bugs` skill (build feedback loop, root cause, not symptom).
 6. **Review.** Spawn reviewer subagent: "Use reviewer to review this diff." Critical code → `code-review` skill (parallel standards + spec). Receiving feedback → `receiving-code-review` skill (verify before implementing, push back if wrong). Architecture issues found → `improve-codebase-architecture` skill.
-7. **Verify + commit.** Before claiming done → `verification-before-completion` skill: run verification command, read full output, confirm. Evidence before claims. Then use `commit` skill for clean conventional commits.
+7. **Verify + commit.** Before claiming done → `verification-before-completion` skill: run verification command, read full output, confirm. Evidence before claims. Then use `commit` skill for clean conventional commits. Use `github` skill for PRs, issues, and CI via `gh` CLI.
 8. **Document.** Prevent unstructured docs — no random markdown files, no duplicating what the code says.
    - Durable gotcha/workflow change → update repo AGENTS.md.
    - Domain term resolved → update `CONTEXT.md` (`domain-modeling` skill).
@@ -54,11 +55,11 @@ Skip steps that don't apply. Don't ask permission for steps that do apply — ju
 
 ## Domain skills (auto-trigger from description)
 
-- **MongoDB** (8): `mongodb-schema-design`, `mongodb-search-and-ai`, `mongodb-query-optimizer`, `mongodb-connection`, `mongodb-mcp-setup`, `mongodb-natural-language-querying`, `mongodb-atlas-stream-processing`, `mongodb-mcp-cluster-per-project` — auto-trigger when working with MongoDB.
+- **MongoDB** (8): `mongodb-schema-design`, `mongodb-search-and-ai`, `mongodb-query-optimizer`, `mongodb-connection`, `mongodb-mcp-setup` (global first-time install), `mongodb-natural-language-querying`, `mongodb-atlas-stream-processing`, `mongodb-mcp-cluster-per-project` (per-project wiring) — auto-trigger when working with MongoDB.
 - **Vercel/React** (5): `vercel-react-best-practices`, `vercel-composition-patterns`, `deploy-to-vercel`, `vercel-optimize`, `web-design-guidelines` — auto-trigger when building React or deploying to Vercel.
 - **UI** (3): `frontend-design` (aesthetic direction), `impeccable` (UI quality/polish), `web-design-guidelines` (UI review) — auto-trigger when building or reviewing UI.
 - **Web** (8): `search`, `scrape`, `discover-api`, `data-feeds`, `live-research`, `agent-browser`, `rag-pipeline`, `brightdata-cli` — auto-trigger for web tasks. `bright-data-best-practices` is a model-invoked reference for BD APIs. Use `bdata` CLI, not MCP.
-- **Code research** (5): `octocode`, `octocode-research`, `octocode-brainstorming`, `octocode-rfc-generator`, `octocode-roast` — auto-trigger for evidence-first research, RFCs, or code critique.
+- **Code research** (5): `octocode` (CLI quick-reference), `octocode-research` (investigation workflow), `octocode-brainstorming` (evidence validation), `octocode-rfc-generator`, `octocode-roast` — auto-trigger for evidence-first research, RFCs, or code critique.
 - **User-invoked** (5): `/teach`, `/triage`, `/writing-great-skills`, `/setup-pre-commit`, `/wizard` (interactive setup for third-party services) — user types these explicitly.
 - **Internal reference** (2): `codebase-design` (module/interface vocabulary), `domain-modeling` (domain glossary) — auto-loaded by other skills (tdd, grill-with-docs, to-spec, improve-codebase-architecture).
 - **Auto-safety** (2): `git-guardrails-claude-code`, `resolving-merge-conflicts` — auto-trigger on git operations and merge conflicts.
@@ -75,6 +76,7 @@ Skip steps that don't apply. Don't ask permission for steps that do apply — ju
 Any time the project pulls in an external technology (framework, SDK, hosted service) you MUST validate latest-version APIs before writing code that uses it.
 
 Steps:
+
 1. Check installed version (`package.json`, `node_modules/<pkg>/package.json`).
 2. Validate against current docs: Pi uses `bdata search` + `bdata scrape`, or `npx octocode` for GitHub/npm.
 3. Run `find-skills` for that tech — if a skill exists (e.g. vercel-react-best-practices), use it.
