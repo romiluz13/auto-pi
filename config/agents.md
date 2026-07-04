@@ -72,7 +72,7 @@ Fan out for read-only work. Stay solo for write work. Context is everything — 
   - Always verify merge has no conflicts before proceeding.
 - **Safety rules:**
   - pi-rewind does NOT checkpoint subagent file changes — run `git status` after subagent writes to trigger a checkpoint.
-  - pi-intercom handles one pending ask at a time — don't fan out decision-needing subagents simultaneously.
+  - pi-intercom allows one pending outbound ask per session. Parent can receive multiple inbound asks from children — handle replies sequentially using `pending` + `reply`.
   - Always `wait()` for async workers to finish before launching reviewers.
 
 Default: fan out research, build solo, review in parallel.
@@ -86,8 +86,9 @@ If `/to-spec` or `/to-tickets` fails, configure the issue tracker first. Externa
 - **UI** (3): `frontend-design` (aesthetic direction), `impeccable` (UI quality/polish), `web-design-guidelines` (UI review) — auto-trigger when building or reviewing UI.
 - **Web** (8): `search`, `scrape`, `discover-api`, `data-feeds`, `live-research`, `agent-browser`, `rag-pipeline`, `brightdata-cli` — auto-trigger for web tasks. `bright-data-best-practices` is a model-invoked reference for BD APIs. Use `bdata` CLI, not MCP.
 - **Code research** (5): `octocode` (CLI quick-reference), `octocode-research` (investigation workflow), `octocode-brainstorming` (evidence validation), `octocode-rfc-generator`, `octocode-roast` — auto-trigger for evidence-first research, RFCs, or code critique.
-- **User-invoked** (6): `/teach`, `/triage`, `/writing-great-skills`, `/setup-pre-commit`, `/wizard` (interactive setup for third-party services), `/implement` (execution wrapper: drives TDD + code-review + commit) — user types these explicitly.
+- **User-invoked** (12 — `disable-model-invocation: true`, agent suggests, user types): `/teach`, `/triage`, `/writing-great-skills`, `/setup-pre-commit`, `/wizard` (interactive setup for third-party services), `/implement` (execution wrapper: drives TDD + code-review + commit), `/to-spec`, `/to-tickets`, `/grill-with-docs`, `/handoff`, `/improve-codebase-architecture`, `/compact-safe`.
 - **Internal reference** (2): `codebase-design` (module/interface vocabulary), `domain-modeling` (domain glossary) — auto-loaded by other skills (tdd, grill-with-docs, to-spec, improve-codebase-architecture).
+- **Python/OSS** (3): `uv` (use uv instead of pip/venv), `github` (gh CLI for issues/PRs/CI), `commit` (clean conventional commits) — auto-trigger for Python development and git operations.
 - **Auto-safety** (2): `git-guardrails-claude-code`, `resolving-merge-conflicts` — auto-trigger on git operations and merge conflicts.
 
 ## Working style
