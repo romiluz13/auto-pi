@@ -13,10 +13,13 @@ YELLOW="\033[0;33m"
 RED="\033[0;31m"
 RESET="\033[0m"
 
-info()  { echo -e "${GREEN}✓${RESET} $*"; }
-warn()  { echo -e "${YELLOW}⚠${RESET} $*"; }
-error() { echo -e "${RED}✗${RESET} $*" >&2; exit 1; }
-step()  { echo -e "\n${BOLD}→ $*${RESET}"; }
+info() { echo -e "${GREEN}✓${RESET} $*"; }
+warn() { echo -e "${YELLOW}⚠${RESET} $*"; }
+error() {
+	echo -e "${RED}✗${RESET} $*" >&2
+	exit 1
+}
+step() { echo -e "\n${BOLD}→ $*${RESET}"; }
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PI_AGENT_DIR="${HOME}/.pi/agent"
@@ -48,19 +51,19 @@ mkdir -p "$PI_AGENT_DIR"
 
 # Merge our settings into existing Pi settings (preserve provider/model)
 if [ -f "$PI_AGENT_DIR/settings.json" ]; then
-  cp "$PI_AGENT_DIR/settings.json" "$PI_AGENT_DIR/settings.json.bak.$(date +%s)"
-  # Keep existing provider/model, add our packages + thinking + compaction
-  existing=$(cat "$PI_AGENT_DIR/settings.json")
-  ours=$(cat "$SCRIPT_DIR/config/settings.json")
-  echo "$existing" | jq --argjson ours "$ours" '. + {
+	cp "$PI_AGENT_DIR/settings.json" "$PI_AGENT_DIR/settings.json.bak.$(date +%s)"
+	# Keep existing provider/model, add our packages + thinking + compaction
+	existing=$(cat "$PI_AGENT_DIR/settings.json")
+	ours=$(cat "$SCRIPT_DIR/config/settings.json")
+	echo "$existing" | jq --argjson ours "$ours" '. + {
     "defaultThinkingLevel": $ours.defaultThinkingLevel,
     "compaction": $ours.compaction,
     "theme": $ours.theme,
     "packages": $ours.packages
-  }' > /tmp/pi-settings-merged.json
-  mv /tmp/pi-settings-merged.json "$PI_AGENT_DIR/settings.json"
+  }' >/tmp/pi-settings-merged.json
+	mv /tmp/pi-settings-merged.json "$PI_AGENT_DIR/settings.json"
 else
-  cp "$SCRIPT_DIR/config/settings.json" "$PI_AGENT_DIR/settings.json"
+	cp "$SCRIPT_DIR/config/settings.json" "$PI_AGENT_DIR/settings.json"
 fi
 
 info "Pi settings configured"
@@ -70,21 +73,21 @@ info "Pi settings configured"
 step "Installing 10 Pi packages"
 
 PACKAGES=(
-  pi-hermes-memory
-  pi-subagents
-  pi-lens
-  pi-context-prune
-  @narumitw/pi-statusline
-  pi-intercom
-  pi-prompt-template-model
-  pi-btw
-  @juicesharp/rpiv-ask-user-question
-  pi-rewind
+	pi-hermes-memory
+	pi-subagents
+	pi-lens
+	pi-context-prune
+	@narumitw/pi-statusline
+	pi-intercom
+	pi-prompt-template-model
+	pi-btw
+	@juicesharp/rpiv-ask-user-question
+	pi-rewind
 )
 
 for pkg in "${PACKAGES[@]}"; do
-  echo "  installing $pkg..."
-  pi install "npm:$pkg" 2>&1 | tail -1
+	echo "  installing $pkg..."
+	pi install "npm:$pkg" 2>&1 | tail -1
 done
 
 # Rebuild better-sqlite3 for pi-hermes-memory
@@ -103,19 +106,19 @@ info "Context pruning enabled (agent-message mode)"
 # ── External CLIs ──────────────────────────────────────────────────────────
 
 if [ "$SKIP_CLI" = false ]; then
-  step "Installing external CLIs"
+	step "Installing external CLIs"
 
-  # Bright Data CLI
-  if ! command -v bdata >/dev/null 2>&1; then
-    echo "  installing bdata (Bright Data CLI)..."
-    npm install -g @brightdata/cli 2>&1 | tail -1
-    info "bdata installed — run 'bdata login' to authenticate (free, 5,000 credits/month)"
-  else
-    info "bdata already installed ($(bdata --version 2>/dev/null))"
-  fi
+	# Bright Data CLI
+	if ! command -v bdata >/dev/null 2>&1; then
+		echo "  installing bdata (Bright Data CLI)..."
+		npm install -g @brightdata/cli 2>&1 | tail -1
+		info "bdata installed — run 'bdata login' to authenticate (free, 5,000 credits/month)"
+	else
+		info "bdata already installed ($(bdata --version 2>/dev/null))"
+	fi
 
-  echo "  octocode available via 'npx octocode'"
-  info "Run 'npx octocode auth login' to authenticate with GitHub"
+	echo "  octocode available via 'npx octocode'"
+	info "Run 'npx octocode auth login' to authenticate with GitHub"
 fi
 
 # ── Skills ─────────────────────────────────────────────────────────────────
@@ -128,42 +131,42 @@ mkdir -p "$AGENTS_SKILLS_DIR" "$CLAUDE_SKILLS_DIR" "$PI_AGENT_DIR/skills"
 BD_SKILLS=(search scrape discover-api data-feeds live-research brightdata-cli)
 BD_REPO="${HOME}/.my-pi-sources/brightdata-skills"
 if [ ! -d "$BD_REPO" ]; then
-  mkdir -p "$(dirname "$BD_REPO")"
-  git clone --depth 1 https://github.com/brightdata/skills.git "$BD_REPO" 2>&1 | tail -1
+	mkdir -p "$(dirname "$BD_REPO")"
+	git clone --depth 1 https://github.com/brightdata/skills.git "$BD_REPO" 2>&1 | tail -1
 fi
 for skill in "${BD_SKILLS[@]}"; do
-  if [ -d "$BD_REPO/skills/$skill" ]; then
-    ln -sfn "$BD_REPO/skills/$skill" "$PI_AGENT_DIR/skills/$skill"
-  fi
+	if [ -d "$BD_REPO/skills/$skill" ]; then
+		ln -sfn "$BD_REPO/skills/$skill" "$PI_AGENT_DIR/skills/$skill"
+	fi
 done
 info "6 Bright Data skills installed"
 
 # Octocode skills (5)
 OC_SKILLS=(octocode octocode-research octocode-brainstorming octocode-rfc-generator octocode-roast)
 for skill in "${OC_SKILLS[@]}"; do
-  npx octocode skill --name "$skill" --platform pi 2>&1 | tail -1
-  npx octocode skill --name "$skill" --platform common 2>&1 | tail -1
+	npx octocode skill --name "$skill" --platform pi 2>&1 | tail -1
+	npx octocode skill --name "$skill" --platform common 2>&1 | tail -1
 done
 info "5 Octocode skills installed"
 
 # MongoDB skills (7 official from mongodb/agent-skills)
 MDB_REPO="${HOME}/.my-pi-sources/mongodb-agent-skills"
 if [ ! -d "$MDB_REPO" ]; then
-  mkdir -p "$(dirname "$MDB_REPO")"
-  git clone --depth 1 https://github.com/mongodb/agent-skills.git "$MDB_REPO" 2>&1 | tail -1
+	mkdir -p "$(dirname "$MDB_REPO")"
+	git clone --depth 1 https://github.com/mongodb/agent-skills.git "$MDB_REPO" 2>&1 | tail -1
 fi
 MDB_SKILLS=(mongodb-atlas-stream-processing mongodb-connection mongodb-mcp-setup mongodb-natural-language-querying mongodb-query-optimizer mongodb-schema-design mongodb-search-and-ai)
 for skill in "${MDB_SKILLS[@]}"; do
-  if [ -d "$MDB_REPO/skills/$skill" ]; then
-    cp -r "$MDB_REPO/skills/$skill" "$AGENTS_SKILLS_DIR/$skill"
-  fi
+	if [ -d "$MDB_REPO/skills/$skill" ]; then
+		cp -r "$MDB_REPO/skills/$skill" "$AGENTS_SKILLS_DIR/$skill"
+	fi
 done
 info "7 MongoDB skills installed"
 
 # Vercel skills (5 — react-best-practices, composition-patterns, deploy-to-vercel, web-design-guidelines, agent-browser)
 VC_SKILLS=(vercel-react-best-practices vercel-composition-patterns deploy-to-vercel web-design-guidelines)
 for skill in "${VC_SKILLS[@]}"; do
-  npx skills add vercel-labs/agent-skills --skill "$skill" -y 2>&1 | tail -1
+	npx skills add vercel-labs/agent-skills --skill "$skill" -y 2>&1 | tail -1
 done
 npx skills add vercel-labs/agent-browser --skill agent-browser -y 2>&1 | tail -1
 info "5 Vercel skills installed"
@@ -194,30 +197,30 @@ info "19 Matt Pocock skills installed"
 # Adapted Superpowers skills (3 — brainstorming, verification-before-completion, receiving-code-review)
 # These are bundled in the repo under skills/
 for skill in brainstorming verification-before-completion receiving-code-review; do
-  if [ -d "$SCRIPT_DIR/skills/$skill" ]; then
-    cp -r "$SCRIPT_DIR/skills/$skill" "$AGENTS_SKILLS_DIR/$skill"
-    ln -sfn "$AGENTS_SKILLS_DIR/$skill" "$CLAUDE_SKILLS_DIR/$skill"
-  fi
+	if [ -d "$SCRIPT_DIR/skills/$skill" ]; then
+		cp -r "$SCRIPT_DIR/skills/$skill" "$AGENTS_SKILLS_DIR/$skill"
+		ln -sfn "$AGENTS_SKILLS_DIR/$skill" "$CLAUDE_SKILLS_DIR/$skill"
+	fi
 done
 info "3 adapted Superpowers skills installed"
 
 # Python/OSS skills (3 — uv, github, commit from mitsuhiko/agent-stuff)
 MIT_REPO="${HOME}/.my-pi-sources/mitsuhiko-agent-stuff"
 if [ ! -d "$MIT_REPO" ]; then
-  mkdir -p "$(dirname "$MIT_REPO")"
-  git clone --depth 1 https://github.com/mitsuhiko/agent-stuff.git "$MIT_REPO" 2>&1 | tail -1
+	mkdir -p "$(dirname "$MIT_REPO")"
+	git clone --depth 1 https://github.com/mitsuhiko/agent-stuff.git "$MIT_REPO" 2>&1 | tail -1
 fi
 for skill in uv github commit; do
-  if [ -d "$MIT_REPO/skills/$skill" ]; then
-    cp -r "$MIT_REPO/skills/$skill" "$AGENTS_SKILLS_DIR/$skill"
-  fi
+	if [ -d "$MIT_REPO/skills/$skill" ]; then
+		cp -r "$MIT_REPO/skills/$skill" "$AGENTS_SKILLS_DIR/$skill"
+	fi
 done
 info "3 Python/OSS skills installed"
 
 # Link shared skills to Claude Code
 for skill in "$AGENTS_SKILLS_DIR"/*; do
-  name=$(basename "$skill")
-  ln -sfn "$skill" "$CLAUDE_SKILLS_DIR/$name"
+	name=$(basename "$skill")
+	ln -sfn "$skill" "$CLAUDE_SKILLS_DIR/$name"
 done
 info "All skills linked to Claude Code"
 
@@ -229,11 +232,11 @@ AI_DIR="${HOME}/.ai"
 mkdir -p "$AI_DIR"
 
 if [ -f "$AI_DIR/AGENTS.md" ]; then
-  cp "$AI_DIR/AGENTS.md" "$AI_DIR/AGENTS.md.bak.$(date +%s)"
-  warn "Existing AGENTS.md backed up — review and merge manually"
+	cp "$AI_DIR/AGENTS.md" "$AI_DIR/AGENTS.md.bak.$(date +%s)"
+	warn "Existing AGENTS.md backed up — review and merge manually"
 else
-  cp "$SCRIPT_DIR/config/agents.md" "$AI_DIR/AGENTS.md"
-  info "Global AGENTS.md installed"
+	cp "$SCRIPT_DIR/config/agents.md" "$AI_DIR/AGENTS.md"
+	info "Global AGENTS.md installed"
 fi
 
 # Create symlinks so all agents load the same brain
@@ -250,15 +253,15 @@ info "Codex: ~/.codex/AGENTS.md symlink created"
 # Claude Code uses @import in ~/.claude/CLAUDE.md
 mkdir -p "${HOME}/.claude"
 if [ -f "${HOME}/.claude/CLAUDE.md" ]; then
-  if ! grep -q "@~/.ai/AGENTS.md" "${HOME}/.claude/CLAUDE.md" 2>/dev/null; then
-    echo "@~/.ai/AGENTS.md" >> "${HOME}/.claude/CLAUDE.md"
-    info "Claude Code: @import added to CLAUDE.md"
-  else
-    info "Claude Code: @import already present"
-  fi
+	if ! grep -q "@~/.ai/AGENTS.md" "${HOME}/.claude/CLAUDE.md" 2>/dev/null; then
+		echo "@~/.ai/AGENTS.md" >>"${HOME}/.claude/CLAUDE.md"
+		info "Claude Code: @import added to CLAUDE.md"
+	else
+		info "Claude Code: @import already present"
+	fi
 else
-  echo "@~/.ai/AGENTS.md" > "${HOME}/.claude/CLAUDE.md"
-  info "Claude Code: CLAUDE.md created with @import"
+	echo "@~/.ai/AGENTS.md" >"${HOME}/.claude/CLAUDE.md"
+	info "Claude Code: CLAUDE.md created with @import"
 fi
 
 # ── Done ───────────────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
   "showPruneStatusLine": true,
   "summarizerModel": "default",
   "summarizerThinking": "default",
-  "pruneOn": "agent-message",
+  "pruneOn": "agentic-auto",
   "remindUnprunedCount": true,
   "batchingMode": "turn"
 }
