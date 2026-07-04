@@ -264,6 +264,18 @@ else
 	info "Claude Code: CLAUDE.md created with @import"
 fi
 
+# ── Prompt Templates ───────────────────────────────────────────────────────
+
+step "Installing prompt templates"
+
+mkdir -p "${HOME}/.pi/agent/prompts"
+for template in "$SCRIPT_DIR"/config/prompts/*.md; do
+	if [ -f "$template" ]; then
+		cp "$template" "${HOME}/.pi/agent/prompts/"
+	fi
+done
+info "8 prompt templates installed (/plan, /build, /review, /debug, /research, /ship, /feature, /fix)"
+
 # ── Done ───────────────────────────────────────────────────────────────────
 
 echo -e "\n${BOLD}${GREEN}✓ my-pi setup complete!${RESET}\n"
