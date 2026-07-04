@@ -264,6 +264,18 @@ else
 	info "Claude Code: CLAUDE.md created with @import"
 fi
 
+# ── Models config (compat fix for Grove) ───────────────────────────────────
+
+step "Installing models config (Grove compat fix)"
+
+if [ -f "$SCRIPT_DIR/config/models.json" ]; then
+  if [ -f "${HOME}/.pi/agent/models.json" ]; then
+    cp "${HOME}/.pi/agent/models.json" "${HOME}/.pi/agent/models.json.bak.$(date +%s)"
+  fi
+  cp "$SCRIPT_DIR/config/models.json" "${HOME}/.pi/agent/models.json"
+  info "models.json installed (supportsDeveloperRole: false for Grove)"
+fi
+
 # ── Prompt Templates ───────────────────────────────────────────────────────
 
 step "Installing prompt templates"

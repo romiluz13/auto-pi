@@ -1,0 +1,496 @@
+{
+  "providers": {
+    "grove": {
+      "name": "Grove (Anthropic)",
+      "baseUrl": "https://grove-gateway-prod.azure-api.net/grove-foundry-prod/anthropic",
+      "apiKey": "$GROVE_API_KEY",
+      "api": "anthropic-messages",
+      "headers": {
+        "api-key": "$GROVE_API_KEY"
+      },
+      "models": [
+        {
+          "id": "claude-fable-5",
+          "name": "Fable 5 (Grove)",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1000000,
+          "maxTokens": 128000,
+          "cost": {
+            "input": 10.00,
+            "output": 50.00,
+            "cacheRead": 1.00,
+            "cacheWrite": 12.50
+          },
+          "compat": {
+            "forceAdaptiveThinking": true
+          }
+        },
+        {
+          "id": "claude-sonnet-5",
+          "name": "Sonnet 5 (Grove)",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1000000,
+          "maxTokens": 64000,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "compat": {
+            "forceAdaptiveThinking": true
+          }
+        },
+        {
+          "id": "claude-opus-4-8",
+          "name": "Opus 4.8 (Grove)",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1000000,
+          "maxTokens": 128000,
+          "cost": {
+            "input": 5.00,
+            "output": 25.00,
+            "cacheRead": 0.50,
+            "cacheWrite": 6.25
+          },
+          "compat": {
+            "forceAdaptiveThinking": true
+          }
+        }
+      ]
+    },
+    "grove-openai": {
+      "name": "Grove (OpenAI)",
+      "baseUrl": "https://grove-gateway-prod.azure-api.net/grove-foundry-prod/openai/v1",
+      "apiKey": "$GROVE_API_KEY",
+      "api": "openai-completions",
+      "headers": {
+        "api-key": "$GROVE_API_KEY"
+      },
+      "models": [
+        {
+          "id": "gpt-4.1",
+          "name": "GPT-4.1 (Grove)",
+          "reasoning": false,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1047576,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 1.48,
+            "output": 5.92,
+            "cacheRead": 0.37,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "gpt-4.1-mini",
+          "name": "GPT-4.1 Mini (Grove)",
+          "reasoning": false,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1047576,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.296,
+            "output": 1.184,
+            "cacheRead": 0.074,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "gpt-4.1-nano",
+          "name": "GPT-4.1 Nano (Grove)",
+          "reasoning": false,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1047576,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.074,
+            "output": 0.296,
+            "cacheRead": 0.0185,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "gpt-4o",
+          "name": "GPT-4o (Grove)",
+          "reasoning": false,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "cost": {
+            "input": 2.035,
+            "output": 8.14,
+            "cacheRead": 0.925,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "gpt-4o-mini",
+          "name": "GPT-4o Mini (Grove)",
+          "reasoning": false,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "cost": {
+            "input": 0.1221,
+            "output": 0.4884,
+            "cacheRead": 0.0555,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "grok-4.3",
+          "name": "Grok 4.3 (Grove)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 1000000,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "grok-code-fast-1",
+          "name": "Grok Code Fast 1 (Grove)",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 131072,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.148,
+            "output": 1.11,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "kimi-k2.6",
+          "name": "Kimi K2.6 (Grove)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 262144,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.703,
+            "output": 2.96,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "kimi-k2.5",
+          "name": "Kimi K2.5 (Grove)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 262144,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.444,
+            "output": 2.22,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "kimi-k2-thinking",
+          "name": "Kimi K2 Thinking (Grove)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 262144,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.444,
+            "output": 1.85,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "deepseek-v4-flash",
+          "name": "DeepSeek V4 Flash (Grove)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.1036,
+            "output": 0.2072,
+            "cacheRead": 0.0021,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "deepseek-v3.2",
+          "name": "DeepSeek V3.2 (Grove)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 131072,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.4292,
+            "output": 1.2432,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "deepseek-v3.2-speciale",
+          "name": "DeepSeek V3.2 Speciale (Grove)",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 131072,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.4292,
+            "output": 1.2432,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "mistral-medium-2505",
+          "name": "Mistral Medium 2505 (Grove)",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 131072,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.296,
+            "output": 1.48,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "mistral-small-2503",
+          "name": "Mistral Small 2503 (Grove)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 262144,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.074,
+            "output": 0.222,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "llama-4-maverick-17b-128e-instruct-fp8",
+          "name": "Llama 4 Maverick (Grove)",
+          "reasoning": false,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 1.0434,
+            "output": 0.259,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "llama-4-scout-17b-16e-instruct",
+          "name": "Llama 4 Scout (Grove)",
+          "reasoning": false,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 10000000,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.148,
+            "output": 0.5772,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "phi-4-reasoning",
+          "name": "Phi-4 Reasoning (Grove)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 16384,
+          "maxTokens": 8192,
+          "cost": {
+            "input": 0.0925,
+            "output": 0.37,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "phi-4-mini-instruct",
+          "name": "Phi-4 Mini Instruct (Grove)",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 16384,
+          "maxTokens": 8192,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "phi-4-mini-reasoning",
+          "name": "Phi-4 Mini Reasoning (Grove)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 16384,
+          "maxTokens": 8192,
+          "cost": {
+            "input": 0.0592,
+            "output": 0.2368,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "FW-GLM-5.2",
+          "name": "GLM 5.2 Fireworks (Grove)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 1.1396,
+            "output": 3.5816,
+            "cacheRead": 0.114,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "FW-GLM-5.1",
+          "name": "GLM 5.1 Fireworks (Grove)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 202752,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 1.1396,
+            "output": 3.5816,
+            "cacheRead": 0.2116,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "FW-MiniMax-M2.5",
+          "name": "MiniMax M2.5 Fireworks (Grove)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 204800,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.2442,
+            "output": 0.9768,
+            "cacheRead": 0.0222,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "FW-Kimi-K2.6",
+          "name": "Kimi K2.6 Fireworks (Grove)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 262144,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.7733,
+            "output": 3.256,
+            "cacheRead": 0.1302,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "FW-DeepSeek-V4-Pro",
+          "name": "DeepSeek V4 Pro Fireworks (Grove)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 1.4164,
+            "output": 2.8327,
+            "cacheRead": 0.118,
+            "cacheWrite": 0
+          }
+        }
+      ],
+      "compat": {
+        "supportsDeveloperRole": false
+      }
+    }
+  }
+}
