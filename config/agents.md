@@ -115,6 +115,6 @@ Skip only for: pure utility libs with stable APIs (date-fns, zod, lodash). When 
 
 ## Hygiene
 
-- Monthly: review memory, prune stale entries. Check `bdata zones` for credit usage.
+- Memory: two layers — `pi-hermes-memory` (cross-session, SQLite FTS5) + `pi-observational-memory` (within-session, survives compaction). Monthly: review both, prune stale entries. Check `bdata zones` for credit usage.
 - Memory hygiene: if memory contradicts current code, trust the code.
 - `~/.agents/skills/` should contain only skills that earn their place in the system prompt.

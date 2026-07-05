@@ -14,6 +14,7 @@
     "npm:pi-hermes-memory",
     "npm:pi-intercom",
     "npm:pi-lens",
+    "npm:pi-observational-memory",
     "npm:pi-prompt-template-model",
     "npm:pi-rewind",
     "npm:pi-subagents",
