@@ -26,7 +26,7 @@ When given a task, follow this flow automatically. The workflow IS the skill rou
    - **Need evidence from primary sources** → `research` or `octocode-research` skill (background agent, cited markdown — 3+ independent sources agree → stop, max 6 calls per round).
    - Read pre-existing ADRs (`docs/adr/`) as SETTLED constraints — if the plan contradicts one, FLAG it, don't silently override.
    - Bug fix or small change → skip to step 4.
-4. **Build.** Use `/implement` as the execution wrapper (drives TDD + code-review + commit). Follow existing patterns. Don't over-engineer. Python → use `uv` (not pip/venv). Fix type/LSP errors immediately when detected.
+4. **Build.** Use `/build` (TDD) or `/feature` (full chain: plan→build→review→ship) as the execution wrapper. Follow existing patterns. Don't over-engineer. Python → use `uv` (not pip/venv). Fix type/LSP errors immediately when detected.
 5. **Test.** Run relevant tests. No tests for changed code → write them (`tdd` skill: test first, see fail, implement, see pass). Exit 1 from import/syntax error is NOT a real RED — a genuine RED is a behavioral failure. Tests fail → `diagnosing-bugs` skill (build feedback loop, root cause, not symptom) → fix → return to step 5. No hypothesis without a repro loop — build one first (failing test → curl → CLI diff → headless browser → trace replay → throwaway harness → fuzz → git bisect → differential → human last). If no loop can be built, STOP — return BLOCKED. Generate 3-5 ranked hypotheses before testing any. Never simplify away a safety check during refactoring — verify it's dead code with a test first.
 6. **Review.** Fan out 2-3 reviewer subagents with different focuses (standards, spec, security). Give reviewers fresh context — only the diff, not the builder's reasoning (anti-anchored review). Before dispatching, grep your own drafted prompt for bias phrases ("do not flag", "should be fine", "no need to check") — if found, rewrite. An APPROVE with zero findings AND <3 file:line citations is a rubber stamp — trigger fallback verification. Critical code → `code-review` skill. Receiving feedback → `receiving-code-review` skill (verify before implementing, push back if wrong). Grep changed files for swallowed errors: empty catches, discarded promises, TODO/FIXME, debug logging left in. Architecture issues → `improve-codebase-architecture` skill → return to step 4.
 7. **Verify + commit.** You are an independent auditor — a passing test or green build is never sufficient by itself. Before verifying, list every claim from prior steps, mark each UNVERIFIED, then independently check each. Before claiming done → `verification-before-completion` skill: run the project's test/lint/typecheck command, read full output, confirm. Then use `commit` skill for clean conventional commits. Use `github` skill for PRs, issues, and CI via `gh` CLI. CI fails → `diagnosing-bugs` → fix → return to step 5.
@@ -122,3 +122,14 @@ Skip only for: pure utility libs with stable APIs (date-fns, zod, lodash). When 
 - Memory: two layers — `pi-hermes-memory` (cross-session, SQLite FTS5) + `pi-observational-memory` (within-session, survives compaction). Monthly: review both, prune stale entries. Check `bdata zones` for credit usage.
 - Memory hygiene: if memory contradicts current code, trust the code.
 - `~/.agents/skills/` should contain only skills that earn their place in the system prompt.
+
+## Slash commands (the user interface)
+
+- `/feature "<desc>"` — full chain: plan → build → review → ship (autonomous end-to-end)
+- `/fix "<desc>"` — full chain: debug → build → review → ship (autonomous end-to-end)
+- `/plan "<desc>"` — brainstorm + design + spec + tickets
+- `/build "<desc>"` — TDD: test first, see fail, implement, see pass
+- `/debug "<desc>"` — build feedback loop, find root cause, fix
+- `/review` — parallel reviewers on current diff, anti-anchored
+- `/ship` — verify with evidence, commit, document
+- `/research "<topic>"` — parallel fan-out across web, GitHub, codebase
