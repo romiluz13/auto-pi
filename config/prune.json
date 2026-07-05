@@ -1,9 +1,0 @@
-{
-  "enabled": true,
-  "showPruneStatusLine": true,
-  "summarizerModel": "default",
-  "summarizerThinking": "default",
-  "pruneOn": "agentic-auto",
-  "remindUnprunedCount": true,
-  "batchingMode": "turn"
-}

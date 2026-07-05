@@ -22,7 +22,7 @@ A curated, reproducible Pi coding agent setup built on three principles:
 | pi-hermes-memory | Persistent memory, session search, learns from corrections |
 | pi-subagents | Delegate to child agents — review, scout, parallel work |
 | pi-lens | LSP diagnostics, linters, formatters on every edit |
-| pi-context-prune | Summarize old tool outputs → token savings |
+| @hypabolic/pi-hypa | Summarize old tool outputs → token savings |
 | @narumitw/pi-statusline | Model, tokens, cost, git branch in status bar |
 | pi-intercom | Subagents can ask parent session when blocked |
 | pi-prompt-template-model | `/build` → auto-switch model+skills → restore |
@@ -137,7 +137,7 @@ my-pi/
 ├── config/
 │   ├── settings.json       Pi settings (10 packages, high thinking, tuned compaction)
 │   ├── agents.md           Global AGENTS.md with 10-step autonomous workflow (real file)
-│   └── prune.json          pi-context-prune config
+│   └── models.json         Grove provider compat config
 ├── scripts/
 │   ├── install.sh          One-command installer (packages + CLIs + skills + AGENTS.md + symlinks)
 │   └── update.sh           Update all packages + skills

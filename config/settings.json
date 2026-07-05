@@ -7,44 +7,16 @@
   },
   "theme": "dark",
   "packages": [
-    "npm:pi-hermes-memory",
-    "npm:pi-subagents",
-    "npm:pi-lens",
-    "npm:pi-context-prune",
-    "npm:@narumitw/pi-statusline",
-    "npm:pi-intercom",
-    "npm:pi-prompt-template-model",
-    "npm:pi-btw",
+    "npm:@hypabolic/pi-hypa",
     "npm:@juicesharp/rpiv-ask-user-question",
-    "npm:pi-rewind"
+    "npm:@narumitw/pi-statusline",
+    "npm:pi-btw",
+    "npm:pi-hermes-memory",
+    "npm:pi-intercom",
+    "npm:pi-lens",
+    "npm:pi-prompt-template-model",
+    "npm:pi-rewind",
+    "npm:pi-subagents"
   ],
-  "defaultProjectTrust": "always",
-  "subagents": {
-    "agentOverrides": {
-      "worker": {
-        "thinking": "xhigh"
-      },
-      "planner": {
-        "thinking": "xhigh"
-      },
-      "oracle": {
-        "thinking": "xhigh"
-      },
-      "reviewer": {
-        "thinking": "xhigh"
-      },
-      "researcher": {
-        "thinking": "xhigh"
-      },
-      "context-builder": {
-        "thinking": "xhigh"
-      },
-      "scout": {
-        "thinking": "xhigh"
-      },
-      "delegate": {
-        "thinking": "xhigh"
-      }
-    }
-  }
+  "defaultProjectTrust": "always"
 }
