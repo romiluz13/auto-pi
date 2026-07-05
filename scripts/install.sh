@@ -95,5 +95,21 @@ step "Rebuilding native modules"
 (cd "$PI_AGENT_DIR/npm" && npm rebuild better-sqlite3 2>&1 | tail -1) || warn "better-sqlite3 rebuild failed — may need manual fix"
 info "Native modules rebuilt"
 
-# ── Context prune config ───────────────────────────────────────────────────
+# ── Web Search Config (pi-web-access) ───────────────────────────────────────
+
+step "Configuring web search (pi-web-access)"
+
+if [ ! -f "${HOME}/.pi/web-search.json" ]; then
+  cat > "${HOME}/.pi/web-search.json" << 'WSEOF'
+{
+  "provider": "brave",
+  "workflow": "summary-review"
+}
+WSEOF
+  info "Created ~/.pi/web-search.json (add your API keys: braveApiKey, tavilyApiKey, geminiApiKey)"
+else
+  info "web-search.json already exists — keeping your keys"
+fi
+
+# ── Done ───────────────────────────────────────────────────────────────────
 

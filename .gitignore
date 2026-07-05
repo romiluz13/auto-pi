@@ -2,3 +2,5 @@ node_modules/
 *.log
 .DS_Store
 .my-pi-sources/
+.pi/web-search.json
+web-search.json
