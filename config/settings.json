@@ -16,7 +16,8 @@
     "npm:pi-lens",
     "npm:pi-prompt-template-model",
     "npm:pi-rewind",
-    "npm:pi-subagents"
+    "npm:pi-subagents",
+    "npm:pi-web-access"
   ],
   "defaultProjectTrust": "always"
 }
