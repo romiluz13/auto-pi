@@ -2,8 +2,8 @@
   "defaultThinkingLevel": "xhigh",
   "compaction": {
     "enabled": true,
-    "reserveTokens": 16384,
-    "keepRecentTokens": 30000
+    "reserveTokens": 629146,
+    "keepRecentTokens": 50000
   },
   "theme": "dark",
   "packages": [
