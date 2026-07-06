@@ -1,9 +1,18 @@
 {
-  "defaultThinkingLevel": "xhigh",
-  "compaction": {
+  "npmCommand": [
+    "mise",
+    "exec",
+    "node@24",
+    "--",
+    "npm"
+  ],
+  "lastChangelogVersion": "0.80.3",
+  "defaultProvider": "grove-openai",
+  "defaultModel": "FW-GLM-5.2",
+  "retry": {
     "enabled": true,
-    "reserveTokens": 629146,
-    "keepRecentTokens": 50000
+    "maxRetries": 10,
+    "baseDelayMs": 2000
   },
   "theme": "dark",
   "packages": [
@@ -20,5 +29,39 @@
     "npm:pi-subagents",
     "npm:pi-web-access"
   ],
+  "defaultThinkingLevel": "xhigh",
+  "subagents": {
+    "agentOverrides": {
+      "worker": {
+        "thinking": "xhigh"
+      },
+      "planner": {
+        "thinking": "xhigh"
+      },
+      "oracle": {
+        "thinking": "xhigh"
+      },
+      "reviewer": {
+        "thinking": "xhigh"
+      },
+      "researcher": {
+        "thinking": "xhigh"
+      },
+      "context-builder": {
+        "thinking": "xhigh"
+      },
+      "scout": {
+        "thinking": "xhigh"
+      },
+      "delegate": {
+        "thinking": "xhigh"
+      }
+    }
+  },
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 629146,
+    "keepRecentTokens": 50000
+  },
   "defaultProjectTrust": "always"
 }
