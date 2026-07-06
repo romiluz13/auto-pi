@@ -88,6 +88,26 @@ retried turn). Plus `session_compact` audit + `/guardrails on|off|test`.
 - **Research basis:** arXiv 2507.11538 (IFScale — density decay, primacy),
   claude-code#7777 (model admits rules are advisory), community consensus.
 
+### `coach.ts` — the system comes to you (auto-coach)
+
+Solves the adoption problem: "I can't remember all the commands."
+You type a task in plain English. Before the agent runs, Coach classifies it
+(build / debug / plan / research / review / ship / trivial) and shows a
+one-tap suggestion of the right workflow. You press Enter to accept — Coach
+transforms your input into the matching slash command. You never have to
+remember /loop, /feature, /research — Coach tells you which fits THIS task.
+
+- **Trigger:** automatic — intercepts every user input via the `input` event.
+  Skip with: prefix `!` (raw) or `/` (already a command). `/coach on|off|test`.
+- **Harmony contract:** owns NO axis, registers NO tools, hooks NO tool_call,
+  NO before_agent_start. The `input` event is NOT used by any installed
+  package or other extension — it's a free axis. Skips `source:"extension"`
+  messages so it never interferes with loop steering or hermes background work.
+  Trivial tasks pass through untouched (zero friction for the common case).
+- **Why this exists:** a system you don't use is worth zero. 8 slash commands +
+  4 extension triggers is past the human instruction ceiling. Coach inverts
+  the interface — the system surfaces the command, you don't recall it.
+
 ## Harmony guardrails (for any future extension added here)
 
 1. **One moving part per axis.** Each capability axis already has an owner
