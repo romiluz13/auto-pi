@@ -30,7 +30,7 @@ SKIP_CLI=false
 [[ "${1:-}" == "--skip-cli" ]] && SKIP_CLI=true
 
 echo -e "${BOLD}my-pi installer${RESET}"
-echo -e "The best Pi coding agent setup — 12 packages, 60 skills, autonomous workflow.\n"
+echo -e "The best Pi coding agent setup — 12 packages, 60 skills, 2 custom extensions, autonomous workflow.\n"
 
 # ── Prerequisites ──────────────────────────────────────────────────────────
 
@@ -114,5 +114,20 @@ WSEOF
 else
 	info "web-search.json already exists — keeping your keys"
 fi
+
+# ── Custom Extensions ─────────────────────────────────────────────────────
+
+step "Installing custom extensions (palette + handoff)"
+
+mkdir -p "$PI_AGENT_DIR/extensions"
+for ext in "$SCRIPT_DIR"/extensions/*.ts; do
+	[ -f "$ext" ] || continue
+	name=$(basename "$ext")
+	cp "$ext" "$PI_AGENT_DIR/extensions/$name"
+	echo "  installed extension: $name"
+done
+# Copy the extensions README (documentation, not code)
+[ -f "$SCRIPT_DIR/extensions/README.md" ] && cp "$SCRIPT_DIR/extensions/README.md" "$PI_AGENT_DIR/extensions/README.md"
+info "Custom extensions installed — /reload in Pi to activate (Ctrl+Shift+P for palette, /handoff for session handoff)"
 
 # ── Done ───────────────────────────────────────────────────────────────────
