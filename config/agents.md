@@ -129,7 +129,16 @@ Skip only for: pure utility libs with stable APIs (date-fns, zod, lodash). When 
 - Memory hygiene: if memory contradicts current code, trust the code.
 - `~/.agents/skills/` should contain only skills that earn their place in the system prompt.
 
-## Slash commands (the user interface)
+## Pi harness (non-obvious infrastructure — don't reinvent what these do)
+
+- **Coach** (`coach.ts`): the DEFAULT user interface. The user types a task in plain English; Coach classifies it and suggests the workflow (/loop, /research, /review, /ship, or "just do it"). The user rarely types a slash command directly. Don't second-guess a steered input — it was routed intentionally.
+- **`/loop "<task>"`** (loop engine): for hard/multi-phase tasks. Bounded (cap 3), plateau-aware, independent verifier convergence (santa, `--cross-model`), test-honesty gates, reconciliation over assertion. Durable state at `~/.pi/workflows/`. Prefer it over `/feature` when the task has separable concerns or a contract.
+- **Context sidecar** (`@spences10/pi-context`): oversized tool output (>24KB/300 lines) is stored in SQLite, a receipt is returned in-context. Retrieve with `context_search` / `context_get` — don't re-run the expensive command.
+- **Guardrails** (`guardrails.ts`): AGENTS.md rules are re-injected every turn (prominence + compaction-survival). If you skipped them before, follow them now — they didn't go away.
+- **Destructive-command gate** (`@spences10/pi-confirm-destructive`): the SYSTEM confirms destructive ops (rm unrecoverable, git reset --hard, destructive SQL). You don't need to ask — it will prompt. Still: state destructive intent before running.
+- **Observability** (`/observability`): live browser dashboard at `127.0.0.1:43190` — for the user to watch, not for you to drive.
+
+## Slash commands (power-user shortcuts — Coach suggests these; you don't memorize them)
 
 - `/feature "<desc>"` — full chain: plan → build → review → ship (autonomous end-to-end)
 - `/fix "<desc>"` — full chain: debug → build → review → ship (autonomous end-to-end)
