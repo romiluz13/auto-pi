@@ -1,6 +1,6 @@
 # my-pi
 
-**The best Pi coding agent setup — 12 packages, 54 skills, 8 slash commands, 5 custom extensions (incl. coach + loop engine + guardrails), 10-step autonomous workflow. You never have to remember a command — Coach suggests the right one. Zero bloat, pure Pi ideology.**
+**The best Pi coding agent setup — 15 packages, 54 skills, 8 slash commands, 5 custom extensions (incl. coach + loop engine + guardrails), 10-step autonomous workflow. You never have to remember a command — Coach suggests the right one. Zero bloat, pure Pi ideology.**
 
 [![Pi](https://img.shields.io/badge/Pi-v0.80+-blue.svg)](https://pi.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -75,7 +75,7 @@ Every task flows through these steps automatically. The workflow IS the skill ro
 
 ---
 
-## 12 Pi Packages
+## 15 Pi Packages
 
 Every package earns its slot. No duplicates, no bloat.
 
@@ -93,6 +93,9 @@ Every package earns its slot. No duplicates, no bloat.
 | @juicesharp/rpiv-ask-user-question | Structured clarifying questions instead of guessing |
 | pi-rewind | `/rewind` — checkpoint browser, diff preview, redo stack |
 | pi-web-access | `web_search` + `fetch_content` tools — YouTube transcripts, PDFs, video analysis |
+| @spences10/pi-confirm-destructive | Git-aware confirmation layer for destructive ops (rm unrecoverable, git reset --hard, destructive SQL, disk tools). Placed BEFORE pi-hypa so it sees the original command. Aligns with AGENTS.md Safety section. |
+| @spences10/pi-context | SQLite FTS sidecar for oversized tool output (>24KB/300 lines) — stores out-of-context, returns a receipt, retrievable via `context_search`/`context_get`. Complements pi-hypa (compresses in-context; pi-context stores out-of-context). |
+| @spences10/pi-observability | Live local browser dashboard (port 43190) + SSE event stream. Read-only forwarder — never mutates agent state, never touches the footer (pi-statusline owns it), never spawns LSP (pi-lens owns it), redacts secrets before streaming. `/observability` to open. |
 
 ### Two Memory Layers (structural advantage)
 
@@ -213,10 +216,16 @@ Loaded automatically by installed packages.
 | MCP bridge / pi-mcp-adapter | CLI + skills is the Pi way — no subprocess bloat |
 | @octocodeai/pi-extension | Conflicts with 6 of our packages (duplicate tools) |
 | Superpowers (as package) | Bootstrap injection overrides AGENTS.md workflow — took only 3 unique skills |
-| pi-permission-system | Pi trusts the agent — no permission popups |
 | monopi | Bundle installer — we curated individually |
 | pi-simplify | code-review skill + subagents cover this |
 | rpiv-todo | Pi intentionally has no todos |
+| @spences10/pi-team-mode | Conflicts with pi-intercom (second message bus — broker.sock). We keep intercom. |
+| @spences10/pi-redact | Redundant — pi-hermes-memory secret-scans on input, pi-observability redacts on stream. Covered. |
+| OpenRouter Fusion | We have santa-method cross-model in the loop engine (--cross-model). Don't double up. |
+
+### What we adopted from spences10/my-pi (after 3-reviewer conflict audit)
+
+Adopted (new axes, zero conflict, read the code first): `@spences10/pi-confirm-destructive` (destructive-command gate, aligns with AGENTS.md Safety), `@spences10/pi-context` (oversized-output SQLite sidecar, complements pi-hypa), `@spences10/pi-observability` (read-only browser dashboard). Full audit with file:line evidence in `docs/audits/`.
 | GBrain | Personal knowledge brain, not coding, MCP-based |
 | octocode-awareness | Claude Code hooks, conflicts with pi-hermes-memory |
 | 15 bloat skills | Non-coding, one-time, deprecated, or redundant |

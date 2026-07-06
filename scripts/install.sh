@@ -30,7 +30,7 @@ SKIP_CLI=false
 [[ "${1:-}" == "--skip-cli" ]] && SKIP_CLI=true
 
 echo -e "${BOLD}my-pi installer${RESET}"
-echo -e "The best Pi coding agent setup — 12 packages, 60 skills, 5 custom extensions (incl. coach + loop engine + guardrails), autonomous workflow.\n"
+echo -e "The best Pi coding agent setup — 15 packages, 60 skills, 5 custom extensions (incl. coach + loop engine + guardrails), autonomous workflow.\n"
 
 # ── Prerequisites ──────────────────────────────────────────────────────────
 
@@ -72,12 +72,18 @@ info "Pi settings configured"
 
 # ── Packages ───────────────────────────────────────────────────────────────
 
-step "Installing 12 Pi packages"
+step "Installing 15 Pi packages"
 
+# Order matters: confirm-destructive must run BEFORE pi-hypa so it sees
+# the original bash command (not hypa's rewritten form). pi-context must
+# run BEFORE pi-lens so large-output receipts don't replace lens diagnostics.
 PACKAGES=(
+	@spences10/pi-confirm-destructive
+	@spences10/pi-context
 	pi-hermes-memory
 	pi-observational-memory
 	pi-subagents
+	@spences10/pi-observability
 	pi-lens
 	@hypabolic/pi-hypa
 	@narumitw/pi-statusline
