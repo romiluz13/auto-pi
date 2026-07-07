@@ -43,12 +43,16 @@ type Intent =
 	| "orient" // understand existing code — NO changes, answer inline
 	| "trivial" // short, no action — just do it
 	| "build-trivial" // 1-2 files, single change — just do it (no loop)
-	| "build" // multi-file / cross-module — /loop
-	| "debug" // diagnosis IS the deliverable — /loop (debug)
-	| "plan" // design question — /loop (plan phase first)
+	| "build" // multi-file / cross-module — /feature (native chain), /loop alt
+	| "debug" // diagnosis IS the deliverable — /fix (native chain), /loop alt
+	| "plan" // design question — /plan (brainstorm+spec), /loop alt
 	| "research" // needs evidence — /research
 	| "review" // advisory only — /review
-	| "ship"; // commit/pr — /ship
+	| "ship" // commit/pr — /ship
+	| "refactor" // improve structure — /improve-codebase-architecture
+	| "teach" // teach the agent — /teach
+	| "handoff" // continue elsewhere — /handoff
+	| "setup"; // configure tooling — /wizard
 
 interface Classification {
 	intent: Intent;
@@ -58,27 +62,45 @@ interface Classification {
 function classify(text: string): Classification {
 	const t = text.toLowerCase().trim();
 	const words = t.split(/\s+/);
-	const changeAhead = /and then|then (build|fix|add|implement|change|update|create)/.test(t);
-	const buildVerb = /\b(build|add|implement|create|update|make|generate|set up|setup|integrate|migrate|support|enable|wire up|write|refactor|fix|redesign|restructure)\b/.test(t);
-	const debugVerb = /\b(debug|bug|broken|failing|fails?\s+to|crash|regression|diagnos|throws|exception|stacktrace|why is .* not working|doesn't work|not working)\b/.test(t);
+	const changeAhead =
+		/and then|then (build|fix|add|implement|change|update|create)/.test(t);
+	const buildVerb =
+		/\b(build|add|implement|create|update|make|generate|set up|setup|integrate|migrate|support|enable|wire up|write|refactor|fix|redesign|restructure)\b/.test(
+			t,
+		);
+	const debugVerb =
+		/\b(debug|bug|broken|failing|fails?\s+to|crash|regression|diagnos|throws|exception|stacktrace|why is .* not working|doesn't work|not working)\b/.test(
+			t,
+		);
 
 	// ORIENT — understand existing code, NOT change it. First-class, never falls
 	// through to BUILD (cc10x: "help me understand" must never spawn a write builder).
 	if (
-		/\b(help me understand|how (does|do|is) .*(work|structured|implemented|connected)|explain (how|what|the|where)|walk me through|map (this|the)|what does .*(do|mean)|where is .*(defined|implemented|used)|i'm unfamiliar with|zoom out|trace (through|how)|show me how)\b/.test(t)
-		&& !changeAhead
+		/\b(help me understand|how (does|do|is) .*(work|structured|implemented|connected)|explain (how|what|the|where)|walk me through|map (this|the)|what does .*(do|mean)|where is .*(defined|implemented|used)|i'm unfamiliar with|zoom out|trace (through|how)|show me how)\b/.test(
+			t,
+		) &&
+		!changeAhead
 	) {
-		return { intent: "orient", reason: "Orientation — understand existing code. No changes, answer inline." };
+		return {
+			intent: "orient",
+			reason:
+				"Orientation — understand existing code. No changes, answer inline.",
+		};
 	}
 	// Pure questions (no action verb, no "then change") → also orient.
-		if (
-		/^(what|why|how|explain|show|list|tell|describe|summarize|difference between)\b/.test(t)
-		&& !buildVerb
-		&& !debugVerb
-		&& !/\b(deploy|test)\b/.test(t)
-		&& !changeAhead
+	if (
+		/^(what|why|how|explain|show|list|tell|describe|summarize|difference between)\b/.test(
+			t,
+		) &&
+		!buildVerb &&
+		!debugVerb &&
+		!/\b(deploy|test)\b/.test(t) &&
+		!changeAhead
 	) {
-		return { intent: "orient", reason: "Question / exploration — answer inline, no workflow." };
+		return {
+			intent: "orient",
+			reason: "Question / exploration — answer inline, no workflow.",
+		};
 	}
 
 	// SHIP — single-word commands, checked before build/review.
@@ -87,48 +109,128 @@ function classify(text: string): Classification {
 	}
 
 	// REVIEW — advisory only, never creates code (cc10x: REVIEW never spawns code-changing tasks).
-	if (/\b(review|audit|roast|critique|check (my|this) (code|diff|pr)|find (issues|problems|antipatterns))\b/.test(t)) {
-		return { intent: "review", reason: "Review — /review fans out parallel reviewers (advisory, no code changes)." };
+	if (
+		/\b(review|audit|roast|critique|check (my|this) (code|diff|pr)|find (issues|problems|antipatterns))\b/.test(
+			t,
+		)
+	) {
+		return {
+			intent: "review",
+			reason:
+				"Review — /review fans out parallel reviewers (advisory, no code changes).",
+		};
 	}
 
 	// RESEARCH — needs evidence from multiple sources.
-	if (/\b(research|investigate|compare|find (evidence|sources)|what (do|does) people|community|benchmark|prior art|is there (a|an) (lib|package|tool))\b/.test(t)) {
-		return { intent: "research", reason: "Needs evidence from multiple sources — /research fans out." };
+	if (
+		/\b(research|investigate|compare|find (evidence|sources)|what (do|does) people|community|benchmark|prior art|is there (a|an) (lib|package|tool))\b/.test(
+			t,
+		)
+	) {
+		return {
+			intent: "research",
+			reason: "Needs evidence from multiple sources — /research fans out.",
+		};
+	}
+
+	// TEACH — user is teaching the agent a durable preference/process.
+	if (/\b(teach you|remember that|from now on|next time (always|do)|always (do|use|run)|never (do|use|run))\b/.test(t)) {
+		return { intent: "teach", reason: "Teaching the agent — /teach captures the preference into memory." };
+	}
+
+	// HANDOFF — continue work in a new session.
+	if (/\b(handoff|hand off|continue (this )?in a new session|transfer (this )?to (a )?(new|another) session|start a new session (with|for) this)\b/.test(t)) {
+		return { intent: "handoff", reason: "Continuation — /handoff drafts a transfer prompt for a new session." };
+	}
+
+	// SETUP — configure tooling/services (not a code build).
+	if (/\b(set up pre-commit|configure (pre-commit|mcp|mongodb|eslint|prettier|linting|hooks|the tooling)|install and configure|wizard|setup-pre-commit)\b/.test(t)) {
+		return { intent: "setup", reason: "Tooling setup — /wizard configures third-party services." };
 	}
 
 	// DEBUG — diagnosis/repair IS the primary deliverable.
 	// cc10x: ERROR wins over BUILD, but route on PRIMARY DELIVERABLE, not first keyword.
 	// "add dark-mode and fix the button" = BUILD (fix is incidental).
 	// "why is login broken" / "debug the payment flow" = DEBUG.
-	const debugFraming = /^(why|debug|diagnos|what.*(wrong|broken|failing)|the (bug|error|crash)|fix the (broken|failing|crash|bug))\b/i.test(t);
+	const debugFraming =
+		/^(why|debug|diagnos|what.*(wrong|broken|failing)|the (bug|error|crash)|fix the (broken|failing|crash|bug))\b/i.test(
+			t,
+		);
 	if (debugVerb && (!buildVerb || debugFraming)) {
-		return { intent: "debug", reason: "Bug diagnosis is the deliverable — /loop builds a feedback loop, finds root cause, fixes (bounded)." };
+		return {
+			intent: "debug",
+			reason:
+				"Bug diagnosis is the deliverable — /fix runs debug→build→review→ship (native chain). /loop alt for bounded feedback loop.",
+		};
 	}
 
-	// PLAN — design/architect/spec.
-	if (/\b(plan|design|architect|spec|rfc|brainstorm|how should (we|i) (build|structure)|redesign|restructure|refactor (the|this))\b/.test(t)) {
-		return { intent: "plan", reason: "Design question — /loop runs the plan phase (read-only) first." };
+	// REFACTOR — improve structure/testability of existing code (distinct from PLAN).
+	if (
+		/\b(refactor (this|the|a)|improve (the )?(structure|architecture|testability)|clean up (this|the)|simplify (this|the)|decouple (these|the)|break up (this|the)|split (this|the) into)\b/.test(t)
+	) {
+		return {
+			intent: "refactor",
+			reason: "Structural improvement — /improve-codebase-architecture (read-only diagnose, then BUILD with gates).",
+		};
+	}
+
+	// PLAN — design/architect/spec (refactor moved to its own intent above).
+	if (
+		/\b(plan|design|architect|spec|rfc|brainstorm|how should (we|i) (build|structure)|redesign|restructure)\b/.test(
+			t,
+		)
+	) {
+		return {
+			intent: "plan",
+			reason: "Design question — /plan brainstorms + writes spec + tickets. /loop alt runs plan phase + full bounded workflow.",
+		};
 	}
 
 	// BUILD — changes code. Complexity gradient (cc10x: trivial → reduced path; non-trivial → full loop).
 	if (buildVerb) {
-		const trivialSignal = /\b(typo|rename (this|the)|fix the (spelling|typo)|add a comment|change the (string|text|message)|update the version|bump (the )?version|quick (fix|change)|one-line|small (fix|change|tweak))\b/.test(t);
-		const nonTrivialSignal = /\b(feature|system|endpoint|api|auth|authentication|database|db|migration|integrate|integration|wire up|set up|setup|support for|refactor (the|this)|redesign|restructure|service|layer|pipeline|workflow|orchestrat)\b/.test(t);
-		const manyFiles = (t.match(/\b(src|lib|app|packages?|components?|routes?|models?|controllers?|services?)\//g) || []).length > 1;
+		const trivialSignal =
+			/\b(typo|rename (this|the)|fix the (spelling|typo)|add a comment|change the (string|text|message)|update the version|bump (the )?version|quick (fix|change)|one-line|small (fix|change|tweak))\b/.test(
+				t,
+			);
+		const nonTrivialSignal =
+			/\b(feature|system|endpoint|api|auth|authentication|database|db|migration|integrate|integration|wire up|set up|setup|support for|refactor (the|this)|redesign|restructure|service|layer|pipeline|workflow|orchestrat)\b/.test(
+				t,
+			);
+		const manyFiles =
+			(
+				t.match(
+					/\b(src|lib|app|packages?|components?|routes?|models?|controllers?|services?)\//g,
+				) || []
+			).length > 1;
 		if (trivialSignal && !nonTrivialSignal) {
-			return { intent: "build-trivial", reason: "Trivial change (1-2 files, single outcome) — just do it, no loop needed." };
+			return {
+				intent: "build-trivial",
+				reason:
+					"Trivial change (1-2 files, single outcome) — just do it, no loop needed.",
+			};
 		}
 		if (nonTrivialSignal || manyFiles) {
-			return { intent: "build", reason: "Multi-file / cross-module build — /loop runs plan→build→review→verify→ship (bounded)." };
+			return {
+				intent: "build",
+				reason:
+					"Multi-file / cross-module build — /feature runs plan→build→review→ship (native chain). /loop alt for bounded + convergence.",
+			};
 		}
-		return { intent: "build", reason: "Build task — /loop for the bounded workflow, or just do it if it stays small." };
+		return {
+			intent: "build",
+			reason:
+				"Build task — /feature (native chain) or /loop (bounded). Just do it if it stays small.",
+		};
 	}
 
 	// Trivial: short, no action verb.
 	if (words.length <= 3) {
 		return { intent: "trivial", reason: "Short task — just do it directly." };
 	}
-	return { intent: "trivial", reason: "No workflow needed — just do it directly." };
+	return {
+		intent: "trivial",
+		reason: "No workflow needed — just do it directly.",
+	};
 }
 
 // ─── Suggestion mapping ─────────────────────────────────────────────────────
@@ -140,17 +242,36 @@ interface Suggestion {
 }
 
 function suggestionsFor(c: Classification): Suggestion[] {
-	const loop: Suggestion = {
-		label: "Run /loop (bounded workflow)",
-		command: '/loop "$TASK"',
-		description:
-			"plan → build → review → verify → ship, with gates + convergence. For hard/multi-phase tasks.",
+	// Native Pi prompt-template chains (the power commands).
+	const feature: Suggestion = {
+		label: "Run /feature (native chain)",
+		command: '/feature "$TASK"',
+		description: "plan → build → review → ship. Autonomous, native Pi chain. The power command for standard builds.",
+	};
+	const fix: Suggestion = {
+		label: "Run /fix (native debug chain)",
+		command: '/fix "$TASK"',
+		description: "debug → build → review → ship. Autonomous, native. The power command for bugs.",
+	};
+	const plan: Suggestion = {
+		label: "Run /plan (brainstorm + spec + tickets)",
+		command: '/plan "$TASK"',
+		description: "Brainstorm, design, write spec + tickets. For design questions.",
+	};
+	const build: Suggestion = {
+		label: "Run /build (TDD only)",
+		command: '/build "$TASK"',
+		description: "TDD: test → fail → implement → pass. No review/ship — for focused implementation.",
+	};
+	const debug: Suggestion = {
+		label: "Run /debug (feedback loop only)",
+		command: '/debug "$TASK"',
+		description: "Build a feedback loop, find root cause, fix. No review/ship chain.",
 	};
 	const research: Suggestion = {
 		label: "Run /research (fan out)",
 		command: '/research "$TASK"',
-		description:
-			"Parallel research across web + GitHub + codebase. For evidence-gathering.",
+		description: "Parallel research across web + GitHub + codebase. For evidence-gathering.",
 	};
 	const review: Suggestion = {
 		label: "Run /review (parallel reviewers)",
@@ -162,10 +283,48 @@ function suggestionsFor(c: Classification): Suggestion[] {
 		command: "/ship",
 		description: "Verify with evidence, then commit. Use when code is ready.",
 	};
+	// Custom loop engine — the bounded, gated differentiator.
+	const loop: Suggestion = {
+		label: "Run /loop (bounded workflow)",
+		command: '/loop "$TASK"',
+		description: "plan → build → review → verify → ship, with gates + convergence + plateau detection. For hard/risky/multi-phase tasks.",
+	};
+	// User-invocable skill commands.
+	const improveArch: Suggestion = {
+		label: "Run /improve-codebase-architecture",
+		command: '/improve-codebase-architecture',
+		description: "Read-only diagnose structure → propose deepening → route through BUILD with gates.",
+	};
+	const teach: Suggestion = {
+		label: "Run /teach",
+		command: '/teach',
+		description: "Capture a durable preference/process into memory.",
+	};
+	const handoff: Suggestion = {
+		label: "Run /handoff (session continuation)",
+		command: '/handoff',
+		description: "Draft a transfer prompt for a new session from current context.",
+	};
+	const wizard: Suggestion = {
+		label: "Run /wizard (setup third-party services)",
+		command: '/wizard',
+		description: "Interactive setup for pre-commit, MCP, linting, etc.",
+	};
+	const grill: Suggestion = {
+		label: "Run /grill-with-docs (stress-test plan)",
+		command: '/grill-with-docs',
+		description: "Relentless interview to stress-test a plan before building.",
+	};
+	// The universal escape hatch — fuzzy-search ALL commands.
+	const palette: Suggestion = {
+		label: "Browse all commands (/palette)",
+		command: "/palette",
+		description: "Fuzzy-search every command, prompt, and skill. When Coach's routing isn't what you wanted.",
+	};
 	const justDoIt: Suggestion = {
 		label: "Just do it (no workflow)",
 		command: null,
-		description: "Quick fix — agent handles it directly, no loop/gates.",
+		description: "Agent handles it directly, no chain/gates.",
 	};
 	const explore: Suggestion = {
 		label: "Answer inline (explore)",
@@ -179,39 +338,27 @@ function suggestionsFor(c: Classification): Suggestion[] {
 		case "trivial":
 			return [justDoIt]; // pass-through, no popup
 		case "build-trivial":
-			return [justDoIt, { ...loop, label: "Actually, run /loop anyway" }];
+			return [justDoIt, build, { ...feature, label: "Or /feature (full chain)" }];
 		case "build":
-			return [loop, justDoIt, research];
+			return [feature, loop, build, justDoIt, palette];
 		case "debug":
-			return [
-				{
-					...loop,
-					label: "Run /loop (debug: feedback loop → root cause → fix)",
-					description:
-					"debug intent — bounded loop, finds root cause not symptom.",
-				},
-				justDoIt,
-				research,
-			];
+			return [fix, loop, debug, justDoIt, palette];
 		case "plan":
-			return [
-				{
-					...loop,
-					label: "Run /loop (plan phase first, read-only)",
-					description: "plan intent — explores read-only, then decides.",
-				},
-				{ ...research, label: "Or /research first" },
-				justDoIt,
-			];
+			return [plan, loop, grill, { ...research, label: "Or /research first" }, justDoIt];
 		case "research":
-			return [
-				research,
-				{ ...loop, label: "Or /loop (if it becomes a build task)" },
-			];
+			return [research, { ...loop, label: "Or /loop (if it becomes a build task)" }, palette];
 		case "review":
-			return [review, { ...loop, label: "Or /loop (full build+review)" }];
+			return [review, { ...loop, label: "Or /loop (full build+review)" }, palette];
 		case "ship":
 			return [ship, review];
+		case "refactor":
+			return [improveArch, { ...loop, label: "Or /loop (bounded refactor)" }, { ...plan, label: "Or /plan (design first)" }, palette];
+		case "teach":
+			return [teach, justDoIt];
+		case "handoff":
+			return [handoff, palette];
+		case "setup":
+			return [wizard, palette];
 	}
 }
 
@@ -241,7 +388,11 @@ export default function coachExtension(pi: ExtensionAPI): void {
 		// cc10x-style: ORIENT and trivial and build-trivial pass through SILENTLY
 		// (no popup). ORIENT must NEVER fall through to BUILD — it answers inline.
 		// build-trivial defaults to just-do-it. Only real workflows popup.
-		if (c.intent === "orient" || c.intent === "trivial" || c.intent === "build-trivial") {
+		if (
+			c.intent === "orient" ||
+			c.intent === "trivial" ||
+			c.intent === "build-trivial"
+		) {
 			return { action: "continue" };
 		}
 
