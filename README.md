@@ -1,6 +1,6 @@
 # my-pi
 
-**The best Pi coding agent setup - 15 packages, 57 skills, 8 slash commands, 5 custom extensions (incl. coach + loop engine + guardrails), 10-step autonomous workflow. You never have to remember a command - Coach suggests the right one. Every Pi power leveraged. Zero bloat, pure Pi ideology.**
+**The best Pi coding agent setup - 15 packages, 58 skills, 9 slash commands, 5 custom extensions (incl. coach + loop engine + guardrails), 10-step autonomous workflow. You never have to remember a command - Coach suggests the right one and activates the right skills. Every Pi power leveraged. Self-maintaining via /setup-audit. Zero bloat, pure Pi ideology.**
 
 [![Pi](https://img.shields.io/badge/Pi-v0.80+-blue.svg)](https://pi.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -35,9 +35,9 @@ After that, just describe what you want. Pi handles the rest.
 
 ---
 
-## The User Interface — 8 Slash Commands
+## The User Interface - 9 Slash Commands
 
-These are the commands you type. Each one kicks off an autonomous workflow.
+These are the commands you type. Each one kicks off an autonomous workflow. Coach suggests the right one + activates the right skills automatically - you never have to remember.
 
 | Command | What it does | Skills it loads |
 | --------- | ------------- | ---------------- |
@@ -49,8 +49,9 @@ These are the commands you type. Each one kicks off an autonomous workflow.
 | `/review` | Parallel reviewers on current diff, anti-anchored | code-review |
 | `/ship` | Verify with evidence, commit, document | verification-before-completion |
 | `/research "compare state libraries"` | Parallel fan-out across web, GitHub, codebase | research |
+| `/setup-audit` | **Full health check:** versions, harmony, Coach coverage, disk, AGENTS.md, ecosystem steals | setup-maintenance |
 
-**`/feature` and `/fix` are the power commands** — they chain 4 skills end-to-end and run autonomously until done. Type one command, get a fully reviewed, verified, committed feature.
+**`/feature` and `/fix` are the power commands** - they chain 4 skills end-to-end and run autonomously until done. Type one command, get a fully reviewed, verified, committed feature. **`/setup-audit` is the self-maintenance command** - run monthly to keep the setup sharp and find new leverage.
 
 ---
 

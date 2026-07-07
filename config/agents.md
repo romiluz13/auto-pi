@@ -80,6 +80,7 @@ If `/to-spec` or `/to-tickets` fails, configure the issue tracker first. Externa
 - **Python/OSS** (3): `uv` (use uv instead of pip/venv), `github` (gh CLI for issues/PRs/CI), `commit` (clean conventional commits) — auto-trigger for Python development and git operations.
 - **Auto-safety** (2): `git-guardrails-claude-code`, `resolving-merge-conflicts` — auto-trigger on git operations and merge conflicts.
 - **Code quality** (3): `memory-compounding` (5-outcome memory review + 3x promote + docs/solutions/), `codebase-hygiene` (semantic duplicate detection + module deepening, read-only), `diff-driven-docs` (3-layer doc impact classifier, write only what's needed) — auto-trigger on memory hygiene, code audits, and post-BUILD doc checks.
+- **Maintenance** (1): `setup-maintenance` (cadence + on-add harmony gate + improvement loop) — auto-trigger on "audit my setup" / "is my setup healthy" / before adding a package. The `/setup-audit` runner is the one-command full audit.
 
 ## Working style
 

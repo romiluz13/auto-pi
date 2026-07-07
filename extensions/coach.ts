@@ -139,7 +139,8 @@ type Intent =
 	| "triage" // prioritize issues — /triage
 	| "write-skill" // create a skill — /writing-great-skills
 	| "wayfinder" // fog of war — wayfinder skill (auto)
-	| "prototype"; // sanity-check by building — prototype skill (auto)
+	| "prototype" // sanity-check by building — prototype skill (auto)
+	| "audit"; // setup health check — /setup-audit
 
 interface Classification {
 	intent: Intent;
@@ -306,6 +307,19 @@ function classify(text: string): Classification {
 			intent: "write-skill",
 			reason:
 				"Skill authoring — /writing-great-skills guides the skill creation process.",
+		};
+	}
+
+	// AUDIT — setup health check (maintenance loop).
+	if (
+		/\b(audit my setup|is my setup healthy|check my setup|setup (health|audit)|health check|setup-maintenance|maintain my setup)\b/.test(
+			t,
+		)
+	) {
+		return {
+			intent: "audit",
+			reason:
+				"Setup health — /setup-audit runs versions + harmony + Coach coverage + disk + AGENTS.md + ecosystem scan.",
 		};
 	}
 
@@ -543,6 +557,12 @@ function suggestionsFor(c: Classification): Suggestion[] {
 		description:
 			"Guide the skill creation process — structure, triggers, pitfalls.",
 	};
+	const setupAudit: Suggestion = {
+		label: "Run /setup-audit (full health check)",
+		command: "/setup-audit",
+		description:
+			"Versions + harmony + Coach coverage + disk + AGENTS.md + ecosystem steals. Fans out 6 subagents.",
+	};
 	// Auto-skills surfaced as primary suggestions (no slash command — activated via hint).
 	const wayfinder: Suggestion = {
 		label: "Use wayfinder (chart investigation tickets)",
@@ -640,6 +660,8 @@ function suggestionsFor(c: Classification): Suggestion[] {
 			return [triage, palette];
 		case "write-skill":
 			return [writeSkill, palette];
+		case "audit":
+			return [setupAudit, palette];
 		case "wayfinder":
 			return [wayfinder, plan, { ...research, label: "Or /research first" }, justDoIt, palette];
 		case "prototype":
