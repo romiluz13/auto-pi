@@ -351,7 +351,7 @@ function dishonestyHits(text: string): string[] {
 
 // ─── Phase steering prompts (enriched with Archon steals — all steering text) ──
 
-/** Format the intent's nonGoals as a respect-block for the reviewer. Steal 4. */
+/** Format the intent's nonGoals as a respect-block for the reviewer. */
 function nonGoalsBlock(state: LoopState): string {
 	const ng = state.intent?.nonGoals ?? [];
 	if (ng.length === 0) return "";
@@ -364,7 +364,7 @@ function phasePrompt(state: LoopState, phase: Phase): string {
 		case "plan":
 			return `${base}PLAN phase (read-only — write/edit/bash-mutating are gated off). Explore the codebase, understand the target, and write a plan to .loop-plan.md.
 
-**Patterns to Mirror (Steal 3 — extract BEFORE planning):** Use read/grep/find/lsp_* to produce a patterns table with ACTUAL code snippets copied from the codebase (not invented) + file:line refs:
+**Patterns to Mirror (extract BEFORE planning):** Use read/grep/find/lsp_* to produce a patterns table with ACTUAL code snippets copied from the codebase (not invented) + file:line refs:
 | Category | File:Lines | Pattern | Code Snippet |
 |----------|-----------|---------|--------------|
 | NAMING | path:10-15 | … | \`actual snippet\` |
@@ -373,7 +373,7 @@ function phasePrompt(state: LoopState, phase: Phase): string {
 | TESTS | path:1-30 | … | \`actual snippet\` |
 Write the plan to .loop-plan.md, including a MIRROR: {file:lines} reference on each future task so BUILD follows real patterns.
 
-**PLAN REVIEW GATE (cc10x steal — fail-closed, 3 checks, 3-try cap):** After writing the plan, run a self-audit BEFORE declaring PLAN done. Output SPEC_GATE_PASS or SPEC_GATE_FAIL:
+**PLAN REVIEW GATE (fail-closed, 3 checks, 3-try cap):** After writing the plan, run a self-audit BEFORE declaring PLAN done. Output SPEC_GATE_PASS or SPEC_GATE_FAIL:
 1. **Feasibility** — use find/ls/read to verify EVERY referenced file path exists; read 1-2 real files to confirm proposed patterns/libraries match the codebase; flag any invented/unverified file assumptions; verify dependency ordering (no circular/forward refs).
 2. **Completeness** — all requirements mapped to plan items; every change has a verification step; edge cases addressed; cross-file integration points listed.
 3. **Scope & Alignment** — matches the request (no different problem); no scope creep (extra abstractions/refactors beyond request); no under-scoping; complexity proportional.
@@ -390,7 +390,7 @@ Report when the checkpoint is satisfied.`;
 
 **TDD:** write the test first, watch it fail, implement, watch it pass. Exit 1 from import/syntax error is NOT a real RED — a genuine RED is a behavioral failure.
 
-**Per-task validation (Steal 5 — the golden rule: never accumulate broken state):** After EVERY file change, run the project's type-check/lint (e.g. \`npm run type-check\`, \`bun run type-check\`, \`uv run mypy\`, \`cargo check\`, \`go build ./...\`). If it fails, FIX IT before the next task — do not move on with broken state. pi-lens surfaces live diagnostics; this is the active project-wide check that complements it.
+**Per-task validation (the golden rule: never accumulate broken state):** After EVERY file change, run the project's type-check/lint (e.g. \`npm run type-check\`, \`bun run type-check\`, \`uv run mypy\`, \`cargo check\`, \`go build ./...\`). If it fails, FIX IT before the next task — do not move on with broken state. pi-lens surfaces live diagnostics; this is the active project-wide check that complements it.
 
 **BUILD_CHECKPOINT (satisfy ALL before signaling completion):**
 - [ ] Every task implemented per its MIRROR reference
@@ -399,7 +399,7 @@ Report when the checkpoint is satisfied.`;
 - [ ] No deviation from the plan without it being documented
 Report what changed and the final test result.`;
 		case "review":
-			return `${base}REVIEW phase. Run \`git diff > .loop-diff.patch\` first, then dispatch 5 reviewer subagents in parallel (Steal 1 — each narrow, give each the diff PATH, never the body):
+			return `${base}REVIEW phase. Run \`git diff > .loop-diff.patch\` first, then dispatch 5 reviewer subagents in parallel (each narrow, give each the diff PATH, never the body):
 1. **code-review** — quality, pattern compliance, bugs (logic/null/race/security)
 2. **error-handling** — swallowed errors, empty catches, discarded promises, unhandled rejections
 3. **test-coverage** — missing tests, untested edge cases, tests that don't assert the behavior
@@ -666,7 +666,7 @@ function setupHooks(pi: ExtensionAPI): void {
 			recordStatus(ctx);
 			await steer(
 				ctx,
-				`${phasePrompt(active, "build")}\n\nRemediation iteration ${active.iteration}: fix the verify failures (score ${score}, honesty hits: ${honestyHits.join(", ") || "none"}, convergence: ${converged ? "yes" : "no"}).\n\n**Change an input before re-dispatching (cc10x steal):** do NOT retry the same task with the same approach — that just burns a cycle and reproduces the failure. Change at least one: narrow the scope, escalate the model tier (Ctrl+L mid-session), change the approach/tool, OR if the plan itself is wrong — STOP and ask the human (do not loop). **Bidirectional verify:** before implementing the fix, confirm the fix is in the right direction — if the PLAN is wrong, fix the plan, not the code.`,
+				`${phasePrompt(active, "build")}\n\nRemediation iteration ${active.iteration}: fix the verify failures (score ${score}, honesty hits: ${honestyHits.join(", ") || "none"}, convergence: ${converged ? "yes" : "no"}).\n\n**Change an input before re-dispatching:** do NOT retry the same task with the same approach — that just burns a cycle and reproduces the failure. Change at least one: narrow the scope, escalate the model tier (Ctrl+L mid-session), change the approach/tool, OR if the plan itself is wrong — STOP and ask the human (do not loop). **Bidirectional verify:** before implementing the fix, confirm the fix is in the right direction — if the PLAN is wrong, fix the plan, not the code.`,
 			);
 			return;
 		}
@@ -707,7 +707,7 @@ function setupHooks(pi: ExtensionAPI): void {
 				recordStatus(ctx);
 				await steer(
 					ctx,
-					`${phasePrompt(active, "build")}\n\nRemediation iteration ${active.iteration}: address the CRITICAL/HIGH review findings.\n\n**Change an input before re-dispatching (cc10x steal):** do NOT retry the same approach — narrow scope, escalate model tier (Ctrl+L), change approach/tool, or if the plan is wrong STOP and ask the human.`,
+					`${phasePrompt(active, "build")}\n\nRemediation iteration ${active.iteration}: address the CRITICAL/HIGH review findings.\n\n**Change an input before re-dispatching:** do NOT retry the same approach — narrow scope, escalate model tier (Ctrl+L), change approach/tool, or if the plan is wrong STOP and ask the human.`,
 				);
 				return;
 			}
