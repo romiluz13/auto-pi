@@ -301,7 +301,6 @@ Beyond the 15 packages + 5 extensions + 54 skills, the setup pulls every zero-ri
 
 | Lever | What it does |
 | --------- | ------------ |
-| `PI_CACHE_RETENTION=long` | Extended prompt cache → direct cost/latency cut on long sessions |
 | `enabledModels` (10 patterns) | Ctrl+P one-key model cycling across Claude/GPT/Grok/Kimi/DeepSeek/GLM |
 | `externalEditor: code --wait` | Ctrl+G opens VS Code for long prompts (not nano fallback) |
 | `treeFilterMode: no-tools` | Cleaner `/tree` navigation through tool-heavy sessions |
@@ -315,6 +314,8 @@ Beyond the 15 packages + 5 extensions + 54 skills, the setup pulls every zero-ri
 | Live observability | @spences10/pi-observability browser dashboard at 127.0.0.1:43190 |
 
 **Nothing wasted, nothing over-built.** Every lever is zero-risk (no new moving parts) and harmony-audited (0 critical/major conflicts across all 15 packages + 5 extensions — audits in `docs/audits/`).
+
+> **Note on `PI_CACHE_RETENTION`:** the Pi docs list this env var for extended prompt caching (Anthropic 1h / OpenAI 24h), but it is **NOT compatible with custom OpenAI-compatible gateways** — it injects a `prompt_cache_retention` field the gateway rejects with a 400. Skip it if your provider is a proxy/gateway (like our grove-openai). It only works against native Anthropic/OpenAI endpoints.
 
 ---
 
