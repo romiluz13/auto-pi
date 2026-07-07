@@ -79,6 +79,7 @@ If `/to-spec` or `/to-tickets` fails, configure the issue tracker first. Externa
 - **Internal reference** (2): `codebase-design` (module/interface vocabulary), `domain-modeling` (domain glossary) — auto-loaded by other skills (tdd, grill-with-docs, to-spec, improve-codebase-architecture).
 - **Python/OSS** (3): `uv` (use uv instead of pip/venv), `github` (gh CLI for issues/PRs/CI), `commit` (clean conventional commits) — auto-trigger for Python development and git operations.
 - **Auto-safety** (2): `git-guardrails-claude-code`, `resolving-merge-conflicts` — auto-trigger on git operations and merge conflicts.
+- **Code quality** (3): `memory-compounding` (5-outcome memory review + 3x promote + docs/solutions/), `codebase-hygiene` (semantic duplicate detection + module deepening, read-only), `diff-driven-docs` (3-layer doc impact classifier, write only what's needed) — auto-trigger on memory hygiene, code audits, and post-BUILD doc checks.
 
 ## Working style
 
