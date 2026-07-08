@@ -3,11 +3,12 @@
  *
  * Solves the known failure: "the agent says it didn't pay attention to AGENTS.md."
  *
- * Every turn, before_agent_start re-appends a HARD RULES block — pulled from the
- * AGENTS.md that Pi already loaded into systemPromptOptions.contextFiles — to the
- * TOP-ATTENTION region of the system prompt. This defeats mid-session forgetting
- * and survives compaction BY CONSTRUCTION (Pi re-runs before_agent_start on the
- * retried turn after compaction, rebuilding the system prompt from the options).
+ * Injects the FULL HARD RULES block on session_start and after compaction
+ * (when context is genuinely lost). On every other turn, injects a 1-line
+ * reminder. This defeats mid-session forgetting and survives compaction BY
+ * CONSTRUCTION while avoiding the reasoning-saturation cost of re-injecting
+ * the full rulebook every turn (ETH Zurich 'Evaluating AGENTS.md' Feb 2026:\ * full re-injection every turn breaks reasoning tasks +20% inference cost;
+ * helps only formatting/extraction).
  *
  * Trigger: automatic — loads on session_start, runs every before_agent_start.
  * No command, no shortcut, no tool. Configure via ~/.pi/agent/guardrails.json.
@@ -48,13 +49,18 @@ import type {
 // ─── Config ─────────────────────────────────────────────────────────────────
 
 interface GuardrailsConfig {
-	/** Re-inject the rules block every turn (default true). */
+	/** Re-inject the rules block (default true). */
 	enabled: boolean;
 	/** Max chars of AGENTS.md to re-inject (keeps the block in the primacy window). */
 	maxChars: number;
 	/** Also warn if AGENTS.md was not found in contextFiles at all. */
 	warnIfMissing: boolean;
 }
+
+// Set by session_start and session_compact — the next before_agent_start does
+// a full inject (context was genuinely lost), then clears it. Every other turn
+// gets a 1-line reminder. Starts true so the first turn always gets the full block.
+let fullInjectNext = true;
 
 const DEFAULT_CONFIG: GuardrailsConfig = {
 	enabled: true,
@@ -100,6 +106,10 @@ function truncate(content: string, maxChars: number): string {
 	return `${content.slice(0, maxChars)}\n\n[…truncated; full AGENTS.md already in context above…]`;
 }
 
+function reminderLine(): string {
+	return "\n\n## ⚡ AGENTS.md rules in effect — see the session-start injection above. Follow them.\n";
+}
+
 function rulesBlock(
 	agentsMd: { path: string; content: string } | null,
 	cfg: GuardrailsConfig,
@@ -118,36 +128,38 @@ function rulesBlock(
 export default function guardrailsExtension(pi: ExtensionAPI): void {
 	const cfg = loadConfig();
 
-	// Re-inject every turn. This is the core mechanism.
+	// Full inject on session_start + post-compact; 1-line reminder otherwise.
 	pi.on("before_agent_start", async (event, ctx) => {
 		if (!cfg.enabled) return;
-		const agentsMd = findAgentsMd(event.systemPromptOptions?.contextFiles);
-		if (!agentsMd && cfg.warnIfMissing) {
-			ctx.ui.notify("guardrails: AGENTS.md not found in contextFiles — no rules to re-inject.", "warning");
+		if (fullInjectNext) {
+			const agentsMd = findAgentsMd(event.systemPromptOptions?.contextFiles);
+			if (!agentsMd && cfg.warnIfMissing) {
+				ctx.ui.notify("guardrails: AGENTS.md not found in contextFiles — no rules to re-inject.", "warning");
+			}
+			fullInjectNext = false;
+			return { systemPrompt: event.systemPrompt + rulesBlock(agentsMd, cfg) };
 		}
-		// Append (never replace) — preserves Pi's base prompt + hermes + ptm.
-		return {
-			systemPrompt: event.systemPrompt + rulesBlock(agentsMd, cfg),
-		};
+		// Reminder-only turn: keep the rules present without saturating reasoning.
+		return { systemPrompt: event.systemPrompt + reminderLine() };
 	});
 
-	// Belt-and-suspenders: after compaction, audit that the rules survived.
-	// before_agent_start re-injects unconditionally next turn, so this is just
-	// observability — it cannot block, only warn.
+	// After compaction, flag the next turn for a full re-inject + audit survival.
 	pi.on("session_compact", async (_event, ctx) => {
 		if (!cfg.enabled) return;
+		fullInjectNext = true;
 		const sp = ctx.getSystemPrompt();
 		if (!/HARD RULES/.test(sp)) {
 			ctx.ui.notify(
-				"guardrails: rules dropped after compaction — will re-inject next turn",
+				"guardrails: rules dropped after compaction — will full-re-inject next turn",
 				"warning",
 			);
 		}
 	});
 
-	// One-time load notification (non-blocking, additive status slot).
+	// Session start: flag the first turn for a full inject + load status.
 	pi.on("session_start", async (_event, ctx) => {
 		if (!cfg.enabled) return;
+		fullInjectNext = true;
 		ctx.ui.setStatus("guardrails", ctx.ui.theme.fg("dim", "⚡ rules"));
 	});
 
