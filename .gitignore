@@ -4,3 +4,7 @@ node_modules/
 .my-pi-sources/
 .pi/web-search.json
 web-search.json
+
+# Internal launch/social drafts — never publish
+docs/launch-post-*.md
+docs/social-posts-*.md
