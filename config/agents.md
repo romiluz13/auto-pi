@@ -68,19 +68,11 @@ Default: fan out research, build solo, review in parallel.
 
 If `/to-spec` or `/to-tickets` fails, configure the issue tracker first. External tech → validate APIs before step 4 (see below).
 
-## Domain skills (auto-trigger from description)
+## Skill routing
 
-- **MongoDB** (8): `mongodb-schema-design`, `mongodb-search-and-ai`, `mongodb-query-optimizer`, `mongodb-connection`, `mongodb-mcp-setup` (global first-time install), `mongodb-natural-language-querying`, `mongodb-atlas-stream-processing`, `mongodb-mcp-cluster-per-project` (per-project wiring) — auto-trigger when working with MongoDB.
-- **Vercel/React** (5): `vercel-react-best-practices`, `vercel-composition-patterns`, `deploy-to-vercel`, `vercel-optimize`, `web-design-guidelines` — auto-trigger when building React or deploying to Vercel.
-- **UI** (3): `frontend-design` (aesthetic direction), `impeccable` (UI quality/polish), `web-design-guidelines` (UI review) — auto-trigger when building or reviewing UI.
-- **Web** (8): `search`, `scrape`, `discover-api`, `data-feeds`, `live-research`, `agent-browser`, `rag-pipeline`, `brightdata-cli` — auto-trigger for web tasks. Use `bdata` CLI for SERP/scrape/structured data. Use `pi-web-access` tools (`web_search`, `fetch_content`) for YouTube video understanding, PDF extraction, and local video analysis — configured with Brave, Tavily, and Gemini API keys at `~/.pi/web-search.json`. Fallback order: if `bdata` fails or rate-limited, use `pi-web-access` `web_search`. If `pi-web-access` fails, use `bdata search`. Never both for the same query — pick one, fall back only on failure.
-- **Code research** (5): `octocode` (CLI quick-reference), `octocode-research` (investigation workflow), `octocode-brainstorming` (evidence validation), `octocode-rfc-generator`, `octocode-roast` — auto-trigger for evidence-first research, RFCs, or code critique.
-- **User-invoked** (12 — `disable-model-invocation: true`, agent suggests, user types): `/teach`, `/triage`, `/writing-great-skills`, `/setup-pre-commit`, `/wizard` (interactive setup for third-party services), `/implement` (execution wrapper: drives TDD + code-review + commit), `/to-spec`, `/to-tickets`, `/grill-with-docs`, `/handoff`, `/improve-codebase-architecture`, `/compact-safe`.
-- **Internal reference** (2): `codebase-design` (module/interface vocabulary), `domain-modeling` (domain glossary) — auto-loaded by other skills (tdd, grill-with-docs, to-spec, improve-codebase-architecture).
-- **Python/OSS** (3): `uv` (use uv instead of pip/venv), `github` (gh CLI for issues/PRs/CI), `commit` (clean conventional commits) — auto-trigger for Python development and git operations.
-- **Auto-safety** (2): `git-guardrails-claude-code`, `resolving-merge-conflicts` — auto-trigger on git operations and merge conflicts.
-- **Code quality** (3): `memory-compounding` (5-outcome memory review + 3x promote + docs/solutions/), `codebase-hygiene` (semantic duplicate detection + module deepening, read-only), `diff-driven-docs` (3-layer doc impact classifier, write only what's needed) — auto-trigger on memory hygiene, code audits, and post-BUILD doc checks.
-- **Maintenance** (1): `setup-maintenance` (cadence + on-add harmony gate + improvement loop) — auto-trigger on "audit my setup" / "is my setup healthy" / before adding a package. The `/setup-audit` runner is the one-command full audit.
+Skills auto-trigger from their descriptions — the agent decides which to invoke based on the task. Don't memorize skill names; Coach surfaces the right one. Full skill set is discovered live via the harness, so adding a skill needs no edit here.
+
+**Web tools fallback:** `bdata` CLI for SERP/scrape/structured data; `pi-web-access` (`web_search`, `fetch_content`) for YouTube/PDF/local-video. If `bdata` fails or rate-limits → `pi-web-access` `web_search`; if that fails → `bdata search`. Never both for the same query — pick one, fall back only on failure.
 
 ## Working style
 
@@ -133,20 +125,7 @@ Skip only for: pure utility libs with stable APIs (date-fns, zod, lodash). When 
 
 ## Pi harness (non-obvious infrastructure — don't reinvent what these do)
 
-- **Coach** (`coach.ts`): the DEFAULT user interface. The user types a task in plain English; Coach classifies it and suggests the workflow (/loop, /research, /review, /ship, or "just do it"). The user rarely types a slash command directly. Don't second-guess a steered input — it was routed intentionally.
-- **`/loop "<task>"`** (loop engine): for hard/multi-phase tasks. Bounded (cap 3), plateau-aware, independent verifier convergence (santa, `--cross-model`), test-honesty gates, reconciliation over assertion. Durable state at `~/.pi/workflows/`. Prefer it over `/feature` when the task has separable concerns or a contract.
-- **Context sidecar** (`@spences10/pi-context`): oversized tool output (>24KB/300 lines) is stored in SQLite, a receipt is returned in-context. Retrieve with `context_search` / `context_get` — don't re-run the expensive command.
-- **Guardrails** (`guardrails.ts`): AGENTS.md rules are re-injected every turn (prominence + compaction-survival). If you skipped them before, follow them now — they didn't go away.
-- **Destructive-command gate** (`@spences10/pi-confirm-destructive`): the SYSTEM confirms destructive ops (rm unrecoverable, git reset --hard, destructive SQL). You don't need to ask — it will prompt. Still: state destructive intent before running.
-- **Observability** (`/observability`): live browser dashboard at `127.0.0.1:43190` — for the user to watch, not for you to drive.
-
-## Slash commands (power-user shortcuts — Coach suggests these; you don't memorize them)
-
-- `/feature "<desc>"` — full chain: plan → build → review → ship (autonomous end-to-end)
-- `/fix "<desc>"` — full chain: debug → build → review → ship (autonomous end-to-end)
-- `/plan "<desc>"` — brainstorm + design + spec + tickets
-- `/build "<desc>"` — TDD: test first, see fail, implement, see pass
-- `/debug "<desc>"` — build feedback loop, find root cause, fix
-- `/review` — parallel reviewers on current diff, anti-anchored
-- `/ship` — verify with evidence, commit, document
-- `/research "<topic>"` — parallel fan-out across web, GitHub, codebase
+- **Coach** is the DEFAULT user interface — don't second-guess a steered input; it was routed intentionally.
+- **`/loop`** for hard/multi-phase tasks — prefer it over `/feature` when the task has separable concerns or a contract.
+- **Context sidecar** — retrieve oversized output via `context_search` / `context_get`; don't re-run the expensive command.
+- **Observability** dashboard is for the user to watch, not for you to drive.
