@@ -1,3 +1,5 @@
+> **HISTORICAL** — this audit reflects pre-prune state (12–15 packages, pi-hypa active, 150-line AGENTS.md). Kept for the decision trail. For current state see the [2026-07-09 deep review](2026-07-09-deep-review.md) and [README](../../README.md).
+
 # Pi Docs: Unused Capabilities vs. Our Setup
 
 Audited: README.md, usage.md, sessions.md, session-format.md, settings.md, quickstart.md, terminal-setup.md, tmux.md, shell-aliases.md, keybindings.md, containerization.md, security.md, development.md, termux.md, windows.md (v0.80.x docs at `.../pi-coding-agent/docs/`).

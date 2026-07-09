@@ -1,3 +1,5 @@
+> **HISTORICAL** — this audit reflects pre-prune state (12–15 packages, pi-hypa active, 150-line AGENTS.md). Kept for the decision trail. For current state see the [2026-07-09 deep review](2026-07-09-deep-review.md) and [README](../../README.md).
+
 # Pi Extensions Audit — 5 Custom Extensions
 
 Date: 2026-07-07

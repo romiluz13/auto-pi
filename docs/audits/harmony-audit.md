@@ -1,3 +1,5 @@
+> **HISTORICAL** — this audit reflects pre-prune state (12–15 packages, pi-hypa active, 150-line AGENTS.md). Kept for the decision trail. For current state see the [2026-07-09 deep review](2026-07-09-deep-review.md) and [README](../../README.md).
+
 # Pi Agent Setup — Harmony & Conflict Audit
 
 Audited paths: `~/.pi/agent/` (settings.json, models.json, prompts/, skills/, npm/node_modules/*).

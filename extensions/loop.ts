@@ -227,6 +227,17 @@ function applyPhaseTools(pi: ExtensionAPI, phase: Phase): void {
 	pi.setActiveTools(restricted);
 }
 
+/** Restore the full toolset the session had before the loop restricted it.
+ *  Called at EVERY terminal exit (PASS / CAP / WEDGE / reject / abort) so the
+ *  agent is never left stranded with a phase-restricted toolset after the loop
+ *  ends. Idempotent — safe to call when no snapshot exists. */
+function restoreTools(pi: ExtensionAPI): void {
+	if (phaseToolSnapshot) {
+		pi.setActiveTools(phaseToolSnapshot);
+		phaseToolSnapshot = null;
+	}
+}
+
 // ─── Steering ───────────────────────────────────────────────────────────────
 
 async function steer(pi: ExtensionAPI, message: string): Promise<void> {
@@ -545,6 +556,7 @@ function setupHooks(pi: ExtensionAPI): void {
 					active.phase = "rejected";
 					logEvent(active, "rejected_no_contract");
 					persist(active);
+					restoreTools(pi);
 					active = null;
 					recordStatus(ctx);
 					return;
@@ -569,6 +581,7 @@ function setupHooks(pi: ExtensionAPI): void {
 				active.phase = "rejected";
 				logEvent(active, "rejected_preflight");
 				persist(active);
+				restoreTools(pi);
 				active = null;
 				recordStatus(ctx);
 				return;
@@ -638,6 +651,7 @@ function setupHooks(pi: ExtensionAPI): void {
 				logEvent(active, "cap_reached");
 				active.phase = "done";
 				persist(active);
+				restoreTools(pi);
 				active = null;
 				recordStatus(ctx);
 				return;
@@ -650,6 +664,7 @@ function setupHooks(pi: ExtensionAPI): void {
 				logEvent(active, "plateau_detected");
 				active.phase = "done";
 				persist(active);
+				restoreTools(pi);
 				active = null;
 				recordStatus(ctx);
 				return;
@@ -679,6 +694,7 @@ function setupHooks(pi: ExtensionAPI): void {
 			active.phase = "done";
 			persist(active);
 			ctx.ui.notify("Loop: SHIPPED. Workflow complete.", "info");
+			restoreTools(pi);
 			active = null;
 			recordStatus(ctx);
 			return;
@@ -717,6 +733,7 @@ function setupHooks(pi: ExtensionAPI): void {
 				logEvent(active, "cap_reached_review");
 				active.phase = "done";
 				persist(active);
+				restoreTools(pi);
 				active = null;
 				recordStatus(ctx);
 				return;
@@ -764,6 +781,7 @@ function setupHooks(pi: ExtensionAPI): void {
 					logEvent(active, "cap_reached_build");
 					active.phase = "done";
 					persist(active);
+					restoreTools(pi);
 					active = null;
 					recordStatus(ctx);
 					return;
@@ -905,10 +923,7 @@ export default function loopEngineExtension(pi: ExtensionAPI): void {
 			active.phase = "done";
 			persist(active);
 			active = null;
-			if (phaseToolSnapshot) {
-				pi.setActiveTools(phaseToolSnapshot);
-				phaseToolSnapshot = null;
-			}
+			restoreTools(pi);
 			recordStatus(ctx);
 			ctx.ui.notify("Loop aborted. Tools restored.", "info");
 		},
