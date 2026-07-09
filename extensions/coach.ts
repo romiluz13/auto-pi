@@ -37,6 +37,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { complete, type Message } from "@earendil-works/pi-ai/compat";
 import type {
@@ -57,7 +58,7 @@ interface CoachConfig {
 }
 
 function loadCoachModel(): string {
-	const path = join(process.env.HOME ?? "~", ".pi", "agent", "coach.json");
+	const path = join(homedir(), ".pi", "agent", "coach.json");
 	if (!existsSync(path)) return DEFAULT_COACH_MODEL;
 	try {
 		const raw = JSON.parse(readFileSync(path, "utf-8")) as Partial<CoachConfig>;
@@ -89,6 +90,19 @@ function buildCatalog(pi: ExtensionAPI): CatalogEntry[] {
 		.filter((c) => c.name !== "coach" && c.name !== "palette")
 		.map((c) => ({ name: c.name, description: c.description ?? "" }))
 		.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Set of valid command names from the live catalog — used to validate LLM output. */
+function catalogNames(catalog: CatalogEntry[]): Set<string> {
+	return new Set(catalog.map((c) => c.name));
+}
+
+/** A suggestion's command is safe if it's null (passthrough) or `/name` where name is in the catalog. */
+function isCommandSafe(cmd: string | null, valid: Set<string>): boolean {
+	if (cmd === null) return true;
+	if (!cmd.startsWith("/")) return false;
+	const name = cmd.slice(1).split(/\s|"/)[0];
+	return valid.has(name);
 }
 
 // ─── LLM classification ─────────────────────────────────────────────────────
@@ -247,6 +261,7 @@ export default function coachExtension(pi: ExtensionAPI): void {
 
 		// Classify with the LLM over the live catalog.
 		const catalog = buildCatalog(pi);
+		const valid = catalogNames(catalog);
 		const controller = new AbortController();
 		const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
 		let decision: CoachDecision | null = null;
@@ -280,9 +295,12 @@ export default function coachExtension(pi: ExtensionAPI): void {
 				description: "Fuzzy-search every command, prompt, and skill.",
 			},
 		];
+		// Drop suggestions whose command isn't in the live catalog (defense vs LLM hallucination).
+		const safeSuggestions = suggestions.filter((s) => isCommandSafe(s.command, valid));
+		if (safeSuggestions.length === 0) return { action: "continue" };
 		const choice = await ctx.ui.select(
 			title,
-			suggestions.map((s) => s.label),
+			safeSuggestions.map((s) => s.label),
 		);
 
 		if (choice === undefined) {
@@ -292,7 +310,7 @@ export default function coachExtension(pi: ExtensionAPI): void {
 			return { action: "continue" };
 		}
 
-		const picked = suggestions.find((s) => s.label === choice) ?? null;
+		const picked = safeSuggestions.find((s) => s.label === choice) ?? null;
 		const combinedHint = hintFromSkills(decision.skillHints);
 
 		if (!picked || picked.command === null) {
@@ -303,11 +321,9 @@ export default function coachExtension(pi: ExtensionAPI): void {
 		}
 
 		// Transform the input into the chosen slash command, with the task filled in.
+		// Use a replacement function so $&, $`, $' in user input don't corrupt the command.
 		const taskText = combinedHint ? `${text} ${combinedHint}` : text;
-		const command = picked.command.replace(
-			"$TASK",
-			taskText.replace(/"/g, '\\"'),
-		);
+		const command = picked.command.replace("$TASK", () => taskText.replace(/"/g, '\\"'));
 		return { action: "transform", text: command };
 	});
 
@@ -333,8 +349,7 @@ export default function coachExtension(pi: ExtensionAPI): void {
 				return;
 			}
 			if (sub === "test" || sub.startsWith("test ")) {
-				// Classify a sample without transforming. (Fixed: sub.startsWith
-				// handles "/coach test <sample>" — the old exact-match was unreachable.)
+				// Classify a sample without transforming.
 				const sample = (args ?? "").replace(/^test\s*/i, "").trim();
 				if (!sample) {
 					ctx.ui.notify(

@@ -7,7 +7,8 @@
  * (when context is genuinely lost). On every other turn, injects a 1-line
  * reminder. This defeats mid-session forgetting and survives compaction BY
  * CONSTRUCTION while avoiding the reasoning-saturation cost of re-injecting
- * the full rulebook every turn (ETH Zurich 'Evaluating AGENTS.md' Feb 2026:\ * full re-injection every turn breaks reasoning tasks +20% inference cost;
+ * the full rulebook every turn (ETH Zurich 'Evaluating AGENTS.md' Feb 2026:
+ * full re-injection every turn breaks reasoning tasks +20% inference cost;
  * helps only formatting/extraction).
  *
  * Trigger: automatic — loads on session_start, runs every before_agent_start.
@@ -107,7 +108,7 @@ function truncate(content: string, maxChars: number): string {
 }
 
 function reminderLine(): string {
-	return "\n\n## ⚡ AGENTS.md rules in effect — see the session-start injection above. Follow them.\n";
+	return "\n\n## ⚡ AGENTS.md rules in effect — follow them. Full rules were injected at session start and after any compaction.\n";
 }
 
 function rulesBlock(
@@ -115,7 +116,7 @@ function rulesBlock(
 	cfg: GuardrailsConfig,
 ): string {
 	const header =
-		"\n\n## ⚡ HARD RULES — re-injected every turn by guardrails.ts (from AGENTS.md)\n\n" +
+		"\n\n## ⚡ HARD RULES — injected by guardrails.ts at session start + after compaction (from AGENTS.md)\n\n" +
 		"These are NOT advisory. You MUST follow them. If you skipped them before, follow them now.\n\n";
 	if (!agentsMd) {
 		return `${header}_AGENTS.md was not loaded into contextFiles — no rules to re-inject. Check that ~/.pi/agent/AGENTS.md exists._\n`;
@@ -139,7 +140,8 @@ export default function guardrailsExtension(pi: ExtensionAPI): void {
 					"warning",
 				);
 			}
-			fullInjectNext = false;
+			// Only clear the flag when rules were actually found — retry next turn if not.
+			if (agentsMd) fullInjectNext = false;
 			return { systemPrompt: event.systemPrompt + rulesBlock(agentsMd, cfg) };
 		}
 		// Reminder-only turn: keep the rules present without saturating reasoning.
