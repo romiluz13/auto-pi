@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Update all my-pi packages and skills
+# Update all auto-pi packages and skills
 set -euo pipefail
 
 BOLD="\033[1m"

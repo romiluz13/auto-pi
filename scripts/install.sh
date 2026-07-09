@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# my-pi installer — sets up the best Pi coding agent configuration
+# auto-pi installer — a Pi coding agent config where the workflow decides what to do
 #
 # Usage:
 #   ./scripts/install.sh          # install everything
@@ -29,8 +29,8 @@ SKIP_CLI=false
 
 [[ "${1:-}" == "--skip-cli" ]] && SKIP_CLI=true
 
-echo -e "${BOLD}my-pi installer${RESET}"
-echo -e "A Pi coding agent config where the workflow decides what to do — 14 packages, 5 custom extensions (coach + loop engine + guardrails), autonomous workflow.\n"
+echo -e "${BOLD}auto-pi installer${RESET}"
+echo -e "A Pi coding agent config where the workflow decides what to do — auto-pi — 14 packages, 5 custom extensions (coach + loop engine + guardrails), autonomous workflow.\n"
 
 # ── Prerequisites ──────────────────────────────────────────────────────────
 
@@ -198,6 +198,6 @@ info "Repo skills installed to ~/.agents/skills ($(ls -d "$AGENTS_SKILLS_DIR"/*/
 
 # ── Done ───────────────────────────────────────────────────────────────────
 
-echo -e "\n${BOLD}${GREEN}✓ my-pi installed!${RESET}"
+echo -e "\n${BOLD}${GREEN}✓ auto-pi installed!${RESET}"
 echo -e "Run \`pi\` to start. Type a task in plain English — Coach suggests the workflow."
 echo -e "(Monthly: ./scripts/update.sh · audit: /setup-audit)"

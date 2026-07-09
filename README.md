@@ -1,4 +1,4 @@
-# my-pi
+# auto-pi
 
 A Pi coding agent config where the **workflow** — not the model — decides what
 to do. Type a task in plain English. The system plans, builds, reviews, debugs,
@@ -7,7 +7,7 @@ No skill to recall. One rule file, shared across Pi, Claude Code, and Codex.
 
 [![Pi](https://img.shields.io/badge/Pi-v0.80+-blue.svg)](https://pi.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/romiluz/my-pi?style=social)](https://github.com/romiluz/my-pi)
+[![GitHub stars](https://img.shields.io/github/stars/romiluz13/auto-pi?style=social)](https://github.com/romiluz13/auto-pi)
 
 ---
 
@@ -18,7 +18,7 @@ You get a box of skills and a hope that the LLM picks the right one at the right
 time. It won't. It forgets the rules by turn 20, skips the review when it's
 "obviously fine," and reports tests passing that it never ran.
 
-my-pi closes that gap with **structure the model is steered through** — enforced
+auto-pi closes that gap with **structure the model is steered through** — enforced
 where Pi's runtime allows (tool restrictions, iteration bounds), prompted where
 it doesn't (phase transitions, verification claims):
 
@@ -71,7 +71,7 @@ engine, side conversations. Full list with the axis each owns in
 | Extension | What it does |
 | ----------- | -------------- |
 | `coach.ts` | Plain-English → workflow. LLM classifies over the live `pi.getCommands()` catalog. One tap to accept. |
-| `loop.ts` | Bounded autonomous loop. Contract gate → Plan → Build → Review → Verify → Ship. RED guard, plateau detection, santa convergence, three exits (PASS / CAP / WEDGE). |
+| `loop.ts` | Bounded autonomous loop. Contract gate → Plan → Build → Review → Verify → Ship. RED guard, plateau detection, santa convergence, two exits (PASS / CAP). |
 | `guardrails.ts` | Keeps AGENTS.md in the system prompt: reminder every turn, full rules on start + after compaction. Defeats mid-session forgetting by construction. |
 | `palette.ts` | Fuzzy command palette over every slash command (`Ctrl+Shift+K`). Zero drift — discovers dynamically. |
 | `handoff.ts` | Deterministic `HANDOFF.md` generation. No LLM call, no compaction — just the session ledger, rendered. |
@@ -99,22 +99,22 @@ Edit once, every agent follows it.
 
 ## Why it's different
 
-| Every other agent setup | my-pi |
+| Every other agent setup | auto-pi |
 | ------------------------ | ------- |
 | LLM picks which skill to run, when | The **workflow** picks. The model executes. |
 | Rules fade out of context by turn 20 | **Guardrails** keeps them in the prompt — reminder every turn, full rules on start + after compaction |
 | "Tests pass" is trusted on the agent's word | **RED guard + evidence block** — a self-reported failing test loops back to fix, not forward to ship; build demands the command + exit code + output as proof |
 | One forward-only pipeline | A real **loop engine** with bounded remediation, plateau detection, verifier convergence |
 | Remember 20 slash commands | Type English. **Coach** routes. |
-| A pile of packages that may conflict | **Harmony-checked** — every axis has one owner, audited by 3 fresh reviewers |
+| A pile of packages that may conflict | **Harmony-checked** — every axis has one owner, every extension audited by 8 fresh-context reviewers |
 | Tied to one tool | One rule file, **three agents** (Pi / Claude Code / Codex) |
 | Rots and drifts | **Self-maintaining** — `/setup-audit` runs 6 parallel checks monthly |
 
 ## Install
 
 ```bash
-git clone https://github.com/romiluz/my-pi.git
-cd my-pi
+git clone https://github.com/romiluz13/auto-pi.git
+cd auto-pi
 ./scripts/install.sh
 ```
 

@@ -43,7 +43,7 @@ pi-observational-memory background work).
 
 ### `loop.ts` — Bounded autonomous loop engine (`/loop`)
 
-The one structural capability my-pi was missing: a real **loop engine**, not a
+The one structural capability auto-pi was missing: a real **loop engine**, not a
 forward-only pipeline. Pre-flight contract gate → PLAN → BUILD → REVIEW →
 VERIFY → SHIP, with bounded remediation loop-back (cap 3), plateau detection
 (`iteration ≥ 3` AND no improvement in last 2), independent verifier
