@@ -76,7 +76,7 @@
     "reserveTokens": 65536,
     "keepRecentTokens": 50000
   },
-  "defaultProjectTrust": "always",
+  "defaultProjectTrust": "ask",
   "enabledModels": [
     "claude-*",
     "gpt-5.4",
@@ -96,10 +96,10 @@
   },
   "retry": {
     "enabled": true,
-    "maxRetries": 10,
+    "maxRetries": 3,
     "baseDelayMs": 2000,
     "provider": {
-      "timeoutMs": 3600000,
+      "timeoutMs": 300000,
       "maxRetries": 0,
       "maxRetryDelayMs": 60000
     }
