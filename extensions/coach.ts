@@ -190,7 +190,7 @@ const WORKFLOW_OPTIONS: WorkflowOption[] = [
 		description: "Standards + spec + security. Pins code-review skill.",
 	},
 	{
-		label: "/ship — Ship (verify, commit, document, PR)",
+		label: "/ship — Ship (verify, document, commit, PR)",
 		command: "/ship",
 		description: "Independent verification + commit. Pins verification skill.",
 	},

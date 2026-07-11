@@ -1,13 +1,11 @@
 ---
-description: Review current diff — parallel reviewers, silent failure hunt, anti-anchored
+description: Review current diff — two-axis (standards + spec) + security, anti-anchored
 skill: code-review
 ---
-Review the current uncommitted changes. Follow workflow step 6.
+Review the current uncommitted changes. The `code-review` skill is now loaded — it runs two-axis review (Standards + Spec) in parallel sub-agents. Follow its procedure, with these additions:
 
-1. Get the diff: `git diff` (unstaged) and `git diff --cached` (staged).
-2. Fan out 2-3 reviewer subagents with different focuses:
-   - **Standards reviewer**: coding conventions, Fowler code smells, pattern compliance.
-   - **Spec reviewer**: does the diff match the issue/PRD/spec intent?
+1. Get the diff: `git diff` (unstaged) and `git diff --cached` (staged). The code-review skill reviews changes since a fixed point — use `HEAD` as the fixed point for uncommitted changes.
+2. The code-review skill dispatches two parallel reviewers (Standards + Spec). Add a third:
    - **Security reviewer**: injection, auth, secrets, unsafe operations.
 3. Give each reviewer fresh context — only the diff, not the builder's reasoning (anti-anchored review).
 4. After reviews return, run `/skill:receiving-code-review`: verify each suggestion before implementing. Push back if wrong. Don't blindly agree.

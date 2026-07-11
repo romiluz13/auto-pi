@@ -1,27 +1,26 @@
 ---
-description: Research a topic — parallel fan-out across web, GitHub, codebase
+description: Research a topic — investigate against primary sources, capture findings as markdown
 argument-hint: "<topic to research>"
 skill: research
 ---
-Research the following topic. Follow workflow step 1 (fan-out research).
+Research the following topic. Follow the `research` skill procedure (investigate against high-trust primary sources, capture findings as a markdown file).
 
 Topic: $@
 
-Fan out parallel research across multiple sources. Each subagent reads a different source:
+The `research` skill is now loaded — follow its procedure. It delegates to a background agent that investigates against high-trust primary sources and captures findings as a markdown file in the repo.
 
-1. **Web research** — use `bdata search` and `bdata scrape` to find current docs, blog posts, and tutorials. Focus on primary sources (official docs, not secondary write-ups).
+Supplement with parallel fan-out where useful:
 
-2. **GitHub research** — use `npx octocode` tools to search code across repositories. Find how other projects implement this. Look at recent commits and PRs for the latest patterns.
+1. **Web research** — use `bdata search` and `bdata scrape` to find current docs. Focus on primary sources.
+2. **GitHub research** — use `npx octocode` to search code across repositories.
+3. **Codebase research** — search the current repo for existing implementations.
+4. **Memory search** — search memory for past decisions, failures, or insights.
 
-3. **Codebase research** — search the current repo for existing implementations, patterns, or dependencies related to this topic. Use `grep`, `find`, and LSP navigation.
-
-4. **Memory search** — search memory for any past decisions, failures, or insights about this topic.
-
-After all research returns:
+After research returns:
 
 - Synthesize findings into a single summary.
 - Cite each claim to its source.
-- Flag any contradictions between sources.
-- Save key findings to memory (decisions, gotchas, insights — not obvious facts).
+- Flag contradictions.
+- Save key findings to memory.
 
 Do NOT write any code. This is research only.

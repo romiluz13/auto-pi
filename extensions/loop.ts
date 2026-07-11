@@ -419,7 +419,7 @@ If SPEC_GATE_FAIL: revise the plan and re-run (max 3 tries → ESCALATE). No "ap
 - [ ] SPEC_GATE_PASS (feasibility + completeness + scope checks all passed)
 Report when the checkpoint is satisfied.`;
 		case "build":
-			return `${base}BUILD phase (full toolset). Implement per the plan (.loop-plan.md). Read each task's MIRROR: {file:lines} reference and follow that real pattern exactly. Use /skill:implement as the execution wrapper and /skill:tdd for the test-first cycle.
+			return `${base}BUILD phase (full toolset). Implement per the plan (.loop-plan.md). Read each task's MIRROR: {file:lines} reference and follow that real pattern exactly. Use /skill:implement as the execution wrapper and /skill:tdd for the test-first cycle. If tests fail (RED), run /skill:diagnosing-bugs to build a feedback loop and find the root cause.
 
 **TDD:** write the test first, watch it fail, implement, watch it pass. Exit 1 from import/syntax error is NOT a real RED — a genuine RED is a behavioral failure.
 
@@ -457,7 +457,7 @@ Report findings by severity. Use /skill:receiving-code-review when processing fe
 - [ ] Two fresh reviewers dispatched and CONVERGED (or diverged — report honestly)
 Report score + convergence + honesty hits.`;
 		case "ship":
-			return `${base}SHIP phase. Only proceed if: evidence recorded, score ≥ ${PASS_THRESHOLD}, two reviewers converged, no test-honesty hits, reconciliation diff clean. Commit with a clean conventional message (run /skill:commit then /skill:github for PRs). Report the commit hash — phase advances ONLY on a real hash, not the word "committed."
+			return `${base}SHIP phase. Only proceed if: evidence recorded, score ≥ ${PASS_THRESHOLD}, two reviewers converged, no test-honesty hits, reconciliation diff clean. Run /skill:verification-before-completion for the final independent audit, then /skill:commit for a clean conventional commit, then /skill:github for PRs. Report the commit hash — phase advances ONLY on a real hash, not the word "committed."
 
 **SHIP_CHECKPOINT (satisfy ALL before committing):**
 - [ ] Score ≥ ${PASS_THRESHOLD} AND reviewers converged
