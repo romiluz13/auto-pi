@@ -1,13 +1,15 @@
 /**
  * Coach — the system comes to you, you never remember a command.
  *
- * You type a task in plain English. Before the agent runs, Coach asks a cheap
- * LLM (deepseek-v4-flash by default) to pick the right workflow from the LIVE
- * command catalog (discovered via pi.getCommands() — never hard-coded, so
- * adding a skill needs zero edit here). You press Enter to accept (or pick
- * another, or "just do it" for a quick fix). Your input is then transformed
- * into the matching slash command. You never have to remember /loop, /feature,
- * /research — Coach tells you which one fits THIS task, in the moment.
+ * You type a task in plain English. Coach shows a fixed 9-option workflow menu.
+ * You pick one. Coach transforms your input into the matching slash command.
+ * Pi expands the prompt template, the `skill:` frontmatter pin fires, and the
+ * skill content is mechanically injected. No improvisation. No orphans.
+ *
+ * The LLM is used ONLY for skillHints (optional domain skill activation notes
+ * like MongoDB/UI/Python). If the LLM fails, the menu still shows — skillHints
+ * are non-blocking. The workflow selection itself is NEVER delegated to the LLM
+ * — the user always picks from the fixed menu.
  *
  * Trigger: automatic — intercepts every user input via the `input` event.
  *          Skip with: prefix your message with `!` (raw mode) or `/` (already
@@ -16,34 +18,15 @@
  * Harmony contract:
  * - Owns NO axis. Registers NO tools. Hooks NO tool_call, NO before_agent_start.
  *   DOES hook `input` (the interception point) and `session_start` (status indicator).
- * - The `input` event is NOT used by any installed package (pi-hermes-memory,
- *   pi-observational-memory, pi-prompt-template-model, pi-rewind,
- *   pi-btw, pi-subagents, pi-lens, pi-web-access, pi-intercom, pi-statusline,
- *   palette/handoff/loop — none hook `input`). This is a free axis.
- * - Skips source:"extension" messages (agent-injected steers) so it never
- *   interferes with the loop engine's steering or hermes's background work.
- * - On "just do it", passthrough, or LLM failure → action:"continue" — the
- *   input passes through untouched. Zero overhead, zero interference.
- *
- * Why this exists (the adoption problem):
- * A system you don't use is worth zero. Slash commands only work if you
- * remember them. Coach inverts the interface: the system reads your task and
- * surfaces the one command that fits — with a one-tap confirm.
- *
- * Ideology (Matt Pocock — the agent is smart, give it judgment):
- * The routing decision is made by an LLM call, NOT a hard-coded regex table.
- * The command catalog is read live from pi.getCommands() at call time, so
- * adding a new skill or command automatically makes it routable — zero code
- * or config edit. This is the deliberate opposite of a hard-coded router.
+ * - The `input` event is NOT used by any installed package. This is a free axis.
+ * - Skips source:"extension" messages (agent-injected steers).
+ * - C1 fix: skips when the loop is paused for human input (imports isLoopPausedForHuman).
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { complete, type Message } from "@earendil-works/pi-ai/compat";
-// C1 fix: import the loop pause-state check so Coach can skip when the loop
-// is paused for human input. Without this, Coach's {action:"handled"} short-
-// circuits the input chain and the loop never resumes.
 import { isLoopPausedForHuman } from "./loop.ts";
 import type {
 	ExtensionAPI,
@@ -52,9 +35,6 @@ import type {
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 
-// Per-session toggle (previously a module-level `let` that leaked across
-// sessions and subagents). Keyed by sessionId so every session/subagent gets
-// its own independent Coach state.
 const enabledBySession = new Map<string, boolean>();
 
 function isCoachEnabled(ctx: ExtensionContext): boolean {
@@ -70,16 +50,11 @@ function setCoachEnabled(ctx: ExtensionContext, value: boolean): void {
 const DEFAULT_COACH_MODEL = "grove-openai/deepseek-v4-flash";
 const LLM_TIMEOUT_MS = 5000;
 
-interface CoachConfig {
-	/** "provider/model-id" — the cheap model that classifies + routes. */
-	coachModel: string;
-}
-
 function loadCoachModel(): string {
 	const path = join(homedir(), ".pi", "agent", "coach.json");
 	if (!existsSync(path)) return DEFAULT_COACH_MODEL;
 	try {
-		const raw = JSON.parse(readFileSync(path, "utf-8")) as Partial<CoachConfig>;
+		const raw = JSON.parse(readFileSync(path, "utf-8")) as { coachModel?: string };
 		return typeof raw.coachModel === "string" && raw.coachModel.trim()
 			? raw.coachModel.trim()
 			: DEFAULT_COACH_MODEL;
@@ -88,168 +63,40 @@ function loadCoachModel(): string {
 	}
 }
 
-// ─── Dynamic catalog (the 0-phantom, auto-discovers-new-skills core) ────────
-
-interface CatalogEntry {
-	name: string;
-	description: string;
-}
+// ─── LLM skillHints (optional, non-blocking) ────────────────────────────────
 
 /**
- * Build the command catalog LIVE from pi.getCommands(). This is the same
- * mechanism palette.ts uses — it "never drifts when prompts or skills are
- * added." If you drop a new skill in ~/.pi/agent/skills/, it appears here
- * automatically on the next input. Zero code or config edit. Only real
- * commands appear (no hard-coded list can drift to phantoms).
+ * Ask the coach model for domain skill hints ONLY (not routing).
+ * The LLM looks at the task text and suggests which domain skills are relevant
+ * (MongoDB, UI, Python, web, etc.). This is non-blocking — if it fails, the
+ * menu still shows without hints.
  */
-function buildCatalog(pi: ExtensionAPI): CatalogEntry[] {
-	return pi
-		.getCommands()
-		.filter((c) => c.name !== "coach" && c.name !== "palette")
-		.map((c) => ({ name: c.name, description: c.description ?? "" }))
-		.sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/** Set of valid command names from the live catalog — used to validate LLM output. */
-function catalogNames(catalog: CatalogEntry[]): Set<string> {
-	return new Set(catalog.map((c) => c.name));
-}
-
-/** A suggestion's command is safe if it's null (passthrough) or `/name` where name is in the catalog. */
-function isCommandSafe(cmd: string | null, valid: Set<string>): boolean {
-	if (cmd === null) return true;
-	if (!cmd.startsWith("/")) return false;
-	const name = cmd.slice(1).split(/\s|"/)[0];
-	return valid.has(name);
-}
-
-// ─── LLM classification ─────────────────────────────────────────────────────
-
-interface LLMSuggestion {
-	label: string;
-	/** Slash command with $TASK placeholder, or null = pass-through ("just do it"). */
-	command: string | null;
-	description: string;
-}
-
-interface CoachDecision {
-	intent: string;
-	reason: string;
-	/** true = skip the popup (orient/trivial/build-trivial). */
-	passthrough: boolean;
-	suggestions: LLMSuggestion[];
-	skillHints: string[];
-}
-
-function parseCoachResponse(text: string): CoachDecision | null {
-	try {
-		const cleaned = text
-			.replace(/^```(?:json)?\s*/i, "")
-			.replace(/\s*```$/i, "")
-			.trim();
-		const obj = JSON.parse(cleaned) as Record<string, unknown>;
-		if (typeof obj !== "object" || obj === null) return null;
-		const suggestions = Array.isArray(obj.suggestions)
-			? (obj.suggestions as Record<string, unknown>[]).map((s) => ({
-					label: String(s.label ?? s.command ?? "Just do it"),
-					command:
-						s.command === null || s.command === undefined
-							? null
-							: String(s.command),
-					description: String(s.description ?? ""),
-				}))
-			: [];
-		return {
-			intent: String(obj.intent ?? "trivial"),
-			reason: String(obj.reason ?? ""),
-			passthrough: Boolean(obj.passthrough),
-			suggestions,
-			skillHints: Array.isArray(obj.skillHints)
-				? (obj.skillHints as unknown[]).map((s) => String(s))
-				: [],
-		};
-	} catch {
-		return null;
-	}
-}
-
-/**
- * Ask the coach model to route the user's task. Returns null on any failure
- * (model not found, no API key, timeout, unparseable JSON) — the caller falls
- * back to pass-through, so Coach never blocks the user.
- */
-async function classifyWithLLM(
+async function getSkillHints(
 	text: string,
-	catalog: CatalogEntry[],
 	ctx: ExtensionContext,
 	signal: AbortSignal,
-): Promise<CoachDecision | null> {
-	if (!ctx?.modelRegistry) return null;
+): Promise<string[]> {
+	if (!ctx?.modelRegistry) return [];
 
 	const modelSpec = loadCoachModel();
 	const slashIndex = modelSpec.indexOf("/");
-	if (slashIndex < 1) return null;
+	if (slashIndex < 1) return [];
 	const provider = modelSpec.slice(0, slashIndex);
 	const modelId = modelSpec.slice(slashIndex + 1);
 	const model = ctx.modelRegistry.find(provider, modelId);
-	if (!model) return null;
+	if (!model) return [];
 
 	const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-	if (!auth?.apiKey) return null;
+	if (!auth?.apiKey) return [];
 
-	const catalogText = catalog
-		.map((c) => `- /${c.name} — ${c.description}`)
-		.join("\n");
+	const systemPrompt = `You are a skill-hint extractor for the Pi coding agent. Given the user's task, identify which DOMAIN skills are relevant. Return ONLY valid JSON (no prose, no markdown fences):
 
-	const systemPrompt = `You are Coach, a workflow router for the Pi coding agent. Given the user's task and the live catalog of available commands/skills, decide the best workflow.
-
-Available commands (discovered live — only suggest from this list):
-${catalogText}
-
-Intent → command hints (use these to route reliably):
-  build → /build "$TASK"
-  feature → /feature "$TASK" (full chain: plan→build→review→ship)
-  fix → /fix "$TASK" (full chain: debug→build→review→ship)
-  loop → /loop "$TASK" (bounded autonomous loop for hard/multi-phase tasks)
-  debug → /debug "$TASK"
-  plan → /plan "$TASK"
-  research → /research "$TASK"
-  review → /review
-  ship → /ship
-  audit → /setup-audit
-  handoff → /handoff
-  brainstorm → /skill:brainstorming
-  document → /skill:diff-driven-docs
-  compact → /skill:compact-safe
-  write-skill → /skill:writing-great-skills
-  teach → /skill:teach
-  wayfinder → /skill:wayfinder
-  prototype → /skill:prototype
-  triage → /skill:triage
-  implement → /skill:implement
-
-Return ONLY valid JSON (no prose, no markdown fences):
-{
-  "intent": "<one of: build|debug|plan|research|review|ship|loop|feature|fix|orient|trivial|build-trivial|teach|handoff|setup|implement|compact|triage|write-skill|wayfinder|prototype|audit|brainstorm|document|remember>",
-  "reason": "<one short line explaining the routing>",
-  "passthrough": <true if the task is exploratory/trivial and should run with NO popup — orient/trivial/build-trivial/remember; false if a workflow popup helps>,
-  "suggestions": [
-    {"label": "<display label>", "command": "<slash command with $TASK placeholder, e.g. /feature \\"$TASK\\">", "description": "<one line>"},
-    ...2-4 options, best first, always include a "Just do it" option with command null last
-  ],
-  "skillHints": ["<Domain: activate skill-name>", ...]
-}
+{"skillHints": ["<Domain: activate skill-name>", ...]}
 
 Rules:
-- For orient/trivial/build-trivial/remember: passthrough=true, suggestions=[].
-- command uses $TASK as the placeholder for the user's task text.
-- ONLY suggest commands that exist in the catalog above — never invent one.
-- Keep suggestions to 2-4 options. Always include "Just do it" (command: null) as the last option.
-- skillHints: short activation notes for relevant domain skills (MongoDB, UI, Python, web, etc.); empty array if none.
-- For 'remember' intent: passthrough=true, inject skillHint "Memory: use memory tool to save".
-- For 'loop' intent: always suggest /loop as the first option (it's the most powerful workflow).
-- For 'feature' intent: suggest /loop first (design approval gated), /feature second (fast path, no approval gate).
-- For 'compact' intent: suggest /skill:compact-safe (NOT /compact which is a built-in not in the catalog).`;
+- skillHints: short activation notes for relevant domain skills (MongoDB, UI/Python/web/Vercel/Bright Data, etc.); empty array if none.
+- Do NOT suggest workflow skills (tdd, code-review, brainstorming, etc.) — those are handled by the workflow menu.
+- Keep it to 0-3 hints. Only include skills that are genuinely relevant to the task.`;
 
 	const messages: Message[] = [
 		{ role: "system", content: systemPrompt },
@@ -271,10 +118,15 @@ Rules:
 							.map((p) => p.text ?? "")
 							.join("")
 					: "";
-		if (!content) return null;
-		return parseCoachResponse(content);
+		if (!content) return [];
+		const cleaned = content
+			.replace(/^```(?:json)?\s*/i, "")
+			.replace(/\s*```$/i, "")
+			.trim();
+		const obj = JSON.parse(cleaned) as { skillHints?: unknown[] };
+		return Array.isArray(obj.skillHints) ? obj.skillHints.map(String) : [];
 	} catch {
-		return null;
+		return [];
 	}
 }
 
@@ -283,35 +135,34 @@ function hintFromSkills(skillHints: string[]): string | null {
 	return `[Coach capability activation — ${skillHints.join(" | ")}]`;
 }
 
-// ─── Fixed workflow options (no LLM needed — the user always picks) ─────────
-// The core problem this solves: when Coach passes through "trivial" tasks,
-// the agent improvises from AGENTS.md prose instead of running the prompt
-// commands that mechanically inject skills via `skill:` frontmatter pins.
-// By ALWAYS showing the fixed menu for task-like inputs, the user always
-// sees the workflow options and picks one — guaranteeing the prompt command
-// runs and the skill content is injected.
+// ─── Fixed workflow menu (no LLM routing — the user always picks) ───────────
 
 interface WorkflowOption {
 	label: string;
-	command: string | null; // null = "just do it" (passthrough)
+	command: string | null; // null = passthrough
 	description: string;
 }
 
 const WORKFLOW_OPTIONS: WorkflowOption[] = [
 	{
+		label: "Just do it (raw agent — no workflow)",
+		command: null,
+		description: "Skip the workflow. The agent works from AGENTS.md rules.",
+	},
+	{
 		label: "/build — Build with TDD (red → green → prove it)",
 		command: '/build "$TASK"',
-		description: "Implement, test, fix. Pins the tdd skill.",
+		description: "Implement + test. Pins the tdd skill mechanically.",
 	},
 	{
-		label: "/feature — Full chain: plan → build → review → ship",
+		label: "/feature — Fast chain: plan → build → review → ship (no human gates)",
 		command: '/feature "$TASK"',
-		description: "End-to-end feature. Chains all phases.",
+		description: "End-to-end feature. Runs all phases back-to-back. No pause for approval.",
 	},
 	{
-		label: "/loop — Bounded autonomous loop (hard/multi-phase tasks)",
+		label: "/loop — Bounded loop with phase gates + human approval (hard tasks)",
 		command: '/loop "$TASK"',
-		description: "Contract gate → plan → build → review → verify → ship.",
+		description: "Contract gate → plan → build → review → verify → ship. Pauses for human input. Tool restrictions per phase.",
 	},
 	{
 		label: "/debug — Debug an issue (feedback loop, root cause)",
@@ -339,18 +190,13 @@ const WORKFLOW_OPTIONS: WorkflowOption[] = [
 		description: "Independent verification + commit. Pins verification skill.",
 	},
 	{
-		label: "Just do it (no workflow — raw agent)",
-		command: null,
-		description: "Skip the workflow. The agent improvises from AGENTS.md prose.",
-	},
-	{
 		label: "Browse all commands (/palette)",
 		command: "/palette",
 		description: "Fuzzy-search every command, prompt, and skill.",
 	},
 ];
 
-// Conversational inputs that should skip the popup (responses to agent questions).
+// Conversational responses (yes/no/ok) → skip the popup.
 const CONVERSATIONAL = /^(yes|no|ok|okay|sure|done|go|continue|proceed|do it|go ahead|that's fine|looks good|lgtm|yep|nope|correct|right|exactly|true|false|1|2|3|skip|next|stop|abort|cancel|\d+)\b/i;
 
 // ─── The input interceptor ──────────────────────────────────────────────────
@@ -358,46 +204,34 @@ const CONVERSATIONAL = /^(yes|no|ok|okay|sure|done|go|continue|proceed|do it|go 
 export default function coachExtension(pi: ExtensionAPI): void {
 	pi.on("input", async (event, ctx) => {
 		if (!isCoachEnabled(ctx)) return { action: "continue" };
-
-		// Never touch agent-injected messages (loop steering, hermes, etc.).
 		if (event.source === "extension") return { action: "continue" };
-
-		// C1 fix: if the loop is paused for a human decision, skip Coach entirely.
 		if (isLoopPausedForHuman()) return { action: "continue" };
 
 		const text = event.text.trim();
 		if (!text) return { action: "continue" };
 
-		// Raw mode: leading '!' = pass through untouched (power-user escape hatch).
+		// Raw mode: leading '!' = pass through untouched.
 		if (text.startsWith("!")) {
 			return { action: "transform", text: text.slice(1).trim() };
 		}
 
-		// Already a slash command: pass through (the user knew what they wanted).
+		// Already a slash command: pass through.
 		if (text.startsWith("/")) return { action: "continue" };
 
-		// Conversational responses (yes/no/ok/do it) → passthrough (no popup).
+		// Conversational responses → passthrough (no popup).
 		if (text.length < 30 && CONVERSATIONAL.test(text)) {
 			return { action: "continue" };
 		}
 
-		// For everything else, show the fixed workflow menu.
-		// This is the core fix: instead of LLM routing (unreliable) or passthrough
-		// (which leads to prose improvisation), ALWAYS show the 9 workflow options.
-		// The user picks → Coach transforms to the slash command → Pi expands the
-		// prompt template → the skill: frontmatter pin fires → skill content is
-		// mechanically injected. No improvisation. No orphans.
-		//
-		// Optional: still use LLM for skillHints (domain skills like MongoDB/UI/Python).
+		// Get optional skill hints from LLM (non-blocking).
 		let skillHint: string | null = null;
 		try {
-			const catalog = buildCatalog(pi);
 			const controller = new AbortController();
 			const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
-			const decision = await classifyWithLLM(text, catalog, ctx, controller.signal).finally(() => clearTimeout(timeout));
-			if (decision && decision.skillHints.length > 0) {
-				skillHint = hintFromSkills(decision.skillHints);
-			}
+			const hints = await getSkillHints(text, ctx, controller.signal).finally(
+				() => clearTimeout(timeout),
+			);
+			if (hints.length > 0) skillHint = hintFromSkills(hints);
 		} catch {
 			// LLM failed — skip skillHints, still show the menu.
 		}
@@ -423,7 +257,7 @@ export default function coachExtension(pi: ExtensionAPI): void {
 			return { action: "continue" };
 		}
 
-		// Transform the input into the chosen slash command, with the task filled in.
+		// Transform the input into the chosen slash command.
 		const taskText = skillHint ? `${text} ${skillHint}` : text;
 		const command = picked.command.replace("$TASK", () =>
 			taskText.replace(/"/g, '\\"'),
@@ -435,61 +269,25 @@ export default function coachExtension(pi: ExtensionAPI): void {
 		return { action: "transform", text: command };
 	});
 
-	// /coach command — toggle + status + test the classifier on a sample.
+	// /coach command — toggle + status.
 	pi.registerCommand("coach", {
-		description:
-			"Toggle or test the auto-coach (LLM suggests the right workflow for your task)",
+		description: "Toggle Coach on/off (the fixed workflow menu for plain-English tasks)",
 		handler: async (args, ctx) => {
 			const sub = (args ?? "").trim().toLowerCase();
 			if (sub === "off") {
 				setCoachEnabled(ctx, false);
 				ctx.ui.setStatus("coach", undefined);
-				ctx.ui.notify("Coach OFF — you'll type commands yourself.", "info");
+				ctx.ui.notify("Coach OFF — type slash commands yourself.", "info");
 				return;
 			}
 			if (sub === "on") {
 				setCoachEnabled(ctx, true);
 				ctx.ui.setStatus("coach", ctx.ui.theme.fg("dim", "🧭 coach"));
-				ctx.ui.notify(
-					"Coach ON — type a task and I'll suggest the workflow.",
-					"info",
-				);
-				return;
-			}
-			if (sub === "test" || sub.startsWith("test ")) {
-				// Classify a sample without transforming.
-				const sample = (args ?? "").replace(/^test\s*/i, "").trim();
-				if (!sample) {
-					ctx.ui.notify(
-						"Usage: /coach test <your task> — shows what Coach would suggest",
-						"warning",
-					);
-					return;
-				}
-				const catalog = buildCatalog(pi);
-				const controller = new AbortController();
-				const t = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
-				const decision = await classifyWithLLM(
-					sample,
-					catalog,
-					ctx,
-					controller.signal,
-				).finally(() => clearTimeout(t));
-				if (!decision) {
-					ctx.ui.notify(
-						"Coach: LLM classification failed — check ~/.pi/agent/coach.json (coachModel) and that the model is enabled.",
-						"warning",
-					);
-					return;
-				}
-				ctx.ui.notify(
-					`Coach: "${sample}" → ${decision.intent}\n${decision.reason}\nSuggests: ${decision.suggestions.map((s) => s.label).join(" | ") || "(pass-through)"}\nSkills: ${decision.skillHints.join(", ") || "none"}`,
-					"info",
-				);
+				ctx.ui.notify("Coach ON — type a task and pick a workflow.", "info");
 				return;
 			}
 			ctx.ui.notify(
-				`Coach is ${isCoachEnabled(ctx) ? "ON" : "OFF"}. Type a task in plain English — I'll suggest the workflow. (prefix '!' = raw, '/coach off|on|test')`,
+				`Coach is ${isCoachEnabled(ctx) ? "ON" : "OFF"}. Type a task → pick a workflow. ('!' = raw, '/coach off|on')`,
 				"info",
 			);
 		},
@@ -498,9 +296,8 @@ export default function coachExtension(pi: ExtensionAPI): void {
 	pi.on("session_start", async (_event, ctx) => {
 		if (isCoachEnabled(ctx)) {
 			ctx.ui.setStatus("coach", ctx.ui.theme.fg("dim", "🧭 coach"));
-			// One-time gentle reminder of the interface (not every turn — just once).
 			ctx.ui.notify(
-				"Coach on — just type your task. (I'll suggest the workflow. '!' = raw)",
+				"Coach on — type your task, pick a workflow. ('!' = raw)",
 				"info",
 			);
 		}

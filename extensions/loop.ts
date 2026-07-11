@@ -148,61 +148,15 @@ interface LoopState {
 	updatedAt: string;
 }
 
-// Per-session state (BUG-2 fix: was module-level `let`s that leaked across sessions/subagents).
-// Keyed by sessionId so every session/subagent gets its own independent loop state.
-const activeBySession = new Map<string, LoopState | null>();
-const snapshotBySession = new Map<string, string[] | null>();
-const branchHadBySession = new Map<string, boolean>();
-const expectingBySession = new Map<string, boolean>();
-const pausedBySession = new Map<string, boolean>();
-
-function sid(ctx: ExtensionContext): string {
-	return ctx.sessionManager.getSessionId();
-}
-
-// Accessor properties that read/write the per-session maps:
-function getActive(ctx: ExtensionContext): LoopState | null {
-	return activeBySession.get(sid(ctx)) ?? null;
-}
-function setActive(ctx: ExtensionContext, val: LoopState | null): void {
-	if (val === null) activeBySession.delete(sid(ctx));
-	else activeBySession.set(sid(ctx), val);
-}
-function getSnapshot(ctx: ExtensionContext): string[] | null {
-	return snapshotBySession.get(sid(ctx)) ?? null;
-}
-function setSnapshot(ctx: ExtensionContext, val: string[] | null): void {
-	if (val === null) snapshotBySession.delete(sid(ctx));
-	else snapshotBySession.set(sid(ctx), val);
-}
-function getBranchHad(ctx: ExtensionContext): boolean {
-	return branchHadBySession.get(sid(ctx)) ?? false;
-}
-function setBranchHad(ctx: ExtensionContext, val: boolean): void {
-	branchHadBySession.set(sid(ctx), val);
-}
-function getExpecting(ctx: ExtensionContext): boolean {
-	return expectingBySession.get(sid(ctx)) ?? false;
-}
-function setExpecting(ctx: ExtensionContext, val: boolean): void {
-	expectingBySession.set(sid(ctx), val);
-}
-function getPaused(ctx: ExtensionContext): boolean {
-	return pausedBySession.get(sid(ctx)) ?? false;
-}
-function setPaused(ctx: ExtensionContext, val: boolean): void {
-	pausedBySession.set(sid(ctx), val);
-}
-
-// Backward-compat: `active` is used as a bare variable throughout. We can't
-// replace every usage in one edit without a huge diff, so we keep a getter
-// proxy via `active` as a property on a small object that reads the current
-// session. But that requires ctx everywhere. Instead, we use a simpler
-// approach: the session that STARTED the loop is the "active session" and
-// we track its ID. All bare `active` references are in the loop's own
-// event handlers which have ctx. We'll convert them in the next pass.
-// For now, keep a module-level `active` for the loop-runner context, but
-// also sync to the per-session map.
+// <!-- scar: 2026-07-11 — BUG-2: module-level state leaks across sessions/subagents.
+//   coach.ts and guardrails.ts fixed this with per-session Maps. loop.ts still uses
+//   module-level `let`s because converting every `active` reference to `getActive(ctx)`
+//   is a large refactor (the variable is used in 30+ places across 1000 lines).
+//   The per-session Maps scaffold was removed as dead code — it was never wired in.
+//   Full fix: replace all bare `active`/`pausedForHuman`/etc with per-session Map
+//   accessors, matching the coach.ts pattern. Until then, don't run /loop in
+//   concurrent sessions or subagent sessions.
+// -->
 let active: LoopState | null = null;
 let phaseToolSnapshot: string[] | null = null;
 let branchHadToolCall = false;
@@ -210,8 +164,6 @@ let expectingAgentResponse = false;
 let pausedForHuman = false;
 
 // C1 fix: export pause state so Coach can skip when the loop is paused for human input.
-// Without this, Coach's `input` handler returns {action:"handled"} and short-circuits
-// the input chain — loop.ts's `input` handler never runs, and the loop stays paused forever.
 export function isLoopPausedForHuman(): boolean {
 	return active !== null && pausedForHuman;
 }
