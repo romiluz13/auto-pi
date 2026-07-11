@@ -10,16 +10,16 @@ Ship the current work. Follow workflow steps 7-8.
    - Run the project's test/lint/typecheck command. Read the FULL output. Don't scan for "passed" — read the details.
    - For each claim, mark it VERIFIED or CONTRADICTED. If any is CONTRADICTED, stop and fix before proceeding.
 
-2. **Commit.** Run `/skill:commit` for clean conventional commits. Stage only relevant files. Write a clear commit message:
-   - Subject: imperative mood, under 72 chars.
-   - Body: what changed, why it changed, what was tested.
-
-3. **Document.** Classify doc impact first → run `/skill:diff-driven-docs` to determine what docs need updating.
+2. **Document.** Classify doc impact first → run `/skill:diff-driven-docs` to determine what docs need updating.
    - Durable gotcha/workflow change → update repo AGENTS.md.
    - Domain term resolved → update `CONTEXT.md` (`/skill:domain-modeling`).
    - Architecture decision → write ADR in `docs/adr/` (`/skill:domain-modeling`).
    - User-facing change → update CHANGELOG.
    - Don't create random markdown files.
+
+3. **Commit.** Run `/skill:commit` for clean conventional commits. Stage relevant files INCLUDING doc changes from step 2. Write a clear commit message:
+   - Subject: imperative mood, under 72 chars.
+   - Body: what changed, why it changed, what was tested.
 
 4. **Push + PR.** Run `/skill:github` via `gh` CLI:
    - Push to a branch (not main).

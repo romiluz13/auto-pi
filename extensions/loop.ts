@@ -395,7 +395,7 @@ function phasePrompt(state: LoopState, phase: Phase): string {
 	const base = `[LOOP ENGINE — phase: ${phase}, iteration: ${state.iteration}/${state.maxIterations}]\n`;
 	switch (phase) {
 		case "plan":
-			return `${base}PLAN phase (read + write for .loop-plan.md only — edit/bash-mutating are gated off). Explore the codebase, understand the target, and write a plan to .loop-plan.md.
+			return `${base}PLAN phase (read + write for .loop-plan.md only — edit/bash-mutating are gated off). Explore the codebase, understand the target, and write a plan to .loop-plan.md. Run /skill:brainstorming to explore the design space before writing the plan.
 
 **Patterns to Mirror (extract BEFORE planning):** Use read/grep/find/lsp_* to produce a patterns table with ACTUAL code snippets copied from the codebase (not invented) + file:line refs:
 | Category | File:Lines | Pattern | Code Snippet |
@@ -419,7 +419,7 @@ If SPEC_GATE_FAIL: revise the plan and re-run (max 3 tries → ESCALATE). No "ap
 - [ ] SPEC_GATE_PASS (feasibility + completeness + scope checks all passed)
 Report when the checkpoint is satisfied.`;
 		case "build":
-			return `${base}BUILD phase (full toolset). Implement per the plan (.loop-plan.md). Read each task's MIRROR: {file:lines} reference and follow that real pattern exactly.
+			return `${base}BUILD phase (full toolset). Implement per the plan (.loop-plan.md). Read each task's MIRROR: {file:lines} reference and follow that real pattern exactly. Use /skill:implement as the execution wrapper and /skill:tdd for the test-first cycle.
 
 **TDD:** write the test first, watch it fail, implement, watch it pass. Exit 1 from import/syntax error is NOT a real RED — a genuine RED is a behavioral failure.
 

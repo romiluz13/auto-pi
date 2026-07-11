@@ -170,6 +170,11 @@ const WORKFLOW_OPTIONS: WorkflowOption[] = [
 		description: "Build a repro loop, find root cause, fix. Pins diagnosing-bugs.",
 	},
 	{
+		label: "/fix — Fast chain: debug → build → review → ship (for bugs)",
+		command: '/fix "$TASK"',
+		description: "End-to-end bug fix. Runs all phases back-to-back.",
+	},
+	{
 		label: "/plan — Plan only (no code, design + spec + tickets)",
 		command: '/plan "$TASK"',
 		description: "Understand, brainstorm, write spec + tickets. Pins brainstorming.",
