@@ -1,8 +1,8 @@
 # auto-pi
 
-> The workflow decides what to do. The model executes. You steer.
+> Type a task. Pick a workflow. The right skills fire at the right moment. The agent proves its work. Memory compounds.
 
-A Pi coding agent config that makes skills **actually fire** — not sit in a catalog hoping the LLM notices them. Type a task, pick a workflow, and the skill content is mechanically injected. No improvisation. No orphans. One rule file, shared across Pi, Claude Code, and Codex.
+A Pi coding agent config where every task follows a real engineering workflow — and every workflow loads the right skills at the right step. Not from hope. Not from memory. The actual procedure, mechanically injected where it's needed.
 
 [![Pi](https://img.shields.io/badge/Pi-v0.80+-blue.svg)](https://pi.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -10,103 +10,76 @@ A Pi coding agent config that makes skills **actually fire** — not sit in a ca
 
 ---
 
-## The problem
+## The value
 
-Every coding agent ships the same broken loop:
+You type "add pagination to the user list." You pick a workflow. The right skills load at each phase — the agent follows a real procedure, not an improvisation.
 
-1. **Skills sit in a catalog** — 70+ skills in the system prompt, the model picks whichever it feels like
-2. **Rules fade** — by turn 20, the agent forgot your conventions
-3. **"Tests pass" is trusted on faith** — no proof, no evidence, no independent check
-4. **Workflows are prose** — the agent reads "use TDD" and improvises, instead of loading the actual TDD skill
+**Plan** → the brainstorming skill loads. The agent asks you questions one at a time, proposes approaches, gets your approval. Then writes a spec and breaks it into tickets.
 
-auto-pi fixes all four.
+**Build** → the TDD skill loads. Write the test first, watch it fail, implement, watch it pass. If it fails, the diagnosing-bugs skill loads — build a feedback loop, find the root cause, fix the source.
+
+**Review** → the code-review skill loads. Two-axis review (standards + spec) with fresh-context reviewers who only see the diff. When feedback returns, the receiving-code-review skill loads — verify before implementing, push back if wrong.
+
+**Ship** → the verification skill loads. You are an independent auditor — a passing test is never sufficient. Run the command, read the output, prove it. Then document (before commit, so docs are in the commit). Then commit. Then PR.
+
+**Throughout all of this:**
+
+- **Memory** saves every decision, gotcha, and failure for the next session — it compounds
+- **Research** fans out across web, GitHub, codebase, and memory when you need evidence
+- **Guardrails** keep your conventions in context every turn — rules don't fade
+- **Handoff** captures everything into a document when the session gets long — no lost context
+
+Every skill at the right step. Every phase with the right procedure. Memory that compounds. Research that's grounded. Verification that demands proof.
 
 ## How it works
 
 ```
-you:   add dark mode to the dashboard
+you:   add pagination to the user list
 
-coach: ┌─────────────────────────────────────────────────────────┐
-       │ Coach — pick a workflow for: "add dark mode to the       │
-       │ dashboard"                                               │
-       │                                                          │
-       │  1. Just do it (raw agent)                               │
-       │  2. /build — Build with TDD (red → green → prove it)     │
-       │  3. /feature — Fast chain: plan → build → review → ship  │
-       │  4. /loop — Bounded loop with phase gates + approval     │
-       │  5. /debug — Debug an issue                              │
-       │  6. /fix — Fast chain: debug → build → review → ship     │
-       │  7. /plan — Plan only (no code)                          │
-       │  8. /research — Research a topic                         │
-       │  9. /review — Review current diff                        │
-       │ 10. /ship — Ship (verify, document, commit, PR)          │
-       │ 11. Browse all commands (/palette)                        │
-       └─────────────────────────────────────────────────────────┘
+       1. Just do it (raw agent)
+       2. /build — Build with TDD
+       3. /feature — plan → build → review → ship
+       4. /loop — bounded loop with phase gates + approval
+       5. /debug — feedback loop, root cause
+       6. /fix — debug → build → review → ship
+       7. /plan — plan only (no code)
+       8. /research — parallel fan-out
+       9. /review — review current diff
+      10. /ship — verify, document, commit, PR
+      11. Browse all commands (/palette)
 
-→ you pick 2 → /build "add dark mode to the dashboard"
-  ↓ the tdd skill is mechanically injected via the skill: frontmatter pin
-  ↓ the model gets the REAL TDD procedure, not an improvisation
-  ↓ BUILD  implement, red → green, paste exit code as proof
-  ↓ (then /review → code-review skill injected → parallel reviewers)
-  ↓ (then /ship → verification skill injected → independent audit → commit)
+→ you pick 3 → /feature "add pagination to the user list"
+  PLAN     brainstorming skill injected → questions → approval → spec + tickets
+  BUILD    tdd skill injected → red → green → proof
+           if RED: diagnosing-bugs skill injected → feedback loop → root cause
+  REVIEW   code-review skill injected → 2-axis parallel reviewers → receiving-code-review
+  SHIP     verification skill injected → independent audit → document → commit → PR
 ```
 
-**The skill fires because the prompt command runs.** Not because the model hopefully read a description.
-
-## What makes it different
-
-| Every other setup | auto-pi |
-| --- | --- |
-| 70 skills in catalog, model picks whatever | **Coach's fixed menu** → you pick a workflow → `skill:` pin fires → skill content is mechanically injected |
-| Agent improvises TDD from prose | Agent runs `/build` → `tdd` skill is injected → the actual TDD procedure is in context |
-| Rules fade by turn 20 | **Guardrails** re-injects AGENTS.md every turn + full rules after compaction |
-| "Tests pass" on faith | **RED guard + evidence block** — failing tests loop back, not forward; build demands command + exit code + output |
-| One forward pipeline | **Loop engine** — bounded remediation, plateau detection, independent verifier convergence, phase tool-gates |
-| No idea which skills fired | **`/trace-skills`** — shows available vs activated in real time; orphans are visible |
-| Packages may conflict | **Harmony-checked** — 8 independent audits, 80+ findings fixed, every axis has one owner |
-| Tied to one tool | One rule file, **three agents** (Pi / Claude Code / Codex) |
-
-## The activation guarantee
-
-Six skills are **mechanically pinned** via `skill:` frontmatter — they fire 100% of the time when the prompt runs, no exceptions:
-
-| Skill | Fires when | How |
-| --- | --- | --- |
-| `brainstorming` | `/plan` | `skill:` frontmatter pin |
-| `tdd` | `/build` | `skill:` frontmatter pin |
-| `diagnosing-bugs` | `/debug` | `skill:` frontmatter pin |
-| `research` | `/research` | `skill:` frontmatter pin |
-| `code-review` | `/review` | `skill:` frontmatter pin |
-| `verification-before-completion` | `/ship` | `skill:` frontmatter pin |
-
-Eighteen more skills are **explicitly steered** with `/skill:` notation in prompts, AGENTS.md, and loop phases — the model is told to run them at the right moment. The loop engine's four phases each name their skills: PLAN→`brainstorming`, BUILD→`implement`+`tdd`+`diagnosing-bugs`, REVIEW→`code-review`+`receiving-code-review`, SHIP→`verification`+`commit`+`github`.
-
-> **Technical note:** with our installed `pi-prompt-template-model`, `skill:` is one-per-prompt. Multi-skill hard pins would need a package upgrade or separate prompts. The `/skill:` steer pattern is the workaround — it's not a mechanical pin, but it's far better than hoping the model discovers the skill from its description alone.
-
-~50 domain skills (MongoDB, Vercel, Bright Data, Octocode) activate via model auto-discovery from their descriptions — this is by design for domain-specific capabilities.
+The skill fires because the prompt command runs. The `skill:` frontmatter pin mechanically injects the skill content into context. The model gets the real procedure — not an improvisation from prose.
 
 ## What's inside
 
-**14 npm packages** — one per capability axis, zero collisions:
-memory · subagents · LSP/lens · web · intercom · rewind · destructive-gate · context-sidecar · observability · statusline · questions · prompt-engine · side-conversations · web-access
+**9 workflows** — each loads the right skill at the right phase:
 
-**6 custom extensions:**
+`/build` `/debug` `/feature` `/fix` `/loop` `/plan` `/research` `/review` `/ship`
 
-| Extension | What it does |
+**6 extensions** that make it work:
+
+| Extension | Role |
 | --- | --- |
-| `coach.ts` | Fixed 9-option workflow menu for plain-English tasks. You pick → skill fires. |
-| `loop.ts` | Bounded autonomous loop: contract gate → plan → build → review → verify → ship. RED guard, plateau detection, per-phase tool restrictions. |
-| `guardrails.ts` | Keeps AGENTS.md in the system prompt. Reminder every turn, full rules on start + after compaction. |
-| `trace.ts` | Activation observability. `/trace-skills` shows available vs activated — the orphan detector. |
-| `palette.ts` | Fuzzy command palette (`Ctrl+Shift+K`). Zero drift — discovers dynamically. |
-| `handoff.ts` | Deterministic `HANDOFF.md` from session ledger. No LLM call. |
+| `coach.ts` | Shows the workflow menu when you type a task. You pick, it runs. |
+| `loop.ts` | Bounded autonomous loop for hard tasks. Contract gate, phase tool-gates, RED guard, plateau detection. |
+| `guardrails.ts` | Keeps your rules in context. Re-injects AGENTS.md every turn + after compaction. |
+| `trace.ts` | Shows which skills fired vs which sat orphaned. `/trace-skills` — the orphan detector. |
+| `palette.ts` | Fuzzy search over every command. `Ctrl+Shift+K`. |
+| `handoff.ts` | Captures the session into a document for the next one. No lost context. |
 
-**9 slash commands** — each with a `skill:` pin that mechanically injects the skill:
-`/build` `/debug` `/feature` `/fix` `/plan` `/research` `/review` `/ship` `/setup-audit`
+**14 packages** — one per capability axis, zero collisions: memory, subagents, LSP, web, intercom, rewind, destructive-gate, context-sidecar, observability, statusline, questions, prompt-engine, side-conversations, web-access.
 
-**11 hand-tuned skills** + **53 community skills** (Matt Pocock, MongoDB, Vercel, Bright Data, Octocode, Python/OSS, UX) provisioned by `install.sh`.
+**64 skills** — 11 hand-tuned + 53 community (Matt Pocock, MongoDB, Vercel, Bright Data, Octocode, Python/OSS, UX). The right one loads at the right step.
 
-**One 137-line rule file** — `config/agents.md`, shared across Pi, Claude Code, and Codex. Says "MUST run `/build`" — not "use TDD" — so skills actually fire.
+**One 137-line rule file** — `config/agents.md`, shared across Pi, Claude Code, and Codex. Edit once, every agent follows the same workflow.
 
 ## Install
 
@@ -116,28 +89,20 @@ cd auto-pi
 ./scripts/install.sh
 ```
 
-One command: 14 packages, 6 extensions, 9 commands, 64 skills, model definitions, AGENTS.md wired across three agents. Reload Pi (`/reload`) and type a task.
+One command: 14 packages, 6 extensions, 9 workflows, 64 skills, model definitions, AGENTS.md wired across three agents. Reload Pi (`/reload`) and type a task.
 
 **Prerequisites:** Pi, Node 20+, npm, git, [mise](https://mise.jdx.dev/). `gh` optional.
 
-**Update:** `./scripts/update.sh` (packages + community skills + curated assets)
+**Update:** `./scripts/update.sh`
 
 ## Use it
 
 ```
 pi
-> add pagination to the user list          # Coach shows 9 options → pick /feature
-> !just fix this one typo                  # '!' = raw, no Coach
+> add pagination to the user list          # pick /feature
+> !just fix this one typo                  # '!' = raw, no workflow
 > /loop "migrate auth to JWT end to end"   # hard task → bounded loop
-> /trace-skills                            # see which skills fired vs orphaned
 ```
-
-## Proven, not just built
-
-- **8 independent audits** (48+ subagents across 6 LLM providers) — every extension, package, skill, prompt, and config checked. 80+ findings fixed. 3 refuted by source verification.
-- **Dogfooded** — the Pocock-alignment prune was researched, specced, built, and verified by Pi running this config.
-- **Observable** — the first dogfood test caught 0/6 Grade A skills activating (the agent improvised from prose). The Coach fixed-menu fix was the response. `/trace-skills` proved it worked.
-- **Honest about rejections** — packages excluded for conflict are documented in `extensions/README.md`.
 
 ## Structure
 
@@ -151,7 +116,6 @@ skills/                 11 hand-tuned skills
 scripts/install.sh      one-command setup
 scripts/update.sh       refresh everything
 docs/audits/            the audit trail
-vendor/                 legacy namespace shims
 ```
 
 ## License
