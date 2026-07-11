@@ -283,6 +283,76 @@ function hintFromSkills(skillHints: string[]): string | null {
 	return `[Coach capability activation — ${skillHints.join(" | ")}]`;
 }
 
+// ─── Fixed workflow options (no LLM needed — the user always picks) ─────────
+// The core problem this solves: when Coach passes through "trivial" tasks,
+// the agent improvises from AGENTS.md prose instead of running the prompt
+// commands that mechanically inject skills via `skill:` frontmatter pins.
+// By ALWAYS showing the fixed menu for task-like inputs, the user always
+// sees the workflow options and picks one — guaranteeing the prompt command
+// runs and the skill content is injected.
+
+interface WorkflowOption {
+	label: string;
+	command: string | null; // null = "just do it" (passthrough)
+	description: string;
+}
+
+const WORKFLOW_OPTIONS: WorkflowOption[] = [
+	{
+		label: "/build — Build with TDD (red → green → prove it)",
+		command: '/build "$TASK"',
+		description: "Implement, test, fix. Pins the tdd skill.",
+	},
+	{
+		label: "/feature — Full chain: plan → build → review → ship",
+		command: '/feature "$TASK"',
+		description: "End-to-end feature. Chains all phases.",
+	},
+	{
+		label: "/loop — Bounded autonomous loop (hard/multi-phase tasks)",
+		command: '/loop "$TASK"',
+		description: "Contract gate → plan → build → review → verify → ship.",
+	},
+	{
+		label: "/debug — Debug an issue (feedback loop, root cause)",
+		command: '/debug "$TASK"',
+		description: "Build a repro loop, find root cause, fix. Pins diagnosing-bugs.",
+	},
+	{
+		label: "/plan — Plan only (no code, design + spec + tickets)",
+		command: '/plan "$TASK"',
+		description: "Understand, brainstorm, write spec + tickets. Pins brainstorming.",
+	},
+	{
+		label: "/research — Research a topic (parallel fan-out)",
+		command: '/research "$TASK"',
+		description: "Web, GitHub, codebase, memory. Pins research skill.",
+	},
+	{
+		label: "/review — Review current diff (parallel reviewers)",
+		command: "/review",
+		description: "Standards + spec + security. Pins code-review skill.",
+	},
+	{
+		label: "/ship — Ship (verify, commit, document, PR)",
+		command: "/ship",
+		description: "Independent verification + commit. Pins verification skill.",
+	},
+	{
+		label: "Just do it (no workflow — raw agent)",
+		command: null,
+		description: "Skip the workflow. The agent improvises from AGENTS.md prose.",
+	},
+	{
+		label: "Browse all commands (/palette)",
+		command: "/palette",
+		description: "Fuzzy-search every command, prompt, and skill.",
+	},
+];
+
+// Conversational inputs that should skip the popup (responses to agent questions).
+const CONVERSATIONAL = /^(yes|no|ok|okay|sure|done|go|continue|proceed|do it|go ahead|that's fine|looks good|lgtm|yep|nope|correct|right|exactly|true|false|1|2|3|skip|next|stop|abort|cancel|\d+)\b/i;
+
 // ─── The input interceptor ──────────────────────────────────────────────────
 
 export default function coachExtension(pi: ExtensionAPI): void {
@@ -293,7 +363,6 @@ export default function coachExtension(pi: ExtensionAPI): void {
 		if (event.source === "extension") return { action: "continue" };
 
 		// C1 fix: if the loop is paused for a human decision, skip Coach entirely.
-		// The user's response should resume the loop, not be transformed into a slash command.
 		if (isLoopPausedForHuman()) return { action: "continue" };
 
 		const text = event.text.trim();
@@ -307,88 +376,58 @@ export default function coachExtension(pi: ExtensionAPI): void {
 		// Already a slash command: pass through (the user knew what they wanted).
 		if (text.startsWith("/")) return { action: "continue" };
 
-		// Classify with the LLM over the live catalog.
-		const catalog = buildCatalog(pi);
-		const valid = catalogNames(catalog);
-		// The /palette escape hatch is filtered out of the LLM-facing catalog (so
-		// the model doesn't suggest it as a "workflow"), but it's a real command —
-		// allow it through the safety check for the hardcoded fallback option.
-		valid.add("palette");
-		const controller = new AbortController();
-		const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
-		let decision: CoachDecision | null = null;
-		try {
-			decision = await classifyWithLLM(text, catalog, ctx, controller.signal);
-		} finally {
-			clearTimeout(timeout);
-		}
-
-		// Fallback: LLM failed/timeout/unparseable — pass through, never block.
-		if (!decision) return { action: "continue" };
-
-		// Silent pass-through for exploratory/trivial tasks (no popup).
-		if (decision.passthrough || decision.suggestions.length === 0) {
-			const hint = hintFromSkills(decision.skillHints);
-			if (hint) return { action: "transform", text: `${hint}\n${text}` };
+		// Conversational responses (yes/no/ok/do it) → passthrough (no popup).
+		if (text.length < 30 && CONVERSATIONAL.test(text)) {
 			return { action: "continue" };
 		}
 
-		// Show the coach UI: select with the LLM's suggestions + palette escape.
-		const skillTitle =
-			decision.skillHints.length > 0
-				? ` — activating: ${decision.skillHints.join(", ")}`
-				: "";
-		const title = `Coach → ${decision.intent.toUpperCase()} — ${decision.reason}${skillTitle}`;
-		const suggestions: LLMSuggestion[] = [
-			...decision.suggestions,
-			{
-				label: "Browse all commands (/palette)",
-				command: "/palette",
-				description: "Fuzzy-search every command, prompt, and skill.",
-			},
-		];
-		// Drop suggestions whose command isn't in the live catalog (defense vs LLM hallucination).
-		const safeSuggestions = suggestions.filter((s) =>
-			isCommandSafe(s.command, valid),
-		);
-		if (safeSuggestions.length === 0) return { action: "continue" };
+		// For everything else, show the fixed workflow menu.
+		// This is the core fix: instead of LLM routing (unreliable) or passthrough
+		// (which leads to prose improvisation), ALWAYS show the 9 workflow options.
+		// The user picks → Coach transforms to the slash command → Pi expands the
+		// prompt template → the skill: frontmatter pin fires → skill content is
+		// mechanically injected. No improvisation. No orphans.
+		//
+		// Optional: still use LLM for skillHints (domain skills like MongoDB/UI/Python).
+		let skillHint: string | null = null;
+		try {
+			const catalog = buildCatalog(pi);
+			const controller = new AbortController();
+			const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
+			const decision = await classifyWithLLM(text, catalog, ctx, controller.signal).finally(() => clearTimeout(timeout));
+			if (decision && decision.skillHints.length > 0) {
+				skillHint = hintFromSkills(decision.skillHints);
+			}
+		} catch {
+			// LLM failed — skip skillHints, still show the menu.
+		}
+
+		// Show the fixed workflow menu.
+		const title = `Coach — pick a workflow for: "${text.slice(0, 80)}${text.length > 80 ? "…" : ""}"${skillHint ? ` — ${skillHint}` : ""}`;
 		const choice = await ctx.ui.select(
 			title,
-			safeSuggestions.map((s) => s.label),
+			WORKFLOW_OPTIONS.map((o) => o.label),
 		);
 
 		if (choice === undefined) {
 			// Esc / cancel = just do it (still inject skill hints).
-			const hint = hintFromSkills(decision.skillHints);
-			if (hint) return { action: "transform", text: `${hint}\n${text}` };
+			if (skillHint) return { action: "transform", text: `${skillHint}\n${text}` };
 			return { action: "continue" };
 		}
 
-		const picked = safeSuggestions.find((s) => s.label === choice) ?? null;
-		const combinedHint = hintFromSkills(decision.skillHints);
+		const picked = WORKFLOW_OPTIONS.find((o) => o.label === choice) ?? null;
 
 		if (!picked || picked.command === null) {
-			// "Just do it" or pass-through skill — inject hints, pass original text.
-			if (combinedHint)
-				return { action: "transform", text: `${combinedHint}\n${text}` };
+			// "Just do it" — inject hints, pass original text.
+			if (skillHint) return { action: "transform", text: `${skillHint}\n${text}` };
 			return { action: "continue" };
 		}
 
 		// Transform the input into the chosen slash command, with the task filled in.
-		// Use a replacement function so $&, $`, $' in user input don't corrupt the command.
-		const taskText = combinedHint ? `${text} ${combinedHint}` : text;
+		const taskText = skillHint ? `${text} ${skillHint}` : text;
 		const command = picked.command.replace("$TASK", () =>
 			taskText.replace(/"/g, '\\"'),
 		);
-		// Place the command in the editor and end this turn ("handled" = consumed,
-		// nothing sent to the agent). The user presses Enter, which re-enters prompt()
-		// and runs the FULL command dispatch — including extension commands like
-		// /loop, /palette, /handoff that Pi checks on the original text BEFORE the
-		// `input` event. A plain `transform` would bypass that re-check and send
-		// extension commands to the agent as literal text. Prompt-template commands
-		// (/build, /feature, ...) also work via this path (template expansion runs
-		// on re-entry). In non-TUI mode there's no editor to seed, so fall back to
-		// transform (templates still expand; extension commands won't — best effort).
 		if (ctx.mode === "tui") {
 			ctx.ui.setEditorText(command);
 			return { action: "handled" };
