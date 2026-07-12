@@ -1,85 +1,25 @@
 # auto-pi
 
-> Type a task. Pick a workflow. The right skills fire at the right moment. The agent proves its work. Memory compounds.
+**A workflow OS for [Pi](https://pi.dev).**  
+Type a task → pick a workflow → a pinned skill procedure enters context before the model acts.
 
-A Pi coding agent config where every task follows a real engineering workflow — and every workflow loads the right skills at the right step. Not from hope. Not from memory. The actual procedure, mechanically injected where it's needed.
+Not another coding agent. A dress on Pi’s minimal harness: Coach, slash workflows, mechanical `skill:` pins, and a bounded `/loop` with real tool gates.
 
 [![Pi](https://img.shields.io/badge/Pi-v0.80+-blue.svg)](https://pi.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/romiluz13/auto-pi?style=social)](https://github.com/romiluz13/auto-pi)
 
 ---
 
-## The value
+## What it is / is not
 
-You type "add pagination to the user list." You pick a workflow. The right skills load at each phase — the agent follows a real procedure, not an improvisation.
-
-**Plan** → the brainstorming skill loads. The agent asks you questions one at a time, proposes approaches, gets your approval. Then writes a spec and breaks it into tickets.
-
-**Build** → the TDD skill loads. Write the test first, watch it fail, implement, watch it pass. If it fails, the diagnosing-bugs skill loads — build a feedback loop, find the root cause, fix the source.
-
-**Review** → the code-review skill loads. Two-axis review (standards + spec) with fresh-context reviewers who only see the diff. When feedback returns, the receiving-code-review skill loads — verify before implementing, push back if wrong.
-
-**Ship** → the verification skill loads. You are an independent auditor — a passing test is never sufficient. Run the command, read the output, prove it. Then document (before commit, so docs are in the commit). Then commit. Then PR.
-
-**Throughout all of this:**
-
-- **Memory** saves every decision, gotcha, and failure for the next session — it compounds
-- **Research** fans out across web, GitHub, codebase, and memory when you need evidence
-- **Guardrails** keep your conventions in context every turn — rules don't fade
-- **Handoff** captures everything into a document when the session gets long — no lost context
-
-Every skill at the right step. Every phase with the right procedure. Memory that compounds. Research that's grounded. Verification that demands proof.
-
-## How it works
-
-```
-you:   add pagination to the user list
-
-       1. Just do it (raw agent)
-       2. /build — Build with TDD
-       3. /feature — plan → build → review → ship
-       4. /loop — bounded loop with phase gates + approval
-       5. /debug — feedback loop, root cause
-       6. /fix — debug → build → review → ship
-       7. /plan — plan only (no code)
-       8. /research — parallel fan-out
-       9. /review — review current diff
-      10. /ship — verify, document, commit, PR
-      11. Browse all commands (/palette)
-
-→ you pick 3 → /feature "add pagination to the user list"
-  PLAN     brainstorming skill injected → questions → approval → spec + tickets
-  BUILD    tdd skill injected → red → green → proof
-           if RED: diagnosing-bugs skill injected → feedback loop → root cause
-  REVIEW   code-review skill injected → 2-axis parallel reviewers → receiving-code-review
-  SHIP     verification skill injected → independent audit → document → commit → PR
-```
-
-The skill fires because the prompt command runs. The `skill:` frontmatter pin mechanically injects the skill content into context. The model gets the real procedure — not an improvisation from prose.
-
-## What's inside
-
-**9 workflows** — each loads the right skill at the right phase:
-
-`/build` `/debug` `/feature` `/fix` `/loop` `/plan` `/research` `/review` `/ship`
-
-**6 extensions** that make it work:
-
-| Extension | Role |
+| Is | Is not |
 | --- | --- |
-| `coach.ts` | Shows the workflow menu when you type a task. You pick, it runs. |
-| `loop.ts` | Bounded autonomous loop for hard tasks. Contract gate, phase tool-gates, RED guard, plateau detection. |
-| `guardrails.ts` | Keeps your rules in context. Re-injects AGENTS.md every turn + after compaction. |
-| `trace.ts` | Shows which skills fired vs which sat orphaned. `/trace-skills` — the orphan detector. |
-| `palette.ts` | Fuzzy search over every command. `Ctrl+Shift+K`. |
-| `handoff.ts` | Captures the session into a document for the next one. No lost context. |
+| An installable Pi config: extensions + prompts + skills + shared `AGENTS.md` | A sealed product competing with Claude Code / Codex / ChatGPT |
+| Six workflows that **pin** a primary skill via Pi `skill:` frontmatter | A promise that every cascading skill is force-injected |
+| `/loop` with contract gate, per-phase tool allowlists, RED/plateau exits | Unbounded “autonomous AGI” |
+| Model-agnostic — point Pi at whatever you pay for | Vendor lock-in |
 
-**14 packages** — one per capability axis, zero collisions: memory, subagents, LSP, web, intercom, rewind, destructive-gate, context-sidecar, observability, statusline, questions, prompt-engine, side-conversations, web-access.
-
-**64 skills** — 11 hand-tuned + 53 community (Matt Pocock, MongoDB, Vercel, Bright Data, Octocode, Python/OSS, UX). The right one loads at the right step.
-
-**One 137-line rule file** — `config/agents.md`, shared across Pi, Claude Code, and Codex. Edit once, every agent follows the same workflow.
+---
 
 ## Install
 
@@ -89,34 +29,114 @@ cd auto-pi
 ./scripts/install.sh
 ```
 
-One command: 14 packages, 6 extensions, 9 workflows, 64 skills, model definitions, AGENTS.md wired across three agents. Reload Pi (`/reload`) and type a task.
+Then in Pi: `/reload`, type a task, pick a workflow.
 
-**Prerequisites:** Pi, Node 20+, npm, git, [mise](https://mise.jdx.dev/). `gh` optional.
+**Needs:** [Pi](https://pi.dev) 0.80+, Node (installer uses `mise exec node@24`), npm, git, [mise](https://mise.jdx.dev/), `jq`. `gh` optional.
 
 **Update:** `./scripts/update.sh`
 
-## Use it
+---
+
+## 30 seconds
 
 ```
 pi
-> add pagination to the user list          # pick /feature
-> !just fix this one typo                  # '!' = raw, no workflow
-> /loop "migrate auth to JWT end to end"   # hard task → bounded loop
+> add pagination to the user list
 ```
+
+Coach shows a fixed menu. You pick. Examples:
+
+| You pick | What happens |
+| --- | --- |
+| `/plan` | **Pins** `brainstorming` — questions, design approval, then steered toward spec/tickets |
+| `/build` | **Pins** `tdd` — red → green → prove. On failure, procedure **steers** toward diagnosing-bugs (or run `/debug`) |
+| `/review` | **Pins** `code-review` — two-axis review procedure; receiving feedback is steered |
+| `/ship` | **Pins** `verification-before-completion` — independent audit, then steered docs → commit → PR |
+| `/feature` | Chain: plan → build → review → ship (child pins fire; **no** human approval gates between phases) |
+| `/loop` | Hard task mode: contract → phased tool gates → human pauses → cap / plateau / ship on a **real commit hash** |
+| `Just do it` or `!…` | Raw agent — AGENTS.md only, no workflow pin |
+
+---
+
+## How it works
+
+**Pinned (HARD)** — Pi injects the skill body when the slash command declares `skill:`:
+
+| Command | Pinned skill |
+| --- | --- |
+| `/plan` | `brainstorming` |
+| `/build` | `tdd` |
+| `/debug` | `diagnosing-bugs` |
+| `/research` | `research` |
+| `/review` | `code-review` |
+| `/ship` | `verification-before-completion` |
+
+**Chained** — `/feature` = plan→build→review→ship; `/fix` = debug→build→review→ship. No mega-pin on the chain itself; each leaf brings its pin.
+
+**Steered** — follow-ons live in procedure text (spec/tickets after plan, diagnosing-bugs on RED, receiving-code-review, docs-before-commit, `/skill:commit` / github). The model is instructed to load them; they are not second frontmatter pins.
+
+**Gated (`/loop`)** — extension owns phase tool allowlists, contract preflight, RED halt, plateau detection, ship only when a commit hash appears. Phase skills are steered inside those gates.
+
+**Observable** — `/trace-skills` shows available vs activated skills (orphan detector).
+
+That split is the product: **pins where it matters, gates where autonomy is dangerous, steer for the rest** — not a wall of hoped-for skills.
+
+---
+
+## What's inside
+
+| Piece | What you get |
+| --- | --- |
+| **Coach** | Plain-English task → fixed workflow menu (11 options including raw + palette) |
+| **Prompts** | `/plan` `/build` `/debug` `/research` `/review` `/ship` `/feature` `/fix` `/setup-audit` |
+| **Loop** | `/loop` extension — bounded autonomy for hard multi-phase work |
+| **Extensions** | `coach` · `loop` · `guardrails` · `trace` · `palette` · `handoff` |
+| **Packages** | 14 npm packages (memory, subagents, context sidecar, lens, rewind, web, etc.) |
+| **Skills** | 11 hand-tuned in-repo + community packs provisioned by install (Matt Pocock, MongoDB, Vercel, Bright Data, Octocode, and related). Catalog size varies with sources; **only pinned skills are mechanically injected.** |
+| **Rules** | `config/agents.md` (~137 lines) — installer wires the same file for Pi, Claude Code, and Codex |
+
+### Extensions (honest)
+
+| Extension | Behavior |
+| --- | --- |
+| `coach.ts` | Intercepts plain input → menu → runs the chosen command (`!` or `/` skips) |
+| `loop.ts` | Contract → PLAN/BUILD/REVIEW/VERIFY/SHIP with tool gates, RED/plateau, commit-hash ship |
+| `guardrails.ts` | Full HARD RULES block on session start and after compaction; short reminder on other turns |
+| `trace.ts` | Activation log + `/trace-skills` orphan gap |
+| `palette.ts` | Fuzzy command search — `Ctrl+Shift+K` or `/palette` |
+| `handoff.ts` | Writes a compact `HANDOFF.md` from recent turns + last compaction summary (deterministic, no extra LLM call) |
+
+### Memory
+
+`pi-hermes-memory` + `pi-observational-memory` persist selected lessons and session structure across/within sessions. They do not record every decision automatically — you still steer what matters into memory.
+
+---
+
+## Philosophy
+
+Pi ships a minimal harness on purpose. AutoPi fills the empty layer: **procedure reliability**.
+
+- Rent models (Claude API, ChatGPT Codex subscription, GLM, local — whatever Pi can reach).
+- Own the loop: which skill is pinned, which tools a phase may use, what counts as “shipped.”
+- Prefer one honest pin over fifty silent catalog entries.
+
+---
 
 ## Structure
 
 ```
-config/agents.md        the rule file (137 lines, shared across 3 agents)
-config/settings.json    14 packages, compaction, retry, memory, subagents
-config/models.json      provider + model definitions
-extensions/             6 TypeScript extensions
-prompts/                9 slash commands (each with a skill: pin)
+config/agents.md        shared rules (~137 lines)
+config/settings.json    packages, compaction, memory, subagents
+config/models.json      provider / model definitions
+extensions/             coach, loop, guardrails, trace, palette, handoff
+prompts/                slash workflows (pins + chains + setup-audit)
 skills/                 11 hand-tuned skills
 scripts/install.sh      one-command setup
-scripts/update.sh       refresh everything
-docs/audits/            the audit trail
+scripts/update.sh       refresh
+docs/audits/            design / harmony trail
 ```
+
+---
 
 ## License
 
