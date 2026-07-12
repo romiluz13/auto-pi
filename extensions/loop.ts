@@ -56,24 +56,28 @@ import type {
 import { Key } from "@earendil-works/pi-tui";
 
 // ─── Skill injection (mechanical, not steer) ────────────────────────────────
-// The loop engine STEERS with prose (sendUserMessage), but prose can't
-// mechanically inject skills. The prompt-template engine does it via the
-// `skill:` frontmatter pin — but the loop can't use that mechanism.
-// Instead, we read the SKILL.md directly and inject it as a message BEFORE
-// the phase prompt. Same effect: the skill content is in context.
+// The loop engine STEERS with prose (sendUserMessage). Prose can't mechanically
+// inject skills — the agent improvises instead of loading the real procedure.
+//
+// Fix: read the SKILL.md directly and EMBED the content in the phase prompt
+// itself. One message, one turn — the skill content is 100% in context.
+// No race condition (pi.sendMessage + steer would be two messages with
+// unpredictable ordering). This is the same effect as the PTM `skill:`
+// frontmatter pin, just done by the loop engine.
 
-function injectSkill(pi: ExtensionAPI, skillName: string): boolean {
+function loadSkillContent(skillName: string): string | null {
 	const skillPath = join(homedir(), ".agents", "skills", skillName, "SKILL.md");
-	if (!existsSync(skillPath)) return false;
+	if (!existsSync(skillPath)) return null;
 	const raw = readFileSync(skillPath, "utf-8");
 	// Strip frontmatter (--- ... ---)
 	const body = raw.replace(/^---[\s\S]*?---\s*/, "");
-	pi.sendMessage({
-		customType: "skill-loaded",
-		content: `[Skill loaded: ${skillName}]\n\n${body}`,
-		display: true,
-	});
-	return true;
+	return `--- ${skillName} skill (mechanically injected by loop engine) ---\n${body}\n--- end ${skillName} skill ---\n\n`;
+}
+
+function withSkills(phaseText: string, ...skillNames: string[]): string {
+	const skills = skillNames.map(loadSkillContent).filter(Boolean);
+	if (skills.length === 0) return phaseText;
+	return skills.join("") + phaseText;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -673,8 +677,7 @@ function setupHooks(pi: ExtensionAPI): void {
 			persist(active);
 			// Enter PLAN proper.
 			applyPhaseTools(pi, "plan");
-			injectSkill(pi, "brainstorming");
-			await steer(pi, phasePrompt(active, "plan"));
+			await steer(pi, withSkills(phasePrompt(active, "plan"), "brainstorming"));
 			return;
 		}
 
@@ -713,11 +716,9 @@ function setupHooks(pi: ExtensionAPI): void {
 				logEvent(active, `verify_pass score=${score}`);
 				active.phase = "ship";
 				applyPhaseTools(pi, "ship");
-				injectSkill(pi, "verification-before-completion");
-				injectSkill(pi, "commit");
 				persist(active);
 				recordStatus(ctx);
-				await steer(pi, phasePrompt(active, "ship"));
+				await steer(pi, withSkills(phasePrompt(active, "ship"), "verification-before-completion", "commit"));
 				return;
 			}
 
@@ -768,13 +769,11 @@ function setupHooks(pi: ExtensionAPI): void {
 			// (The previous try/catch ctx.fork() here was a silent no-op.)
 			active.phase = "build";
 			applyPhaseTools(pi, "build");
-			injectSkill(pi, "tdd");
-			injectSkill(pi, "implement");
 			persist(active);
 			recordStatus(ctx);
 			await steer(
 				pi,
-				`${phasePrompt(active, "build")}\n\nRemediation iteration ${active.iteration}: fix the verify failures (score ${score}, honesty hits: ${honestyHits.join(", ") || "none"}, convergence: ${converged ? "yes" : "no"}).\n\n**Change an input before re-dispatching:** do NOT retry the same task with the same approach — that just burns a cycle and reproduces the failure. Change at least one: narrow the scope, escalate the model tier (Ctrl+L mid-session), change the approach/tool, OR if the plan itself is wrong — STOP and ask the human (do not loop). **Bidirectional verify:** before implementing the fix, confirm the fix is in the right direction — if the PLAN is wrong, fix the plan, not the code.`,
+				`${withSkills(phasePrompt(active, "build"), "tdd", "implement")}\n\nRemediation iteration ${active.iteration}: fix the verify failures (score ${score}, honesty hits: ${honestyHits.join(", ") || "none"}, convergence: ${converged ? "yes" : "no"}).\n\n**Change an input before re-dispatching:** do NOT retry the same task with the same approach — that just burns a cycle and reproduces the failure. Change at least one: narrow the scope, escalate the model tier (Ctrl+L mid-session), change the approach/tool, OR if the plan itself is wrong — STOP and ask the human (do not loop). **Bidirectional verify:** before implementing the fix, confirm the fix is in the right direction — if the PLAN is wrong, fix the plan, not the code.`,
 			);
 			return;
 		}
@@ -844,11 +843,9 @@ function setupHooks(pi: ExtensionAPI): void {
 			logEvent(active, "plan_complete");
 			active.phase = "build";
 			applyPhaseTools(pi, "build");
-			injectSkill(pi, "tdd");
-			injectSkill(pi, "implement");
 			persist(active);
 			recordStatus(ctx);
-			await steer(pi, phasePrompt(active, "build"));
+			await steer(pi, withSkills(phasePrompt(active, "build"), "tdd", "implement"));
 			return;
 		}
 		if (phase === "build") {
@@ -891,11 +888,9 @@ function setupHooks(pi: ExtensionAPI): void {
 			logEvent(active, "build_complete");
 			active.phase = "review";
 			applyPhaseTools(pi, "review"); // null = full toolset (reviewer needs subagent dispatch)
-			injectSkill(pi, "code-review");
-			injectSkill(pi, "receiving-code-review");
 			persist(active);
 			recordStatus(ctx);
-			await steer(pi, phasePrompt(active, "review"));
+			await steer(pi, withSkills(phasePrompt(active, "review"), "code-review", "receiving-code-review"));
 			return;
 		}
 	});
