@@ -47,12 +47,34 @@ import {
 	appendFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import type {
 	ExtensionAPI,
 	ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { Key } from "@earendil-works/pi-tui";
+
+// ─── Skill injection (mechanical, not steer) ────────────────────────────────
+// The loop engine STEERS with prose (sendUserMessage), but prose can't
+// mechanically inject skills. The prompt-template engine does it via the
+// `skill:` frontmatter pin — but the loop can't use that mechanism.
+// Instead, we read the SKILL.md directly and inject it as a message BEFORE
+// the phase prompt. Same effect: the skill content is in context.
+
+function injectSkill(pi: ExtensionAPI, skillName: string): boolean {
+	const skillPath = join(homedir(), ".agents", "skills", skillName, "SKILL.md");
+	if (!existsSync(skillPath)) return false;
+	const raw = readFileSync(skillPath, "utf-8");
+	// Strip frontmatter (--- ... ---)
+	const body = raw.replace(/^---[\s\S]*?---\s*/, "");
+	pi.sendMessage({
+		customType: "skill-loaded",
+		content: `[Skill loaded: ${skillName}]\n\n${body}`,
+		display: true,
+	});
+	return true;
+}
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -651,6 +673,7 @@ function setupHooks(pi: ExtensionAPI): void {
 			persist(active);
 			// Enter PLAN proper.
 			applyPhaseTools(pi, "plan");
+			injectSkill(pi, "brainstorming");
 			await steer(pi, phasePrompt(active, "plan"));
 			return;
 		}
@@ -690,6 +713,8 @@ function setupHooks(pi: ExtensionAPI): void {
 				logEvent(active, `verify_pass score=${score}`);
 				active.phase = "ship";
 				applyPhaseTools(pi, "ship");
+				injectSkill(pi, "verification-before-completion");
+				injectSkill(pi, "commit");
 				persist(active);
 				recordStatus(ctx);
 				await steer(pi, phasePrompt(active, "ship"));
@@ -743,6 +768,8 @@ function setupHooks(pi: ExtensionAPI): void {
 			// (The previous try/catch ctx.fork() here was a silent no-op.)
 			active.phase = "build";
 			applyPhaseTools(pi, "build");
+			injectSkill(pi, "tdd");
+			injectSkill(pi, "implement");
 			persist(active);
 			recordStatus(ctx);
 			await steer(
@@ -817,6 +844,8 @@ function setupHooks(pi: ExtensionAPI): void {
 			logEvent(active, "plan_complete");
 			active.phase = "build";
 			applyPhaseTools(pi, "build");
+			injectSkill(pi, "tdd");
+			injectSkill(pi, "implement");
 			persist(active);
 			recordStatus(ctx);
 			await steer(pi, phasePrompt(active, "build"));
@@ -862,6 +891,8 @@ function setupHooks(pi: ExtensionAPI): void {
 			logEvent(active, "build_complete");
 			active.phase = "review";
 			applyPhaseTools(pi, "review"); // null = full toolset (reviewer needs subagent dispatch)
+			injectSkill(pi, "code-review");
+			injectSkill(pi, "receiving-code-review");
 			persist(active);
 			recordStatus(ctx);
 			await steer(pi, phasePrompt(active, "review"));
