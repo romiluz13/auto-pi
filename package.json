@@ -1,0 +1,12 @@
+{
+  "name": "auto-pi",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --experimental-strip-types test/"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1"
+  }
+}
