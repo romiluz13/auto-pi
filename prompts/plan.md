@@ -15,5 +15,6 @@ Feature: $@
    - Design uncertain, answerable by building → `/skill:prototype` (throwaway, answer, discard).
    - Design uncertain, answerable by thinking → `/skill:grill-with-docs` (stress-test the plan).
    - Need evidence from primary sources → `/skill:research` or `/skill:octocode-research`.
+   - RFC or design doc needed → `/skill:octocode-rfc-generator`.
 
 Do NOT write any production code. This is planning only. Stop after tickets are published.

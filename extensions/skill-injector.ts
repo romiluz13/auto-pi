@@ -45,6 +45,8 @@ const SKILL_INJECTIONS: Record<string, string[]> = {
 		"wayfinder",
 		"prototype",
 		"grill-with-docs",
+		"grilling",
+		"octocode-brainstorming",
 	],
 	// /review pins code-review → also need the review toolkit
 	"code-review": [
@@ -58,8 +60,18 @@ const SKILL_INJECTIONS: Record<string, string[]> = {
 		"github",
 		"diff-driven-docs",
 		"domain-modeling",
+		"memory-compounding",
+		"deploy-to-vercel",
 	],
+	// /research pins research → also need code research + live research
+	research: ["octocode-research", "live-research"],
 };
+
+// ─── Vocabulary layer (injected on EVERY before_agent_start) ───────────────
+// These are shared vocabulary skills that run BENEATH the workflow, not as
+// workflow steps. Inspired by ask-matt's "vocabulary underneath" concept.
+// domain-modeling = domain language, codebase-design = deep module vocabulary.
+const VOCABULARY_SKILLS = ["domain-modeling", "codebase-design"];
 
 // ─── Skill content loading ─────────────────────────────────────────────────
 
@@ -140,27 +152,39 @@ let lastInjectedSkills: string[] = [];
 export default function skillInjectorExtension(pi: ExtensionAPI): void {
 	// Inject additional skills into the system prompt.
 	pi.on("before_agent_start", async (event, _ctx) => {
-		const pinnedSkill = detectPinnedSkill(event.prompt);
-		if (!pinnedSkill) return;
-
-		const additionalSkills = SKILL_INJECTIONS[pinnedSkill];
-		if (!additionalSkills || additionalSkills.length === 0) return;
-
-		// Load and concatenate skill content
-		const skillContents: string[] = [];
-		for (const skillName of additionalSkills) {
+		// Layer 1: Vocabulary skills — injected on EVERY before_agent_start,
+		// regardless of which prompt was invoked. These are shared vocabulary
+		// that runs beneath the workflow (inspired by ask-matt's concept).
+		const vocabContents: string[] = [];
+		for (const skillName of VOCABULARY_SKILLS) {
 			const content = loadSkillContent(skillName);
-			if (content) {
-				skillContents.push(content);
+			if (content) vocabContents.push(content);
+		}
+
+		// Layer 2: Prompt-specific skills — detected by prompt pattern
+		const pinnedSkill = detectPinnedSkill(event.prompt);
+		const additionalSkills = pinnedSkill ? SKILL_INJECTIONS[pinnedSkill] : null;
+
+		const skillContents: string[] = [];
+		if (additionalSkills) {
+			for (const skillName of additionalSkills) {
+				const content = loadSkillContent(skillName);
+				if (content) skillContents.push(content);
 			}
 		}
 
-		if (skillContents.length === 0) return;
+		if (vocabContents.length === 0 && skillContents.length === 0) return;
 
-		// Append to system prompt (same mechanism as guardrails.ts)
-		const injection = `\n\n## Additional Skills (mechanically injected by skill-injector)\n${skillContents.join("\n")}\n`;
+		// Build the injection
+		let injection = "";
+		if (vocabContents.length > 0) {
+			injection += `\n\n## Vocabulary Skills (mechanically injected by skill-injector)\n${vocabContents.join("\n")}\n`;
+		}
+		if (skillContents.length > 0) {
+			injection += `\n\n## Additional Skills (mechanically injected by skill-injector)\n${skillContents.join("\n")}\n`;
+		}
 
-		lastInjectedSkills = additionalSkills;
+		lastInjectedSkills = [...VOCABULARY_SKILLS, ...(additionalSkills ?? [])];
 
 		return {
 			systemPrompt: event.systemPrompt + injection,

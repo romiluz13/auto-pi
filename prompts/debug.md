@@ -19,3 +19,5 @@ Issue: $@
 7. **Cleanup.** Remove debugging instrumentation. Run the full test suite. Leave no debug code behind.
 
 Do NOT skip the feedback loop. "I think the problem is..." is not a diagnosis — reproduce it first.
+
+If this is a git merge/rebase conflict → `/skill:resolving-merge-conflicts`.

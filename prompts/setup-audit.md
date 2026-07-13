@@ -76,3 +76,5 @@ After all 6 subagents complete, synthesize into ONE report:
 - **Recommended actions** — ordered, with the specific command/edit to run.
 
 Write the report to `~/Dev/my-pi/docs/audits/setup-audit-YYYY-MM-DD.md` (the repo, so it's publishable). Do NOT push — leave that to the human.
+
+For pre-commit hook setup → `/skill:setup-pre-commit`.

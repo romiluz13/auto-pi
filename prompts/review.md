@@ -13,3 +13,5 @@ Review the current uncommitted changes. The `code-review` skill is now loaded �
 6. If architecture issues are found → run `/skill:improve-codebase-architecture` → fix → return to review.
 
 Report findings by severity: CRITICAL (blocks), HIGH (should fix), LOW (nice to have).
+
+For brutally honest code critique → `/skill:octocode-roast`.

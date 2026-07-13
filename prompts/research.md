@@ -24,3 +24,5 @@ After research returns:
 - Save key findings to memory.
 
 Do NOT write any code. This is research only.
+
+For code-focused research → `/skill:octocode`. For deep multi-source research briefs → `/skill:live-research`.

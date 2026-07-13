@@ -40,7 +40,39 @@ When given a task, follow this flow automatically. The workflow IS the skill rou
 9. **Remember.** Save decisions, gotchas, failures, corrections to memory. Don't save obvious things — save what you'd want to know next time. If memory contradicts current code, trust the code. Capture memory payload from subagents FIRST, before validation — compaction can fire between return and parse. Non-blocking findings go to memory as `Deferred:`, NOT as TODO tasks. Monthly: prune/merge persistent memory → `/skill:memory-compounding`.
 10. **Handoff.** Session getting long → `/skill:compact-safe` (KEEP constraints and errors verbatim, SUMMARIZE resolved decisions, DROP prose and diary) or `/handoff` to create continuation doc. Don't lose context.
 
-**Context hygiene:** Keep steps 1-3 in one unbroken context window. Don't compact or clear until after planning is complete — compaction mid-planning loses the thread.
+**Context hygiene:** Keep steps 1-3 in one unbroken context window. Don't compact or clear until after planning is complete — compaction mid-planning loses the thread. Smart zone: if approaching ~120k tokens before to-tickets, `/skill:handoff` and continue fresh. Each `/build` starts fresh, working from the ticket.
+
+## Skill flow graph
+
+```
+MAIN FLOW: idea → ship
+  /plan → /build → /review → /ship
+  /plan: brainstorming drives grill-with-docs → to-spec → to-tickets
+  /build: implement drives tdd (one red-green slice at a time)
+  /review: code-review (standards + spec + security)
+  /ship: verification → diff-driven-docs → commit → github
+
+ON-RAMPS (merge onto main flow):
+  Bug → /debug (diagnosing-bugs) → /fix (debug→build→review→ship)
+  Issues piling up → /skill:triage → /build
+  Foggy huge effort → /skill:wayfinder → /plan → /build
+  RFC needed → /skill:octocode-rfc-generator → /plan
+
+VOCABULARY (beneath everything, injected every turn by skill-injector):
+  /skill:domain-modeling — domain language
+  /skill:codebase-design — deep module vocabulary
+
+CROSSING SESSIONS:
+  /skill:handoff — fork to new session, preserve context
+  /skill:compact-safe — compact in same session, preserve constraints
+
+CODEBASE HEALTH (upkeep, not feature work):
+  /skill:improve-codebase-architecture → generates ideas → /plan
+  /skill:codebase-hygiene → find semantic duplicates
+
+BRUTAL CRITIQUE:
+  /skill:octocode-roast — when you want brutally honest code critique
+```
 
 ## Subagent strategy
 
