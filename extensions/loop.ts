@@ -610,12 +610,18 @@ interface SubagentResult {
 
 const MAX_SUBAGENT_DEPTH = 3;
 
+function severityRank(severity: string): number {
+	const ranks: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1, none: 0 };
+	return ranks[severity] ?? 0;
+}
+
 async function dispatchPhaseAgent(
 	pi: ExtensionAPI,
 	ctx: ExtensionContext,
 	state: LoopState,
 	phase: string,
 	opts: { budget: number | null; maxTokens: number | null },
+	reviewFocus?: string,
 ): Promise<SubagentResult> {
 	// Fork bomb prevention (L4 fix)
 	const depth = Number(process.env.PI_WORKFLOW_DEPTH ?? "0");
@@ -643,6 +649,7 @@ async function dispatchPhaseAgent(
 		.map(loadSkillContent)
 		.filter(Boolean)
 		.join("");
+	const focusSuffix = reviewFocus ? `\n\n## Review Focus\nYou are reviewing specifically for ${reviewFocus}. Focus your review on this axis.` : "";
 	const dispatchPrompt = buildDispatchPrompt({
 		phase,
 		request: state.userRequest,
@@ -651,16 +658,14 @@ async function dispatchPhaseAgent(
 		iteration: state.iteration,
 		skillContent: skillContent ?? undefined,
 		reviewFindings:
-			typeof state.results["review"] === "string"
-				? (state.results["review"] as string)
+			typeof state.results["review"] === "object"
+				? JSON.stringify(state.results["review"])
 				: undefined,
 		verifyScore:
 			state.scoreHistory.length > 0
 				? state.scoreHistory[state.scoreHistory.length - 1]
 				: undefined,
-	});
-
-	// Create structured output extension
+	}) + focusSuffix;
 	const structuredExt = await createStructuredOutputExtension(schema);
 
 	// Build pi subprocess args
@@ -737,8 +742,13 @@ function parseEmitResult(
 			const event = JSON.parse(trimmed) as Record<string, unknown>;
 
 			// Case 1: tool_execution_end with toolName === "emit_result"
-			if (event.toolName === "emit_result" && event.type === "tool_execution_end") {
-				const resultContent = (event.result as { content?: Array<{ text?: string }> })?.content;
+			if (
+				event.toolName === "emit_result" &&
+				event.type === "tool_execution_end"
+			) {
+				const resultContent = (
+					event.result as { content?: Array<{ text?: string }> }
+				)?.content;
 				const text = resultContent?.[0]?.text;
 				if (text) {
 					try {
@@ -751,7 +761,10 @@ function parseEmitResult(
 
 			// Case 2: message_end (assistant) with toolCall content
 			if (event.type === "message_end") {
-				const msg = event.message as { role?: string; content?: Array<Record<string, unknown>> };
+				const msg = event.message as {
+					role?: string;
+					content?: Array<Record<string, unknown>>;
+				};
 				if (msg?.role === "assistant" && Array.isArray(msg.content)) {
 					for (const block of msg.content) {
 						if (block.type === "toolCall" && block.name === "emit_result") {
@@ -782,8 +795,25 @@ async function runLoopAgents(
 	);
 
 	// Budget tracking (C2 fix — actually enforce --budget and --max-tokens)
-	const spentTokens = 0;
-	const spentCost = 0;
+	let spentTokens = 0;
+	let spentCost = 0;
+
+	// Parse usage from sub-agent JSON output to update budget
+	const updateBudget = (jsonStream: string) => {
+		for (const line of jsonStream.split("\n")) {
+			const trimmed = line.trim();
+			if (!trimmed) continue;
+			try {
+				const event = JSON.parse(trimmed) as Record<string, unknown>;
+				if (event.type === "message_end") {
+					const msg = event.message as { usage?: { totalTokens?: number; cost?: { total?: number } } };
+					const usage = msg?.usage;
+					if (usage?.totalTokens) spentTokens += usage.totalTokens;
+					if (usage?.cost?.total) spentCost += usage.cost.total;
+				}
+			} catch { /* skip */ }
+		}
+	};
 
 	const phases = ["plan", "build", "review", "verify", "ship"] as const;
 
@@ -818,7 +848,46 @@ async function runLoopAgents(
 
 		ctx.ui.notify(`Dispatching ${phase} sub-agent...`, "info");
 
-		const result = await dispatchPhaseAgent(pi, ctx, state, phase, opts);
+		let result: SubagentResult;
+
+		// REVIEW phase: dispatch 3 reviewers in parallel with different focuses (H3 fix)
+		if (phase === "review") {
+			const reviewFocuses = ["standards", "spec", "security"];
+			ctx.ui.notify(`Dispatching ${reviewFocuses.length} review sub-agents in parallel...`, "info");
+
+			const reviewResults = await Promise.all(
+				reviewFocuses.map((focus) =>
+					dispatchPhaseAgent(pi, ctx, state, "review", opts, focus),
+				),
+			);
+
+			// Aggregate: if any reviewer says changes-requested, verdict is changes-requested
+			const allFindings: unknown[] = [];
+			let highestSeverity = "none";
+			let verdict = "approve";
+			for (const rr of reviewResults) {
+				if (rr.ok && rr.structured) {
+					updateBudget(rr.outputText);
+					const findings = rr.structured["findings"] as unknown[];
+					if (Array.isArray(findings)) allFindings.push(...findings);
+					const sev = rr.structured["severity"] as string;
+					if (sev && severityRank(sev) > severityRank(highestSeverity)) highestSeverity = sev;
+					if (rr.structured["verdict"] === "changes-requested") verdict = "changes-requested";
+				}
+			}
+			result = {
+				ok: true,
+				outputText: reviewResults.map((r) => r.outputText).join("\n"),
+				structured: { findings: allFindings, severity: highestSeverity, verdict },
+			};
+		} else {
+			result = await dispatchPhaseAgent(pi, ctx, state, phase, opts);
+		}
+
+		// Update budget tracking from sub-agent usage
+		if (result.ok && phase !== "review") {
+			updateBudget(result.outputText);
+		}
 
 		if (!result.ok) {
 			ctx.ui.notify(
