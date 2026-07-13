@@ -36,7 +36,15 @@
  *      a yearly manual audit. -->
  */
 
-import { existsSync, readFileSync, writeFileSync, appendFileSync, readdirSync, unlinkSync, statSync } from "node:fs";
+import {
+	existsSync,
+	readFileSync,
+	writeFileSync,
+	appendFileSync,
+	readdirSync,
+	unlinkSync,
+	statSync,
+} from "node:fs";
 import { join } from "node:path";
 import type {
 	ExtensionAPI,
@@ -68,10 +76,14 @@ function loadConfig(): TraceConfig {
 	try {
 		const raw = JSON.parse(readFileSync(path, "utf-8")) as Partial<TraceConfig>;
 		return {
-			retentionDays: typeof raw.retentionDays === "number" ? raw.retentionDays : DEFAULT_CONFIG.retentionDays,
-			logDir: typeof raw.logDir === "string" && raw.logDir.trim()
-				? raw.logDir
-				: join(process.env.HOME ?? "~", ".pi", "agent"),
+			retentionDays:
+				typeof raw.retentionDays === "number"
+					? raw.retentionDays
+					: DEFAULT_CONFIG.retentionDays,
+			logDir:
+				typeof raw.logDir === "string" && raw.logDir.trim()
+					? raw.logDir
+					: join(process.env.HOME ?? "~", ".pi", "agent"),
 		};
 	} catch {
 		return {
@@ -86,7 +98,12 @@ function loadConfig(): TraceConfig {
 interface TraceEntry {
 	ts: string;
 	session: string;
-	type: "turn_start" | "skill_activated" | "skill_injected" | "tool_call" | "agent_end";
+	type:
+		| "turn_start"
+		| "skill_activated"
+		| "skill_injected"
+		| "tool_call"
+		| "agent_end";
 	[key: string]: unknown;
 }
 
@@ -123,8 +140,8 @@ function extractSkillName(skillPath: string): string {
 
 function pruneOldTraceFiles(cfg: TraceConfig): number {
 	try {
-		const files = readdirSync(cfg.logDir).filter((f) =>
-			f.startsWith("trace-") && f.endsWith(".jsonl"),
+		const files = readdirSync(cfg.logDir).filter(
+			(f) => f.startsWith("trace-") && f.endsWith(".jsonl"),
 		);
 		const now = Date.now();
 		const maxAgeMs = cfg.retentionDays * 24 * 60 * 60 * 1000;
@@ -154,13 +171,15 @@ function readTodayTrace(cfg: TraceConfig): TraceEntry[] {
 		const path = todayLogPath(cfg);
 		if (!existsSync(path)) return [];
 		const lines = readFileSync(path, "utf-8").split("\n").filter(Boolean);
-		return lines.map((line) => {
-			try {
-				return JSON.parse(line) as TraceEntry;
-			} catch {
-				return null;
-			}
-		}).filter((e): e is TraceEntry => e !== null);
+		return lines
+			.map((line) => {
+				try {
+					return JSON.parse(line) as TraceEntry;
+				} catch {
+					return null;
+				}
+			})
+			.filter((e): e is TraceEntry => e !== null);
 	} catch {
 		return [];
 	}
@@ -180,9 +199,13 @@ export default function traceExtension(pi: ExtensionAPI): void {
 			type: "turn_start",
 			prompt: event.prompt?.slice(0, 200),
 			activeTools: Array.isArray(opts?.selectedTools) ? opts.selectedTools : [],
-			loadedSkills: Array.isArray(opts?.skills) ? opts.skills.map((s) => s.name) : [],
+			loadedSkills: Array.isArray(opts?.skills)
+				? opts.skills.map((s) => s.name)
+				: [],
 			skillCount: Array.isArray(opts?.skills) ? opts.skills.length : 0,
-			contextFiles: Array.isArray(opts?.contextFiles) ? opts.contextFiles.map((f) => f.path) : [],
+			contextFiles: Array.isArray(opts?.contextFiles)
+				? opts.contextFiles.map((f) => f.path)
+				: [],
 			customPrompt: opts?.customPrompt?.slice(0, 100),
 		});
 	});
@@ -229,7 +252,9 @@ export default function traceExtension(pi: ExtensionAPI): void {
 		// and details.{skillName, skillPath} at the TOP LEVEL of the entry.
 		try {
 			const branch = ctx.sessionManager.getBranch();
-			const messageCount = Array.isArray(event.messages) ? event.messages.length : 0;
+			const messageCount = Array.isArray(event.messages)
+				? event.messages.length
+				: 0;
 			// Scan recent entries for skill-loaded custom messages.
 			// Only check entries near the end (this turn's additions).
 			const scanStart = Math.max(0, branch.length - messageCount - 5);
@@ -272,7 +297,8 @@ export default function traceExtension(pi: ExtensionAPI): void {
 
 	// /trace — show the last N activations from today's log.
 	pi.registerCommand("trace", {
-		description: "Show recent activation trace (what skills/tools the workflow invoked)",
+		description:
+			"Show recent activation trace (what skills/tools the workflow invoked)",
 		handler: async (args, ctx) => {
 			const entries = readTodayTrace(cfg);
 			if (entries.length === 0) {
@@ -312,11 +338,15 @@ export default function traceExtension(pi: ExtensionAPI): void {
 
 	// /trace-skills — the orphan detector. Shows available vs activated skills.
 	pi.registerCommand("trace-skills", {
-		description: "Show the skill activation gap: which skills were available but never loaded (orphan detector)",
+		description:
+			"Show the skill activation gap: which skills were available but never loaded (orphan detector)",
 		handler: async (_args, ctx) => {
 			const entries = readTodayTrace(cfg);
 			if (entries.length === 0) {
-				ctx.ui.notify("trace: no trace entries for today yet. Run a workflow first.", "info");
+				ctx.ui.notify(
+					"trace: no trace entries for today yet. Run a workflow first.",
+					"info",
+				);
 				return;
 			}
 
@@ -352,9 +382,13 @@ export default function traceExtension(pi: ExtensionAPI): void {
 
 			const lines: string[] = [];
 			lines.push(`trace-skills: session ${sessionId.slice(0, 8)}`);
-			lines.push(`Available (in system prompt): ${availableSkills.size} skills`);
+			lines.push(
+				`Available (in system prompt): ${availableSkills.size} skills`,
+			);
 			lines.push(`Activated (model read SKILL.md): ${activated.length} skills`);
-			lines.push(`NEVER ACTIVATED (potential orphans): ${orphans.length} skills`);
+			lines.push(
+				`NEVER ACTIVATED (potential orphans): ${orphans.length} skills`,
+			);
 
 			if (activated.length > 0) {
 				lines.push("");
@@ -373,7 +407,9 @@ export default function traceExtension(pi: ExtensionAPI): void {
 
 			if (availableSkills.size === 0) {
 				lines.push("");
-				lines.push("(no turn_start entries with skills found — may need a full agent turn)");
+				lines.push(
+					"(no turn_start entries with skills found — may need a full agent turn)",
+				);
 			}
 
 			ctx.ui.notify(lines.join("\n"), "info");
