@@ -77,6 +77,8 @@ Coach shows a fixed menu. You pick. Examples:
 
 **Gated (`/loop`)** — extension owns phase tool allowlists, contract preflight, RED halt, plateau detection, ship only when a commit hash appears. Phase skills are steered inside those gates.
 
+**Sub-agent dispatch (`/loop --mode=agents`)** — each phase (PLAN, BUILD, REVIEW, VERIFY, SHIP) dispatches a fresh-context sub-agent via `pi --mode json -p --no-session`. Structured output via temporary `emit_result` tool with JSON schema validation. Journaling with cache-replay resume. Budget control (`--budget $N`, `--max-tokens N`). Fork bomb prevention (depth cap 3).
+
 **Observable** — `/trace-skills` shows available vs activated skills (orphan detector).
 
 That split is the product: **pins where it matters, gates where autonomy is dangerous, steer for the rest** — not a wall of hoped-for skills.
@@ -128,7 +130,8 @@ Pi ships a minimal harness on purpose. AutoPi fills the empty layer: **procedure
 config/agents.md        shared rules (~137 lines)
 config/settings.json    packages, compaction, memory, subagents
 config/models.json      provider / model definitions
-extensions/             coach, loop, guardrails, trace, palette, handoff
+extensions/             coach, loop, guardrails, trace, palette, handoff, structured-output, loop-journal, loop-dispatch
+agents/                 plan-agent, build-agent, review-agent, verify-agent, ship-agent
 prompts/                slash workflows (pins + chains + setup-audit)
 skills/                 11 hand-tuned skills
 scripts/install.sh      one-command setup
