@@ -678,12 +678,18 @@ async function dispatchPhaseAgent(
 		}) + focusSuffix;
 	const structuredExt = await createStructuredOutputExtension(schema);
 
-	// Build pi subprocess args
+	// Build pi subprocess args.
+	// --no-session keeps the run ephemeral (not saved); --session-id gives it a
+	// deterministic id so the provider can cache the shared system-prompt prefix
+	// (AGENTS.md + tools + skill content) across all phases of this workflow.
+	// Pi 0.80.2+ (#6070) guarantees --no-session --session-id compose correctly.
 	const piArgs = [
 		"--mode",
 		"json",
 		"-p",
 		"--no-session",
+		"--session-id",
+		state.workflowUuid,
 		"-e",
 		structuredExt.path,
 	];

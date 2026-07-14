@@ -173,17 +173,15 @@ export default function guardrailsExtension(pi: ExtensionAPI): void {
 		return { systemPrompt: event.systemPrompt + reminderLine() };
 	});
 
-	// After compaction, flag the next turn for a full re-inject + audit survival.
-	pi.on("session_compact", async (_event, ctx) => {
+	// After compaction, flag the next turn for a full re-inject — but only when
+	// context was genuinely lost. Manual /compact is user-initiated tidying; the
+	// next turn's 1-line reminder is sufficient there. threshold = auto-compact at
+	// the configured limit; overflow = compaction before a retry. reason/willRetry
+	// metadata shipped in Pi 0.79.10 (SessionCompactEvent.reason).
+	pi.on("session_compact", async (event, ctx) => {
 		if (!isEnabled(ctx, cfg.enabled)) return;
+		if (event.reason === "manual") return;
 		setFullInject(ctx, true);
-		const sp = ctx.getSystemPrompt();
-		if (!/HARD RULES/.test(sp)) {
-			ctx.ui.notify(
-				"guardrails: rules dropped after compaction — will full-re-inject next turn",
-				"warning",
-			);
-		}
 	});
 
 	// Session start: flag the first turn for a full inject + load status.
