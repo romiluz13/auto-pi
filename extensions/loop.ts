@@ -1019,10 +1019,32 @@ function setupHooks(pi: ExtensionAPI): void {
 	});
 
 	// If the loop paused for a human decision, the next user input resumes it.
-	pi.on("input", async () => {
+	// FIX: Previously this only set flags and let the user's raw text ("go ahead")
+	// pass through to the model. The model would respond with something unhelpful,
+	// agent_end would fire, no phase-completion signal would match, and the loop
+	// would get STUCK in the current phase with restricted tools.
+	// Now: consume the input and re-steer the current phase prompt so the agent
+	// gets the actual phase instructions, not "go ahead".
+	pi.on("input", async (_event, ctx) => {
 		if (active && pausedForHuman) {
 			pausedForHuman = false;
 			expectingAgentResponse = true;
+			persist(active);
+			// Re-steer the current phase prompt with the right tools.
+			const phase = active.phase;
+			applyPhaseTools(pi, phase);
+			if (phase === "plan" && !active.intent) {
+				// Still in contract phase — re-steer the contract prompt.
+				await steer(
+					pi,
+					`${contractPrompt(active.userRequest, active.workflowType)}\n\nThe human has resolved the open decisions. Output the contract JSON block.`,
+				);
+			} else {
+				// In a regular phase — re-steer the phase prompt with skills.
+				const skills = PHASE_SKILLS[phase] ?? [];
+				await steer(pi, withSkills(phasePrompt(active, phase), ...skills));
+			}
+			return { action: "handled" };
 		}
 	});
 
@@ -1273,7 +1295,10 @@ function setupHooks(pi: ExtensionAPI): void {
 			applyPhaseTools(pi, "verify");
 			persist(active);
 			recordStatus(ctx);
-			await steer(pi, phasePrompt(active, "verify"));
+			await steer(
+				pi,
+				withSkills(phasePrompt(active, "verify"), "verification-before-completion"),
+			);
 			return;
 		}
 
