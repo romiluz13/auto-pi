@@ -42,6 +42,8 @@ When given a task, follow this flow automatically. The workflow IS the skill rou
 
 **Context hygiene:** Keep steps 1-3 in one unbroken context window. Don't compact or clear until after planning is complete — compaction mid-planning loses the thread. Smart zone: if approaching ~120k tokens before to-tickets, `/skill:handoff` and continue fresh. Each `/build` starts fresh, working from the ticket.
 
+**Autonomous continuation** <!-- scar: 2026-07-16 — 5-project audit found /build (tdd) was NEVER invoked via slash command; model improvised from prose because it can't type slash commands -->: The `skill:` pin only fires when a HUMAN types the slash command. The skill-injector extension closes this gap: it remembers the last detected workflow skill per-session and re-injects it on continuation turns ("go", "yes", "build ticket 02") — so the skill content stays in the system prompt even without a slash command. BUT this only works if a slash command was fired at least ONCE to seed the state. If you start with raw prompts, no skill is remembered. Rules: (1) always start a workflow with a slash command (`/build`, `/plan`, `/debug`); (2) for multi-phase autonomous work, prefer `/loop` — it embeds skill content in phase prompts and doesn't depend on the pin at all; (3) after `/feature` completes one unit, do NOT continue with raw prompts for the next unit — re-invoke `/feature` or use `/loop`.
+
 ## Skill flow graph
 
 ```
