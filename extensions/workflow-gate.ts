@@ -9,164 +9,164 @@
  *   Layer 4: trace.ts — observes and reports activation gaps
  *
  * This extension blocks:
- *   - git commit if verification-before-completion skill was NOT loaded
+ *   - write/edit on SOURCE files if tdd skill was NOT loaded (TDD enforcement)
+ *   - git commit if verification-before-completion OR code-review skills were NOT loaded
  *   - git push if commit skill was NOT loaded
- *   - git commit if the agent hasn't run tests (heuristic: no bash tool call
- *     with test-like command in the current session)
  *
- * The check: scan session entries for customType="skill-loaded" messages
- * to verify which skills PTM actually injected. If a required skill is
- * missing, block the operation with a clear reason.
+ * Escape hatch: /skip-gate toggles a per-session flag that opens all gates.
+ * Use it for quick config edits or when you intentionally skip a workflow.
+ *
+ * The check: scan session entries for skill-loaded messages AND the system
+ * prompt for skill-injector markers. This catches both slash-command turns
+ * (PTM injects skill-loaded message) and continuation turns (skill-injector
+ * adds to system prompt after the 2026-07-16 fix).
  *
  * Harmony contract:
- * - Owns ONE axis: workflow gate enforcement (blocking dangerous ops without skills).
+ * - Owns ONE axis: workflow gate enforcement (blocking ops without skills).
  * - Hooks tool_call (same event as loop.ts phase gates and pi-confirm-destructive).
- * - Returns { block: true, reason: "..." } only for git commit/push without skills.
- * - Does NOT register tools. Does NOT modify system prompt. Does NOT touch session.
- * - Composes with loop.ts (both hook tool_call for different concerns — loop blocks
- *   out-of-phase tools, this blocks unverified commits).
- * - Composes with pi-confirm-destructive (destructive-action gate runs first,
- *   this gate runs for commit/push specifically).
+ * - Returns { block: true, reason: "..." } for gated operations.
+ * - Registers /skip-gate command (per-session toggle, NOT a tool).
+ * - Does NOT modify system prompt. Does NOT touch session storage.
+ * - Composes with loop.ts (both hook tool_call — loop blocks out-of-phase
+ *   tools, this blocks unverified writes/commits).
+ * - Composes with pi-confirm-destructive (runs first, this runs for specific ops).
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+	ExtensionAPI,
+	ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
+import {
+	isSourceFile,
+	shouldGateWrite,
+	shouldGateCommit,
+	shouldGatePush,
+	wasTestRun,
+	type SkillCheckContext,
+} from "./workflow-gate-logic.ts";
 
-// ─── Skill requirements for operations ─────────────────────────────────────
+// ─── Per-session skip-gate state ───────────────────────────────────────────
 
-const COMMIT_REQUIRED_SKILLS = ["verification-before-completion"];
-const PUSH_REQUIRED_SKILLS = ["commit"];
+const skipGateBySession = new Map<string, boolean>();
 
-// ─── Check which skills were loaded in this session ────────────────────────
-
-function getLoadedSkills(ctx: {
-	sessionManager: { getBranch: () => Array<Record<string, unknown>> };
-}): Set<string> {
-	const loaded = new Set<string>();
-	try {
-		const branch = ctx.sessionManager.getBranch();
-		for (const entry of branch) {
-			if (entry.customType === "skill-loaded" && entry.details) {
-				const skillName = (entry.details as { skillName?: string }).skillName;
-				if (skillName) loaded.add(skillName);
-			}
-		}
-	} catch {
-		// Session access may fail — fail open (don't block)
-	}
-	return loaded;
+function isSkipGate(ctx: ExtensionContext): boolean {
+	return skipGateBySession.get(ctx.sessionManager.getSessionId()) ?? false;
 }
 
-// ─── Check if tests were run in this session ───────────────────────────────
+function setSkipGate(ctx: ExtensionContext, value: boolean): void {
+	skipGateBySession.set(ctx.sessionManager.getSessionId(), value);
+}
 
-function wasTestRun(ctx: {
-	sessionManager: { getBranch: () => Array<Record<string, unknown>> };
-}): boolean {
-	try {
-		const branch = ctx.sessionManager.getBranch();
-		for (const entry of branch) {
-			const input = entry.input as { command?: string } | undefined;
-			if (input?.command) {
-				const cmd = input.command.toLowerCase();
-				if (
-					cmd.includes("test") ||
-					cmd.includes("pytest") ||
-					cmd.includes("cargo test") ||
-					cmd.includes("npm test") ||
-					cmd.includes("node --test")
-				) {
-					return true;
-				}
-			}
-		}
-	} catch {
-		// Session access may fail — fail open
-	}
-	return false;
+// ─── Adapt ExtensionContext to SkillCheckContext ───────────────────────────
+
+function toSkillCtx(ctx: ExtensionContext): SkillCheckContext {
+	return {
+		sessionManager: ctx.sessionManager,
+		getSystemPrompt: ctx.getSystemPrompt?.bind(ctx),
+	};
 }
 
 // ─── Extension ──────────────────────────────────────────────────────────────
 
 export default function workflowGateExtension(pi: ExtensionAPI): void {
 	pi.on("tool_call", async (event, ctx) => {
-		// Only check bash tool calls that involve git commit or git push
-		if (event.toolName !== "bash") return;
+		const skip = isSkipGate(ctx);
+		const skillCtx = toSkillCtx(ctx);
 
-		const input = event.input as { command?: string } | undefined;
-		const command = input?.command ?? "";
-
-		// Gate 1: git commit requires verification-before-completion skill
-		if (/\bgit\s+commit\b/.test(command)) {
-			const loaded = getLoadedSkills(ctx);
-			const missing = COMMIT_REQUIRED_SKILLS.filter((s) => !loaded.has(s));
-
-			if (missing.length > 0) {
-				// Check if the skill content is in the system prompt (skill-injector may have added it)
-				// If the /ship prompt was used, verification-before-completion is pinned by PTM
-				// If skill-injector added it to the system prompt, it's not in the session as a message
-				// but the model should still have it. We fail OPEN if we can't find it but the
-				// system prompt might have it.
-				//
-				// For now: only block if we're confident the skill is truly missing.
-				// Check if this looks like a /ship workflow (heuristic: "ship" in recent prompts)
-				const branch = ctx.sessionManager.getBranch();
-				const recentPrompts = branch
-					.filter((e) => e.type === "user" || e.type === "message")
-					.slice(-5)
-					.map((e) => {
-						const content = (e as { message?: { content?: unknown } }).message
-							?.content;
-						if (typeof content === "string") return content;
-						if (Array.isArray(content)) {
-							return content
-								.map((b: { text?: string }) => b?.text ?? "")
-								.join(" ");
-						}
-						return "";
-					})
-					.join(" ");
-
-				if (!recentPrompts.toLowerCase().includes("ship") && !wasTestRun(ctx)) {
-					return {
-						block: true,
-						reason: `[WORKFLOW GATE] git commit blocked: verification-before-completion skill was not loaded. Run /ship to invoke the full shipping workflow (verify → document → commit → push), or manually run /skill:verification-before-completion before committing.`,
-					};
+		// ─── Gate 1: TDD enforcement — block write/edit on source files ───
+		//
+		// The agent cannot write production code unless tdd (or a build-phase
+		// skill) is active. Test files, docs, and config are always allowed.
+		// This is the enforcement that makes "test-first" non-circumventable.
+		if (event.toolName === "write" || event.toolName === "edit") {
+			const input = event.input as { path?: string; filePath?: string } | undefined;
+			const filePath = input?.path ?? input?.filePath ?? "";
+			if (filePath) {
+				const decision = shouldGateWrite(filePath, skillCtx, skip);
+				if (decision.block) {
+					return { block: true, reason: decision.reason };
 				}
 			}
 		}
 
-		// Gate 2: git push requires commit skill
-		if (/\bgit\s+push\b/.test(command)) {
-			const loaded = getLoadedSkills(ctx);
-			const missing = PUSH_REQUIRED_SKILLS.filter((s) => !loaded.has(s));
+		// ─── Gate 2: git commit requires verification + review ───────────
+		if (event.toolName === "bash") {
+			const input = event.input as { command?: string } | undefined;
+			const command = input?.command ?? "";
 
-			if (missing.length > 0) {
-				// Check if this is a /ship workflow
-				const branch = ctx.sessionManager.getBranch();
-				const recentPrompts = branch
-					.filter((e) => e.type === "user" || e.type === "message")
-					.slice(-5)
-					.map((e) => {
-						const content = (e as { message?: { content?: unknown } }).message
-							?.content;
-						if (typeof content === "string") return content;
-						if (Array.isArray(content)) {
-							return content
-								.map((b: { text?: string }) => b?.text ?? "")
-								.join(" ");
-						}
-						return "";
-					})
-					.join(" ");
+			if (/\bgit\s+commit\b/.test(command)) {
+				const testsRan = wasTestRun(skillCtx);
+				const decision = shouldGateCommit(skillCtx, skip, testsRan);
+				if (decision.block) {
+					return { block: true, reason: decision.reason };
+				}
+			}
 
-				if (!recentPrompts.toLowerCase().includes("ship")) {
-					return {
-						block: true,
-						reason: `[WORKFLOW GATE] git push blocked: commit skill was not loaded. Run /ship to invoke the full shipping workflow, or manually run /skill:commit before pushing.`,
-					};
+			// ─── Gate 3: git push requires commit skill ───────────────────
+			if (/\bgit\s+push\b/.test(command)) {
+				const decision = shouldGatePush(skillCtx, skip);
+				if (decision.block) {
+					return { block: true, reason: decision.reason };
 				}
 			}
 		}
 
 		return;
+	});
+
+	// ─── /skip-gate command — per-session escape hatch ───────────────────
+	//
+	// Toggles all workflow gates for this session. Use for quick edits,
+	// config changes, or when you intentionally skip a workflow phase.
+	// Stays on until explicitly turned off.
+	pi.registerCommand("skip-gate", {
+		description:
+			"Toggle workflow gates (TDD, review, verification enforcement) for this session",
+		handler: async (args, ctx) => {
+			const sub = (args ?? "").trim().toLowerCase();
+			if (sub === "on") {
+				setSkipGate(ctx, true);
+				ctx.ui.notify("Workflow gates OFF for this session. Write/commit freely.", "info");
+				ctx.ui.setStatus("gate", ctx.ui.theme.fg("yellow", "🔓 gates off"));
+				return;
+			}
+			if (sub === "off") {
+				setSkipGate(ctx, false);
+				ctx.ui.notify("Workflow gates ON — TDD, review, verification enforced.", "info");
+				ctx.ui.setStatus("gate", ctx.ui.theme.fg("green", "🔒 gates on"));
+				return;
+			}
+			if (sub === "status") {
+				ctx.ui.notify(
+					`Workflow gates ${isSkipGate(ctx) ? "OFF" : "ON"}. Usage: /skip-gate on|off|status`,
+					"info",
+				);
+				return;
+			}
+			// No arg = toggle
+			const newVal = !isSkipGate(ctx);
+			setSkipGate(ctx, newVal);
+			ctx.ui.notify(
+				newVal
+					? "Workflow gates OFF for this session. Write/commit freely."
+					: "Workflow gates ON — TDD, review, verification enforced.",
+				"info",
+			);
+			ctx.ui.setStatus(
+				"gate",
+				newVal
+					? ctx.ui.theme.fg("yellow", "🔓 gates off")
+					: ctx.ui.theme.fg("green", "🔒 gates on"),
+			);
+		},
+	});
+
+	// Session start: show gate status
+	pi.on("session_start", async (_event, ctx) => {
+		if (!isSkipGate(ctx)) {
+			ctx.ui.setStatus("gate", ctx.ui.theme.fg("green", "🔒 gates on"));
+		} else {
+			ctx.ui.setStatus("gate", ctx.ui.theme.fg("yellow", "🔓 gates off"));
+		}
 	});
 }
