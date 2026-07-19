@@ -64,15 +64,17 @@ const SKILL_INJECTIONS: Record<string, string[]> = {
 		"commit",
 		"github",
 		"diff-driven-docs",
-		"domain-modeling",
 		"memory-compounding",
-		"deploy-to-vercel",
 	],
 	research: ["octocode-research", "live-research"],
+	"diagnosing-bugs": [],
+	"setup-maintenance": [],
 };
 
 // ─── Vocabulary layer (injected on EVERY before_agent_start) ───────────────
 
+// domain-modeling is in VOCABULARY_SKILLS (injected every turn), so it is NOT
+// duplicated in SKILL_INJECTIONS["verification-before-completion"].
 const VOCABULARY_SKILLS = ["domain-modeling", "codebase-design"];
 
 // ─── Per-session workflow state ────────────────────────────────────────────

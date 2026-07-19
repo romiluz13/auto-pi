@@ -74,12 +74,19 @@ import { Journal } from "./loop-journal.ts";
 // frontmatter pin, just done by the loop engine.
 
 function loadSkillContent(skillName: string): string | null {
-	const skillPath = join(homedir(), ".agents", "skills", skillName, "SKILL.md");
-	if (!existsSync(skillPath)) return null;
-	const raw = readFileSync(skillPath, "utf-8");
-	// Strip frontmatter (--- ... ---)
-	const body = raw.replace(/^---[\s\S]*?---\s*/, "");
-	return `--- ${skillName} skill (mechanically injected by loop engine) ---\n${body}\n--- end ${skillName} skill ---\n\n`;
+	// Check both skill locations — ~/.agents/skills/ (shared, auto-pi wins)
+	// and ~/.pi/agent/skills/ (npm packages). Matches skill-injector order.
+	const paths = [
+		join(homedir(), ".agents", "skills", skillName, "SKILL.md"),
+		join(homedir(), ".pi", "agent", "skills", skillName, "SKILL.md"),
+	];
+	for (const skillPath of paths) {
+		if (!existsSync(skillPath)) continue;
+		const raw = readFileSync(skillPath, "utf-8");
+		const body = raw.replace(/^---[\s\S]*?---\s*/, "");
+		return `--- ${skillName} skill (mechanically injected by loop engine) ---\n${body}\n--- end ${skillName} skill ---\n\n`;
+	}
+	return null;
 }
 
 function withSkills(phaseText: string, ...skillNames: string[]): string {
@@ -703,7 +710,17 @@ async function dispatchPhaseAgent(
 	// Without this, the sub-agent only gets the dispatch prompt (task + skills)
 	// but not the role-specific protocol, output contract, or safety rules.
 	if (agentType.body && agentType.body.length > 0) {
-		piArgs.push("--append-system-prompt", agentType.body);
+		// Prepend skill content to the agent body so both arrive in the system
+		// prompt via --append-system-prompt. This is CRITICAL for the workflow
+		// gate: the gate checks the system prompt for "--- {skill} skill" markers
+		// to decide whether to allow source writes (TDD gate) and commits (review
+		// gate). If skill content only lives in the dispatch message body, the gate
+		// can't see it and blocks the BUILD/SHIP phases. FLAW-3 fix.
+		const systemPromptAppend = (skillContent ?? "") + agentType.body;
+		piArgs.push("--append-system-prompt", systemPromptAppend);
+	} else if (skillContent) {
+		// No agent body, but skill content exists — still pass it so the gate sees it.
+		piArgs.push("--append-system-prompt", skillContent);
 	}
 
 	// Spawn the sub-agent as a pi subprocess

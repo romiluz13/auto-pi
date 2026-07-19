@@ -208,22 +208,11 @@ for prompt in "$SCRIPT_DIR"/prompts/*.md; do
 done
 info "Prompt templates installed ($(ls "$PI_AGENT_DIR/prompts"/*.md 2>/dev/null | wc -l | tr -d ' ') commands)"
 
-# ── Repo Skills ──────────────────────────────────────────────────────────────
-
-step "Installing repo skills"
-
-mkdir -p "$AGENTS_SKILLS_DIR"
-for skill_dir in "$SCRIPT_DIR"/skills/*/; do
-	[ -d "$skill_dir" ] || continue
-	name=$(basename "$skill_dir")
-	cp -R "$skill_dir" "$AGENTS_SKILLS_DIR/$name"
-done
-# ~/.pi/agent/skills is populated by installed npm packages + fetched skills
-# (Bright Data via update.sh, Octocode via `npx octocode skill`). The repo
-# skills live in ~/.agents/skills which all three agents read.
-info "Repo skills installed to ~/.agents/skills ($(ls -d "$AGENTS_SKILLS_DIR"/*/ 2>/dev/null | wc -l | tr -d ' ') directories)"
-
-# ── Community Skills ────────────────────────────────────────────────────────
+# ── Repo Skills (installed AFTER community skills so auto-pi wins collisions) ─
+# auto-pi's hand-tuned skills (code-review, diagnosing-bugs, brainstorming,
+# grilling) are enhanced forks of Matt Pocock's originals. They MUST be copied
+# AFTER the community skills block so they overwrite the originals. Otherwise
+# Matt's versions shadow auto-pi's and the enhancements never fire. FLAW-1 fix.
 
 step "Provisioning community skills (Matt Pocock, MongoDB, Vercel, Bright Data, Octocode, Python/OSS, UX)"
 
@@ -339,6 +328,21 @@ for d in "$AGENTS_SKILLS_DIR"/*/; do
 done
 
 info "Community skills provisioned ($(ls -d "$AGENTS_SKILLS_DIR"/*/ 2>/dev/null | wc -l | tr -d ' ') total skill directories)"
+
+# ── Repo Skills (overwrite community collisions) ──────────────────────────
+step "Installing repo skills (overwrite community collisions)"
+mkdir -p "$AGENTS_SKILLS_DIR"
+for skill_dir in "$SCRIPT_DIR"/skills/*/; do
+	[ -d "$skill_dir" ] || continue
+	name=$(basename "$skill_dir")
+	[ -n "$name" ] && [ "$name" != "/" ] || continue
+	rm -rf "$AGENTS_SKILLS_DIR/$name"
+	cp -R "$skill_dir" "$AGENTS_SKILLS_DIR/$name"
+done
+# ~/.pi/agent/skills is populated by installed npm packages + fetched skills.
+# The repo skills live in ~/.agents/skills which all three agents read.
+# Copied AFTER community skills so auto-pi's enhanced forks win collisions.
+info "Repo skills installed to ~/.agents/skills ($(ls -d "$AGENTS_SKILLS_DIR"/*/ 2>/dev/null | wc -l | tr -d ' ') directories)"
 
 # ── Done ───────────────────────────────────────────────────────────────────
 

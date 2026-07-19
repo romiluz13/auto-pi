@@ -23,7 +23,7 @@ Check installed vs latest-published for Pi core + all npm packages in `~/.pi/age
 
 ### 2. Harmony re-audit (conflicts)
 
-Scan all 14 packages + 6 custom extensions for collisions on: registered tools, registered commands, event hooks (same event → does ordering matter?), storage paths (SQLite DBs, file dirs).
+Scan all packages + custom extensions for collisions on: registered tools, registered commands, event hooks (same event → does ordering matter?), storage paths (SQLite DBs, file dirs). Enumerate counts dynamically: read `~/.pi/agent/settings.json` `packages` array for the package count, and count `~/.pi/agent/extensions/*.ts` for the extension count.
 
 - Read each package's main extension file + each `~/.pi/agent/extensions/*.ts`.
 - Flag: tool name collisions, command name collisions, hook ordering risks, storage path overlaps.

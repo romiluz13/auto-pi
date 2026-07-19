@@ -163,10 +163,9 @@ export interface DispatchPromptParams {
 export function buildDispatchPrompt(params: DispatchPromptParams): string {
 	const parts: string[] = [];
 
-	// Skill content first (procedure before task)
-	if (params.skillContent) {
-		parts.push(params.skillContent);
-	}
+	// Skill content is NOT included in the dispatch message — it is passed via
+	// --append-system-prompt in loop.ts so the workflow gate can detect skill
+	// markers in the system prompt. Including it here would duplicate tokens.
 
 	// Task context
 	parts.push(`## Task Context`);

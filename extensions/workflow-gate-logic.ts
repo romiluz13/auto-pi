@@ -25,11 +25,33 @@ const TEST_FILE_PATTERNS = [
 ];
 
 const SOURCE_EXTENSIONS = [
-	".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
-	".py", ".go", ".rs", ".java", ".kt", ".rb",
-	".c", ".cpp", ".cc", ".h", ".hpp", ".swift",
-	".php", ".scala", ".clj", ".ex", ".exs", ".heex",
-	".vue", ".svelte", ".astro",
+	".ts",
+	".tsx",
+	".js",
+	".jsx",
+	".mjs",
+	".cjs",
+	".py",
+	".go",
+	".rs",
+	".java",
+	".kt",
+	".rb",
+	".c",
+	".cpp",
+	".cc",
+	".h",
+	".hpp",
+	".swift",
+	".php",
+	".scala",
+	".clj",
+	".ex",
+	".exs",
+	".heex",
+	".vue",
+	".svelte",
+	".astro",
 ];
 
 export function isTestFile(filePath: string): boolean {
@@ -73,7 +95,10 @@ export function getLoadedSkills(ctx: SkillCheckContext): Set<string> {
 	return loaded;
 }
 
-export function isSkillActive(ctx: SkillCheckContext, skillName: string): boolean {
+export function isSkillActive(
+	ctx: SkillCheckContext,
+	skillName: string,
+): boolean {
 	// Source 1: skill-loaded message in session (fresh slash-command turn)
 	const loaded = getLoadedSkills(ctx);
 	if (loaded.has(skillName)) return true;
@@ -92,7 +117,10 @@ export function isSkillActive(ctx: SkillCheckContext, skillName: string): boolea
 	return false;
 }
 
-export function anySkillActive(ctx: SkillCheckContext, skills: string[]): boolean {
+export function anySkillActive(
+	ctx: SkillCheckContext,
+	skills: string[],
+): boolean {
 	return skills.some((s) => isSkillActive(ctx, s));
 }
 
@@ -163,6 +191,16 @@ export function shouldGatePush(
 }
 
 // ─── Test-run detection (heuristic) ────────────────────────────────────────
+
+// No-op Pi extension factory — this file is a library module imported by
+// workflow-gate.ts, not a standalone extension. Pi requires a default export
+// to load a .ts file from the extensions dir without error. Same pattern as
+// loop-dispatch.ts. Without this, every pi subprocess (including subagents)
+// fails to start with "Extension does not export a valid factory function."
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default function (_pi: any) {
+	/* library module — no hooks */
+}
 
 export function wasTestRun(ctx: SkillCheckContext): boolean {
 	try {

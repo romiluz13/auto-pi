@@ -18,7 +18,7 @@ A setup that doesn't degrade is a setup with a maintenance discipline. This skil
 | When | What | How |
 | ---- | ---- | --- |
 | **Monthly** | Full audit (both loops) | `/setup-audit` — fans out 6 subagents, writes a report |
-| **On-add** (new package/extension) | Harmony re-audit | Read the new package's tools/commands/hooks/storage; check for collisions against existing 15 packages + 5 extensions. Reject if it duplicates an existing axis. |
+| **On-add** (new package/extension) | Harmony re-audit | Read the new package's tools/commands/hooks/storage; check for collisions against existing packages + extensions (enumerate dynamically from settings.json + extensions dir). Reject if it duplicates an existing axis. |
 | **Before-publish** (pushing my-pi) | Full audit + sync | `/setup-audit` → fix criticals → sync settings/extensions/skills to `~/Dev/my-pi` → commit + push |
 | **On-extend** (new skill) | Coach coverage check | After adding a skill, grep `coach.ts` — does any intent route to it? If not, add a detector or it's unreachable via Coach. |
 

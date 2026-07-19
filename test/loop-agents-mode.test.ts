@@ -62,7 +62,7 @@ describe("loop agents-mode dispatch", () => {
 		assert.ok(prompt.includes(".loop-plan.md"), "includes plan path");
 	});
 
-	it("buildDispatchPrompt includes skill content when provided", () => {
+	it("buildDispatchPrompt does NOT include skill content (moved to --append-system-prompt)", () => {
 		const prompt = buildDispatchPrompt({
 			phase: "build",
 			request: "build the API",
@@ -72,9 +72,12 @@ describe("loop agents-mode dispatch", () => {
 			skillContent:
 				"--- tdd skill ---\nWrite the failing test first.\n--- end tdd skill ---\n",
 		});
+		// Skill content is now passed via --append-system-prompt in loop.ts so the
+		// workflow gate can detect skill markers in the system prompt. It must NOT
+		// appear in the dispatch message (would duplicate tokens).
 		assert.ok(
-			prompt.includes("Write the failing test first"),
-			"includes skill content",
+			!prompt.includes("Write the failing test first"),
+			"skill content must not be in dispatch prompt (moved to system prompt)",
 		);
 	});
 

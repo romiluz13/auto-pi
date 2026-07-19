@@ -26,10 +26,10 @@ You MUST create a task for each of these items and complete them in order:
 3. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
 4. **Propose 2-3 approaches** — with trade-offs and your recommendation
 5. **Present design** — in sections scaled to their complexity, get user approval after each section
-6. **Write design doc** — save to `docs/specs/YYYY-MM-DD-<topic>-design.md` and commit
+6. **Write design doc** — publish to GitHub Issues via `/skill:to-spec` (or save as ADR in `docs/adr/` for architecture decisions). Do NOT create random markdown files in `docs/specs/` — specs live in the issue tracker.
 7. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
 8. **User reviews written spec** — ask user to review the spec file before proceeding
-9. **Transition to implementation** — invoke `/to-spec` to publish the spec, then `/to-tickets` to break it into tickets
+9. **Transition to implementation** — invoke `/skill:to-spec` to publish the spec, then `/skill:to-tickets` to break it into tickets
 
 ## Process Flow
 
@@ -43,7 +43,7 @@ digraph brainstorming {
     "Write design doc" [shape=box];
     "Spec self-review\n(fix inline)" [shape=box];
     "User reviews spec?" [shape=diamond];
-    "Invoke /to-spec + /to-tickets" [shape=doublecircle];
+    "Invoke /skill:to-spec + /skill:to-tickets" [shape=doublecircle];
 
     "Explore project context" -> "Ask clarifying questions";
     "Ask clarifying questions" -> "Propose 2-3 approaches";
@@ -54,11 +54,11 @@ digraph brainstorming {
     "Write design doc" -> "Spec self-review\n(fix inline)";
     "Spec self-review\n(fix inline)" -> "User reviews spec?";
     "User reviews spec?" -> "Write design doc" [label="changes requested"];
-    "User reviews spec?" -> "Invoke /to-spec + /to-tickets" [label="approved"];
+    "User reviews spec?" -> "Invoke /skill:to-spec + /skill:to-tickets" [label="approved"];
 }
 ```
 
-**The terminal state is transitioning to `/to-spec`.** Do NOT invoke frontend-design, impeccable, or any other implementation skill. The ONLY skills you invoke after brainstorming are `/to-spec` (to publish the spec) then `/to-tickets` (to break it into tickets).
+**The terminal state is transitioning to `/skill:to-spec`.** Do NOT invoke frontend-design, impeccable, or any other implementation skill. The ONLY skills you invoke after brainstorming are `/skill:to-spec` (to publish the spec) then `/skill:to-tickets` (to break it into tickets).
 
 ## The Process
 
@@ -103,7 +103,7 @@ digraph brainstorming {
 
 **Documentation:**
 
-- Write the validated design (spec) to `docs/specs/YYYY-MM-DD-<topic>-design.md`
+- Write the validated design (spec) to the issue tracker via `/skill:to-spec`, or save as an ADR in `docs/adr/` if it's an architecture decision
   - (User preferences for spec location override this default)
 - Use elements-of-style:writing-clearly-and-concisely skill if available
 - Commit the design document to git
@@ -127,8 +127,8 @@ Wait for the user's response. If they request changes, make them and re-run the 
 
 **Implementation:**
 
-- Invoke `/to-spec` to publish the spec to the issue tracker, then `/to-tickets` to break it into tickets
-- Do NOT invoke any other implementation skill. `/to-spec` is the next step.
+- Invoke `/skill:to-spec` to publish the spec to the issue tracker, then `/skill:to-tickets` to break it into tickets
+- Do NOT invoke any other implementation skill. `/skill:to-spec` is the next step.
 
 ## Key Principles
 

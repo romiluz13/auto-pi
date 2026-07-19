@@ -31,9 +31,7 @@ function makeCtx(opts: {
 
 	return {
 		sessionManager: { getBranch: () => branch },
-		getSystemPrompt: opts.systemPrompt
-			? () => opts.systemPrompt!
-			: undefined,
+		getSystemPrompt: opts.systemPrompt ? () => opts.systemPrompt! : undefined,
 	};
 }
 
@@ -96,7 +94,8 @@ test("isSkillActive: detects skill-loaded message in session", () => {
 
 test("isSkillActive: detects skill in system prompt (continuation turn)", () => {
 	const ctx = makeCtx({
-		systemPrompt: "some prompt\n--- tdd skill (mechanically injected by skill-injector) ---\nbody\n--- end tdd skill ---\n",
+		systemPrompt:
+			"some prompt\n--- tdd skill (mechanically injected by skill-injector) ---\nbody\n--- end tdd skill ---\n",
 	});
 	assert.ok(isSkillActive(ctx, "tdd"));
 });
@@ -162,14 +161,19 @@ test("shouldGateCommit: blocks without verification AND without tests", () => {
 });
 
 test("shouldGateCommit: blocks without review skill even if tests ran", () => {
-	const ctx = makeCtx({ skills: ["verification-before-completion"], testCommands: ["npm test"] });
+	const ctx = makeCtx({
+		skills: ["verification-before-completion"],
+		testCommands: ["npm test"],
+	});
 	const result = shouldGateCommit(ctx, false, true);
 	assert.equal(result.block, true);
 	assert.ok(result.reason?.includes("code-review"));
 });
 
 test("shouldGateCommit: allows when both verification and review are active", () => {
-	const ctx = makeCtx({ skills: ["verification-before-completion", "code-review"] });
+	const ctx = makeCtx({
+		skills: ["verification-before-completion", "code-review"],
+	});
 	const result = shouldGateCommit(ctx, false, false);
 	assert.equal(result.block, false);
 });

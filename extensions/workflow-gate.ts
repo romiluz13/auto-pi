@@ -79,7 +79,9 @@ export default function workflowGateExtension(pi: ExtensionAPI): void {
 		// skill) is active. Test files, docs, and config are always allowed.
 		// This is the enforcement that makes "test-first" non-circumventable.
 		if (event.toolName === "write" || event.toolName === "edit") {
-			const input = event.input as { path?: string; filePath?: string } | undefined;
+			const input = event.input as
+				| { path?: string; filePath?: string }
+				| undefined;
 			const filePath = input?.path ?? input?.filePath ?? "";
 			if (filePath) {
 				const decision = shouldGateWrite(filePath, skillCtx, skip);
@@ -126,13 +128,19 @@ export default function workflowGateExtension(pi: ExtensionAPI): void {
 			const sub = (args ?? "").trim().toLowerCase();
 			if (sub === "on") {
 				setSkipGate(ctx, true);
-				ctx.ui.notify("Workflow gates OFF for this session. Write/commit freely.", "info");
+				ctx.ui.notify(
+					"Workflow gates OFF for this session. Write/commit freely.",
+					"info",
+				);
 				ctx.ui.setStatus("gate", ctx.ui.theme.fg("yellow", "🔓 gates off"));
 				return;
 			}
 			if (sub === "off") {
 				setSkipGate(ctx, false);
-				ctx.ui.notify("Workflow gates ON — TDD, review, verification enforced.", "info");
+				ctx.ui.notify(
+					"Workflow gates ON — TDD, review, verification enforced.",
+					"info",
+				);
 				ctx.ui.setStatus("gate", ctx.ui.theme.fg("green", "🔒 gates on"));
 				return;
 			}
