@@ -132,7 +132,7 @@ export default function workflowGateExtension(pi: ExtensionAPI): void {
 					"Workflow gates OFF for this session. Write/commit freely.",
 					"info",
 				);
-				ctx.ui.setStatus("gate", ctx.ui.theme.fg("yellow", "🔓 gates off"));
+				ctx.ui.setStatus("gate", ctx.ui.theme.fg("warning", "🔓 gates off"));
 				return;
 			}
 			if (sub === "off") {
@@ -141,7 +141,7 @@ export default function workflowGateExtension(pi: ExtensionAPI): void {
 					"Workflow gates ON — TDD, review, verification enforced.",
 					"info",
 				);
-				ctx.ui.setStatus("gate", ctx.ui.theme.fg("green", "🔒 gates on"));
+				ctx.ui.setStatus("gate", ctx.ui.theme.fg("accent", "🔒 gates on"));
 				return;
 			}
 			if (sub === "status") {
@@ -163,8 +163,8 @@ export default function workflowGateExtension(pi: ExtensionAPI): void {
 			ctx.ui.setStatus(
 				"gate",
 				newVal
-					? ctx.ui.theme.fg("yellow", "🔓 gates off")
-					: ctx.ui.theme.fg("green", "🔒 gates on"),
+					? ctx.ui.theme.fg("warning", "🔓 gates off")
+					: ctx.ui.theme.fg("accent", "🔒 gates on"),
 			);
 		},
 	});
@@ -172,9 +172,9 @@ export default function workflowGateExtension(pi: ExtensionAPI): void {
 	// Session start: show gate status
 	pi.on("session_start", async (_event, ctx) => {
 		if (!isSkipGate(ctx)) {
-			ctx.ui.setStatus("gate", ctx.ui.theme.fg("green", "🔒 gates on"));
+			ctx.ui.setStatus("gate", ctx.ui.theme.fg("accent", "🔒 gates on"));
 		} else {
-			ctx.ui.setStatus("gate", ctx.ui.theme.fg("yellow", "🔓 gates off"));
+			ctx.ui.setStatus("gate", ctx.ui.theme.fg("warning", "🔓 gates off"));
 		}
 	});
 }
