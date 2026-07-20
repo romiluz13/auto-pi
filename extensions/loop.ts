@@ -251,19 +251,17 @@ function recordStatus(ctx: ExtensionContext): void {
 function applyPhaseTools(pi: ExtensionAPI, phase: Phase): void {
 	const allow = PHASE_TOOLS[phase];
 	if (allow === null) {
-		// Restore full toolset.
-		if (phaseToolSnapshot) {
-			pi.setActiveTools(phaseToolSnapshot);
-		}
+		// Full autonomy: restore ALL available tools, not just the snapshot.
+		// The snapshot may have been taken when tools were restricted (e.g. the
+		// loop started in a gated phase). Using getAllTools() ensures we restore
+		// the true full toolset including bash, subagent, etc.
+		const allTools = pi.getAllTools().map((t) => t.name);
+		pi.setActiveTools(allTools);
 		return;
 	}
 	if (phaseToolSnapshot === null) {
 		phaseToolSnapshot = pi.getActiveTools();
 	}
-	// Restrict to the phase allowlist — only keep tools that are both in the
-	// snapshot AND in the allowlist (so we never add tools the user didn't have,
-	// and never allow tools outside the phase). The allowlist already includes
-	// the phase-essential tools like lsp_diagnostics, subagent, etc.
 	const allowSet = new Set(allow);
 	const restricted = phaseToolSnapshot.filter((t) => allowSet.has(t));
 	pi.setActiveTools(restricted);
@@ -274,10 +272,11 @@ function applyPhaseTools(pi: ExtensionAPI, phase: Phase): void {
  *  agent is never left stranded with a phase-restricted toolset after the loop
  *  ends. Idempotent — safe to call when no snapshot exists. */
 function restoreTools(pi: ExtensionAPI): void {
-	if (phaseToolSnapshot) {
-		pi.setActiveTools(phaseToolSnapshot);
-		phaseToolSnapshot = null;
-	}
+	// Full autonomy: restore ALL available tools, not just the snapshot.
+	// The snapshot may have been taken when tools were restricted.
+	const allTools = pi.getAllTools().map((t) => t.name);
+	pi.setActiveTools(allTools);
+	phaseToolSnapshot = null;
 }
 
 // ─── Steering ───────────────────────────────────────────────────────────────
