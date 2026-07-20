@@ -699,6 +699,21 @@ async function dispatchPhaseAgent(
 		piArgs.push("--append-system-prompt", skillContent);
 	}
 
+	// Model inheritance: if the agent type says "inherit", pass the parent
+	// session's active model to the subprocess so it doesn't fall back to the
+	// config default (which may differ from what the user selected mid-session).
+	// Without this, sub-agents run on settings.json defaultModel, NOT the
+	// model the parent session is actually using.
+	if (agentType.model === "inherit" || !agentType.model) {
+		const parentModel = ctx.getModel();
+		if (parentModel?.provider && parentModel?.id) {
+			piArgs.push("--model", `${parentModel.provider}/${parentModel.id}`);
+		}
+	} else if (agentType.model !== "inherit") {
+		// Explicit model override from the agent type frontmatter
+		piArgs.push("--model", agentType.model);
+	}
+
 	// Spawn the sub-agent as a pi subprocess
 	const result = await new Promise<SubagentResult>((resolve) => {
 		const proc = spawn("pi", [...piArgs, dispatchPrompt], {
