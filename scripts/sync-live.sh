@@ -14,27 +14,27 @@ echo "Syncing auto-pi repo → live config..."
 
 # Extensions
 for f in "$REPO_DIR"/extensions/*.ts; do
-  [ -f "$f" ] || continue
-  name=$(basename "$f")
-  cp "$f" "$PI_DIR/extensions/$name"
-  echo "  ✓ extension: $name"
+	[ -f "$f" ] || continue
+	name=$(basename "$f")
+	cp "$f" "$PI_DIR/extensions/$name"
+	echo "  ✓ extension: $name"
 done
 
 # Prompts
 for f in "$REPO_DIR"/prompts/*.md; do
-  [ -f "$f" ] || continue
-  name=$(basename "$f")
-  cp "$f" "$PI_DIR/prompts/$name"
-  echo "  ✓ prompt: $name"
+	[ -f "$f" ] || continue
+	name=$(basename "$f")
+	cp "$f" "$PI_DIR/prompts/$name"
+	echo "  ✓ prompt: $name"
 done
 
 # Skills (repo skills overwrite ~/.agents/skills/ — auto-pi wins collisions)
 for d in "$REPO_DIR"/skills/*/; do
-  [ -d "$d" ] || continue
-  name=$(basename "$d")
-  rm -rf "$AGENTS_DIR/$name"
-  cp -R "$d" "$AGENTS_DIR/$name"
-  echo "  ✓ skill: $name"
+	[ -d "$d" ] || continue
+	name=$(basename "$d")
+	rm -rf "$AGENTS_DIR/$name"
+	cp -R "$d" "$AGENTS_DIR/$name"
+	echo "  ✓ skill: $name"
 done
 
 # AGENTS.md
@@ -43,11 +43,11 @@ echo "  ✓ AGENTS.md"
 
 # settings.json (merge — don't overwrite, preserve live keys like API tokens)
 if [ -f "$PI_DIR/settings.json" ] && [ -f "$REPO_DIR/config/settings.json" ]; then
-  # Only copy if they differ — and only the keys we manage
-  echo "  ⚠ settings.json: manual merge required (run node -e to patch specific keys)"
+	# Only copy if they differ — and only the keys we manage
+	echo "  ⚠ settings.json: manual merge required (run node -e to patch specific keys)"
 else
-  cp "$REPO_DIR/config/settings.json" "$PI_DIR/settings.json"
-  echo "  ✓ settings.json"
+	cp "$REPO_DIR/config/settings.json" "$PI_DIR/settings.json"
+	echo "  ✓ settings.json"
 fi
 
 echo ""
