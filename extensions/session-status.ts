@@ -15,7 +15,12 @@
  * - Composes with all other extensions (additive status writes).
  */
 
-import { appendFileSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import {
+	appendFileSync,
+	readFileSync,
+	writeFileSync,
+	existsSync,
+} from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -100,8 +105,7 @@ export default function sessionStatusExtension(pi: ExtensionAPI): void {
 					try {
 						const entry = JSON.parse(line) as StatusEntry;
 						latestBySession.set(entry.sessionId, entry);
-					} catch {
-					}
+					} catch {}
 				}
 				const sessions = [...latestBySession.values()];
 				const working = sessions.filter((s) => s.status === "working");
@@ -113,7 +117,8 @@ export default function sessionStatusExtension(pi: ExtensionAPI): void {
 					try {
 						const decisions = JSON.parse(readFileSync(DECISIONS_FILE, "utf-8"));
 						decisionsCount = Array.isArray(decisions)
-							? decisions.filter((d: { resolved?: boolean }) => !d.resolved).length
+							? decisions.filter((d: { resolved?: boolean }) => !d.resolved)
+									.length
 							: 0;
 					} catch {
 						// fail silently
@@ -128,7 +133,9 @@ export default function sessionStatusExtension(pi: ExtensionAPI): void {
 				// Your Call
 				sections.push("### Your Call");
 				if (decisionsCount > 0) {
-					sections.push(`${decisionsCount} open decision(s) need your input. Run /decisions to see them.`);
+					sections.push(
+						`${decisionsCount} open decision(s) need your input. Run /decisions to see them.`,
+					);
 				} else {
 					sections.push("Nothing needs your action right now.");
 				}
@@ -136,18 +143,24 @@ export default function sessionStatusExtension(pi: ExtensionAPI): void {
 
 				// Recently Landed
 				sections.push("### Recently Landed");
-				sections.push("Check `git log --oneline -5` in each active project for recent commits.");
+				sections.push(
+					"Check `git log --oneline -5` in each active project for recent commits.",
+				);
 				sections.push("");
 
 				// Underway
 				sections.push("### Underway");
 				if (working.length > 0) {
 					for (const s of working) {
-						sections.push(`- ${s.project} — ${s.status} (${s.sessionId.slice(0, 8)})`);
+						sections.push(
+							`- ${s.project} — ${s.status} (${s.sessionId.slice(0, 8)})`,
+						);
 					}
 				} else if (settled.length > 0) {
 					for (const s of settled) {
-						sections.push(`- ${s.project} — settled (${s.sessionId.slice(0, 8)})`);
+						sections.push(
+							`- ${s.project} — settled (${s.sessionId.slice(0, 8)})`,
+						);
 					}
 				} else {
 					sections.push("Nothing is underway.");
@@ -167,7 +180,11 @@ export default function sessionStatusExtension(pi: ExtensionAPI): void {
 								const wf = JSON.parse(
 									readFileSync(join(workflowsDir, f), "utf-8"),
 								);
-								if (wf.status && wf.status !== "done" && wf.status !== "rejected") {
+								if (
+									wf.status &&
+									wf.status !== "done" &&
+									wf.status !== "rejected"
+								) {
 									queuedCount++;
 								}
 							}
@@ -177,7 +194,9 @@ export default function sessionStatusExtension(pi: ExtensionAPI): void {
 					// fail silently
 				}
 				if (queuedCount > 0) {
-					sections.push(`${queuedCount} active loop workflow(s). Run /loop-status for details.`);
+					sections.push(
+						`${queuedCount} active loop workflow(s). Run /loop-status for details.`,
+					);
 				} else {
 					sections.push("Nothing is queued.");
 				}
