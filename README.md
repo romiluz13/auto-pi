@@ -3,7 +3,7 @@
 **A workflow OS for [Pi](https://pi.dev).**  
 Type a task → pick a workflow → a pinned skill procedure enters context before the model acts.
 
-Not another coding agent. A dress on Pi’s minimal harness: Coach, slash workflows, mechanical `skill:` pins, and a bounded `/loop` with real tool gates.
+Not another coding agent. A dress on Pi's minimal harness: Coach, slash workflows, mechanical `skill:` pins, and a bounded `/loop` with phase gates (opt-in, disabled by default in full autonomy mode).
 
 [![Pi](https://img.shields.io/badge/Pi-v0.80+-blue.svg)](https://pi.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -16,7 +16,7 @@ Not another coding agent. A dress on Pi’s minimal harness: Coach, slash workfl
 | --- | --- |
 | An installable Pi config: extensions + prompts + skills + shared `AGENTS.md` | A sealed product competing with Claude Code / Codex / ChatGPT |
 | Six workflows that **pin** a primary skill via Pi `skill:` frontmatter | A promise that every cascading skill is force-injected |
-| `/loop` with contract gate, per-phase tool allowlists, RED/plateau exits | Unbounded “autonomous AGI” |
+| `/loop` with contract gate, per-phase tool allowlists (opt-in), RED/plateau exits | Unbounded “autonomous AGI” |
 | Model-agnostic — point Pi at whatever you pay for | Vendor lock-in |
 
 ---
@@ -53,7 +53,7 @@ Coach shows a fixed menu. You pick. Examples:
 | `/review` | **Pins** `code-review` — two-axis review procedure; receiving feedback is steered |
 | `/ship` | **Pins** `verification-before-completion` — independent audit, then steered docs → commit → PR |
 | `/feature` | Chain: plan → build → review → ship (child pins fire; **no** human approval gates between phases) |
-| `/loop` | Hard task mode: contract → phased tool gates → human pauses → cap / plateau / ship on a **real commit hash** |
+| `/loop` | Hard task mode: contract → phased tool gates (opt-in) → human pauses → cap / plateau / ship on a **real commit hash** |
 | `Just do it` or `!…` | Raw agent — AGENTS.md only, no workflow pin |
 
 ---
@@ -75,7 +75,7 @@ Coach shows a fixed menu. You pick. Examples:
 
 **Steered** — follow-ons live in procedure text (spec/tickets after plan, diagnosing-bugs on RED, receiving-code-review, docs-before-commit, `/skill:commit` / github). The model is instructed to load them; they are not second frontmatter pins.
 
-**Gated (`/loop`)** — extension owns phase tool allowlists, contract preflight, RED halt, plateau detection, ship only when a commit hash appears. Phase skills are steered inside those gates.
+**Gated (`/loop`)** — extension owns phase tool allowlists (opt-in, disabled by default in full autonomy mode), contract preflight, RED halt, plateau detection, ship only when a commit hash appears. Phase skills are steered inside those gates.
 
 **Sub-agent dispatch (`/loop --mode=agents`)** — each phase (PLAN, BUILD, REVIEW, VERIFY, SHIP) dispatches a fresh-context sub-agent via `pi --mode json -p --no-session`. Structured output via temporary `emit_result` tool with JSON schema validation. Journaling with cache-replay resume. Budget control (`--budget $N`, `--max-tokens N`). Fork bomb prevention (depth cap 3).
 

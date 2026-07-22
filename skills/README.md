@@ -27,7 +27,7 @@ applicable.
 
 | Source | Skills | Count |
 | -------- | -------- | ------- |
-| **Matt Pocock** (mattpocock/skills) | tdd, handoff, prototype, grill-with-docs, to-spec, to-tickets, triage, implement, code-review, research, wayfinder, wizard, codebase-design, domain-modeling, diagnosing-bugs, resolving-merge-conflicts, writing-great-skills, teach, improve-codebase-architecture | 19 |
+| **Matt Pocock** (mattpocock/skills) | tdd, handoff, prototype, grill-with-docs, to-spec, to-tickets, triage, implement, code-review, research, wayfinder, codebase-design, domain-modeling, diagnosing-bugs, resolving-merge-conflicts, writing-great-skills, teach, improve-codebase-architecture | 18 |
 | **MongoDB** (mongodb/agent-skills) | mongodb-schema-design, mongodb-search-and-ai, mongodb-query-optimizer, mongodb-connection, mongodb-mcp-setup, mongodb-natural-language-querying, mongodb-atlas-stream-processing | 7 |
 | **Vercel** (vercel-labs/agent-skills + vercel-labs/agent-browser) | vercel-react-best-practices, vercel-composition-patterns, deploy-to-vercel, web-design-guidelines, agent-browser | 5 |
 | **Bright Data** (brightdata/skills) | search, scrape, discover-api, data-feeds, live-research, brightdata-cli | 6 |
@@ -37,7 +37,7 @@ applicable.
 ## Skill selection methodology
 
 Every skill was compared prompt-by-prompt against alternatives. Matt Pocock
-wins all 5 conflicts with Superpowers (tdd, debugging, code-review, writing-skills,
+Auto-pi repo forks win all 5 conflicts with Superpowers (tdd, debugging, code-review, writing-skills,
 planning). 3 unique Superpowers skills were adapted and bundled.
 
 ## What was rejected

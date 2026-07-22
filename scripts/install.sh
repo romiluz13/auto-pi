@@ -85,18 +85,17 @@ info "Model definitions deployed (set $GROVE_API_KEY for Grove providers)"
 
 # ── Packages ───────────────────────────────────────────────────────────────
 
-step "Installing 14 Pi packages"
+step "Installing 12 Pi packages"
 
-# Order matters: confirm-destructive must run BEFORE the rest so it sees
-# the original bash command. pi-context must run BEFORE pi-lens so
-# large-output receipts don't replace lens diagnostics.
+# Order matters: pi-context must run BEFORE pi-lens so large-output receipts
+# don't replace lens diagnostics. pi-confirm-destructive and pi-observability
+# were removed (full autonomy mode — no destructive-op prompts, no
+# observability endpoint auth errors).
 PACKAGES=(
-	@spences10/pi-confirm-destructive
 	@spences10/pi-context
 	pi-hermes-memory
 	pi-observational-memory
 	pi-subagents
-	@spences10/pi-observability
 	pi-lens
 	@narumitw/pi-statusline
 	pi-intercom
@@ -208,6 +207,15 @@ for prompt in "$SCRIPT_DIR"/prompts/*.md; do
 done
 info "Prompt templates installed ($(ls "$PI_AGENT_DIR/prompts"/*.md 2>/dev/null | wc -l | tr -d ' ') commands)"
 
+# ── Agent Types (for /loop --mode=agents) ───────────────────────────────────
+step "Installing agent types"
+mkdir -p "$PI_AGENT_DIR/agents"
+for agent in "$SCRIPT_DIR"/agents/*.md; do
+	[ -f "$agent" ] || continue
+	cp "$agent" "$PI_AGENT_DIR/agents/$(basename "$agent")"
+done
+info "Agent types installed ($(ls "$PI_AGENT_DIR/agents"/*.md 2>/dev/null | wc -l | tr -d ' ') agent types)"
+
 # ── Repo Skills (installed AFTER community skills so auto-pi wins collisions) ─
 # auto-pi's hand-tuned skills (code-review, diagnosing-bugs, brainstorming,
 # grilling) are enhanced forks of Matt Pocock's originals. They MUST be copied
@@ -295,11 +303,21 @@ for name in uv github commit; do
 done
 
 # 7. UX skills (3 skills: compact-safe, impeccable, mongodb-mcp-cluster-per-project)
+# Source: 10gen/ux-skills — repo may be private/deleted (HTTP 404 on fresh clone).
+# Fallback: if the clone fails, check ~/Dev/ux-skills (local copy).
 UX_DIR="$SOURCES_DIR/ux-skills"
-clone_if_missing "https://github.com/10gen/ux-skills.git" "$UX_DIR"
-for name in compact-safe impeccable mongodb-mcp-cluster-per-project; do
-	symlink_skill "$UX_DIR/$name" "$name"
-done
+clone_if_missing "https://github.com/10gen/ux-skills.git" "$UX_DIR" 2>/dev/null
+if [ ! -d "$UX_DIR" ] && [ -d "$HOME/Dev/ux-skills" ]; then
+	UX_DIR="$HOME/Dev/ux-skills"
+	warn "ux-skills: using local copy at ~/Dev/ux-skills (GitHub repo returned 404)"
+fi
+if [ -d "$UX_DIR" ]; then
+	for name in compact-safe impeccable mongodb-mcp-cluster-per-project; do
+		symlink_skill "$UX_DIR/$name" "$name"
+	done
+else
+	warn "ux-skills not found — compact-safe, impeccable, mongodb-mcp-cluster-per-project will not be installed. Clone 10gen/ux-skills manually."
+fi
 
 # 8. Post-clone notation fix: ensure skill-body slash refs use /skill: prefix
 # This applies the same fix we applied to live copies — fresh installs get it too.

@@ -28,6 +28,15 @@ for f in "$REPO_DIR"/prompts/*.md; do
 	echo "  ✓ prompt: $name"
 done
 
+# Agent types (for /loop --mode=agents — loadAgentType reads from ~/.pi/agent/agents/)
+mkdir -p "$PI_DIR/agents"
+for f in "$REPO_DIR"/agents/*.md; do
+	[ -f "$f" ] || continue
+	name=$(basename "$f")
+	cp "$f" "$PI_DIR/agents/$name"
+	echo "  ✓ agent type: $name"
+done
+
 # Skills (repo skills overwrite ~/.agents/skills/ — auto-pi wins collisions)
 for d in "$REPO_DIR"/skills/*/; do
 	[ -d "$d" ] || continue
