@@ -23,7 +23,10 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+	ExtensionAPI,
+	ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 
 const STATUS_FILE = join(homedir(), ".pi", "agent", "session-status.jsonl");
 const DECISIONS_FILE = join(homedir(), ".pi", "agent", "decisions.json");
@@ -62,7 +65,34 @@ function getProject(cwd: string): string {
 	return cwd.split("/").pop() ?? cwd;
 }
 
+// Auto-name the session so intercom can target it by a unique name.
+// Without this, sessions spawned from the same parent get the same
+// auto-generated intercom name (e.g. "subagent-chat-019f851b") and
+// can't be targeted individually. We set a unique name on session_start
+// based on project + model, so intercom's turn_start syncPresenceIdentity
+// picks it up and registers it with the broker.
+function autoNameSession(ctx: ExtensionContext): void {
+	const existing = ctx.getSessionName();
+	if (existing && !existing.startsWith("subagent-chat-")) {
+		return; // already named (e.g. via --name flag) — don't override
+	}
+	const cwd = ctx.cwd ?? process.cwd();
+	const project = getProject(cwd);
+	const model = ctx.getModel();
+	const modelId = model?.id ?? "unknown";
+	const autoName = `${project}-${modelId}`;
+	try {
+		ctx.setSessionName(autoName);
+	} catch {
+		// fail silently — naming is best-effort
+	}
+}
+
 export default function sessionStatusExtension(pi: ExtensionAPI): void {
+	pi.on("session_start", async (_event, ctx) => {
+		autoNameSession(ctx);
+	});
+
 	pi.on("agent_start", async (_event, ctx) => {
 		const sessionId = ctx.sessionManager.getSessionId();
 		const cwd = ctx.cwd ?? process.cwd();
