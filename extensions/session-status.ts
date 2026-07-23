@@ -72,6 +72,10 @@ function getProject(cwd: string): string {
 // based on project + model, so intercom's turn_start syncPresenceIdentity
 // picks it up and registers it with the broker.
 function autoNameSession(ctx: ExtensionContext): void {
+	// Guard: getSessionName may not be available on all context shapes
+	// (session_start fires before the full context is wired). Use typeof
+	// check so it fails gracefully instead of throwing.
+	if (typeof ctx.getSessionName !== "function") return;
 	const existing = ctx.getSessionName();
 	if (existing && !existing.startsWith("subagent-chat-")) {
 		return; // already named (e.g. via --name flag) — don't override
@@ -82,18 +86,17 @@ function autoNameSession(ctx: ExtensionContext): void {
 	const modelId = model?.id ?? "unknown";
 	const autoName = `${project}-${modelId}`;
 	try {
-		ctx.setSessionName(autoName);
+		if (typeof ctx.setSessionName === "function") {
+			ctx.setSessionName(autoName);
+		}
 	} catch {
 		// fail silently — naming is best-effort
 	}
 }
 
 export default function sessionStatusExtension(pi: ExtensionAPI): void {
-	pi.on("session_start", async (_event, ctx) => {
-		autoNameSession(ctx);
-	});
-
 	pi.on("agent_start", async (_event, ctx) => {
+		autoNameSession(ctx);
 		const sessionId = ctx.sessionManager.getSessionId();
 		const cwd = ctx.cwd ?? process.cwd();
 		writeStatus({
