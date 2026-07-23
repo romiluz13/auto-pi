@@ -84,7 +84,13 @@ function autoNameSession(ctx: ExtensionContext): void {
 	const project = getProject(cwd);
 	const model = ctx.getModel();
 	const modelId = model?.id ?? "unknown";
-	const autoName = `${project}-${modelId}`;
+	// Append a short session-ID suffix so multiple sessions on the same
+	// project+model get UNIQUE intercom names. Without this, parallel SDR-AI
+	// sessions on FW-GLM-5.2 all get "SDR-AI-FW-GLM-5.2" and intercom can't
+	// target them individually (caused a misdelivery to a RomBot session).
+	const sessionId = ctx.sessionManager?.getSessionId() ?? "";
+	const shortId = sessionId.slice(0, 8);
+	const autoName = `${project}-${modelId}-${shortId}`;
 	try {
 		if (typeof ctx.setSessionName === "function") {
 			ctx.setSessionName(autoName);
