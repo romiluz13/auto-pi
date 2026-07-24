@@ -40,7 +40,7 @@ On top of whatever the repo documents, the Standards axis always carries the **s
 - **The repo overrides.** A documented repo standard always wins; where it endorses something the baseline would flag, suppress the smell.
 - **Always a judgement call.** Each smell is a labelled heuristic ("possible Feature Envy"), never a hard violation — and, like any standard here, skip anything tooling already enforces.
 
-Each smell reads _what it is_ → _how to fix_; match it against the diff:
+Each smell reads *what it is* → *how to fix*; match it against the diff:
 
 - **Mysterious Name** — a function, variable, or type whose name doesn't reveal what it does or holds. → rename it; if no honest name comes, the design's murky.
 - **Duplicated Code** — the same logic shape appears in more than one hunk or file in the change. → extract the shared shape, call it from both.
@@ -80,8 +80,6 @@ Present the two reports under `## Standards` and `## Spec` headings, verbatim or
 End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes — that's the reranking the separation exists to prevent.
 
 ## Review depth checks
-
-**Zero-finding halt:** Zero findings on a non-trivial change means insufficient depth, not perfect code. Re-scan against heuristics and security checklist before reporting CLEAN. An APPROVE with zero findings AND fewer than 3 file:line evidence citations is a rubber stamp — trigger fallback inline verification.
 
 **Friction scan** (architectural signals per-line review misses):
 

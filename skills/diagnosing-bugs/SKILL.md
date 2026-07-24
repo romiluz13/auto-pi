@@ -88,8 +88,6 @@ Each hypothesis must be **falsifiable**: state the prediction it makes.
 Hypothesis quality criteria:
 
 - States a specific mechanism ("X returns null because Y is not set when Z")
-- Predicts a specific test outcome ("if I set Y, X returns the correct value")
-- Is falsifiable ("if Y is already set, this hypothesis is wrong")
 - Explains ALL observed symptoms, not just the primary one
 
 > Format: "If <X> is the cause, then <changing Y> will make the bug disappear / <changing Z> will make it worse."
