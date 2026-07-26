@@ -1,7 +1,7 @@
 # Workflow Skills Audit (v0.3)
 
 **Date:** 2026-07-26
-**Status:** Built, pending GPT-5.6 final review (do NOT ship until reviewed)
+**Status:** APPROVED by GPT-5.6 review (commit a5b94ab, pushed to origin/main)
 **Inventory appendix:** see `docs/audits/2026-07-26-skill-inventory-appendix.md` (all installed skills classified)
 
 ## The architecture (v0.3)
@@ -90,7 +90,7 @@ The genius's review said: "blanket exclusion does not answer whether the library
 | `decision-hold-lifecycle` | Persist unresolved decisions | **Excluded from workflow.** This is an operational utility (repo skill), not a workflow phase. Available on-demand. |
 | `grill-with-docs` | Relentless interview to stress-test a plan | **Excluded from planning-workflow.** Grilling is a separate on-ramp for stress-testing a plan before building. Adding it to every plan would be overkill. Available via `/skill:grill-with-docs` when the user wants to stress-test. |
 
-**Conclusion:** the library IS leveraged optimally. The 6 workflow skills bundle only the normal-path specialists. The situational/on-demand skills (codebase-design, domain-modeling, frontend-design, prototype, grill-with-docs, etc.) are available via `/skill:` when the workflow or user identifies the need — but they're NOT on every plan/build/review/ship because that would bloat the normal path with skills that aren't always relevant.
+**Conclusion:** no additional normal-path candidate was justified in this audit. The 6 workflow skills bundle only the normal-path specialists. The situational/on-demand skills (codebase-design, domain-modeling, frontend-design, prototype, grill-with-docs, etc.) are available via `/skill:` when the workflow or user identifies the need — but they're NOT on every plan/build/review/ship because that would bloat the normal path with skills that aren't always relevant.
 
 ## State protocol (all 6 workflows)
 
