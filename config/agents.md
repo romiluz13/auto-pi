@@ -14,35 +14,24 @@ Single source of truth for every AI coding tool on this machine (Pi, Claude Code
 
 ## Autonomous workflow
 
-When given a task, follow this flow automatically. The workflow IS the skill router — each step names the exact skill. Start with a slash command so the `skill:` pin fires; at the end of each workflow the prompt tells you the next slash command to type.
+When given a task, follow this flow. Each step is a user-facing workflow — type the slash command, the `skill:` pin fires the workflow skill, and the workflow skill orchestrates the internal phases by reading specialists in turn. The user never types internal skill commands.
 
-1. **Understand (ORIENT).** If the user wants to understand (not change), explain inline. Do NOT fall through to build. No write agents, no workflow. If the user wants to change something: read repo AGENTS.md, relevant files, existing patterns. Search memory. Fan out subagents for parallel research (web, GitHub, codebase — each reads a different source). If ambiguous, ask ONE clarifying question. If clear, proceed.
-2. **Brainstorm (new features).** Before building anything new → run `/skill:brainstorming`: explore context, ask questions one at a time, propose approaches, present design, get user approval. Brainstorm with evidence (validate against data) → `/skill:octocode-brainstorming`. Brainstorm by interview (explore intent) → `/skill:brainstorming`.
-3. **Plan (big tasks only).** Pick based on the situation:
-   - **You know what to build** (>3 files, new feature) → `/skill:to-spec` then `/skill:to-tickets`.
-   - **You don't know what to build** (fog of war, loose idea) → `/skill:wayfinder`.
-   - **Design question answerable by building** → `prototype` (throwaway, answer the question, discard — prototype code NEVER becomes production by surviving; if building for real, start a fresh BUILD with full gates).
-   - **Design question answerable by thinking** → `/skill:grill-with-docs` (relentless interview to stress-test the plan, uses `/skill:grilling` primitive + `/skill:domain-modeling` for ADRs).
-   - **Need evidence from primary sources** → `/skill:research` or `/skill:octocode-research` (background agent, cited markdown — 3+ independent sources agree → stop, max 6 calls per round). Research code/prior art with citations → `/skill:octocode-research`. General research (web, docs, concepts) → `/skill:research`.
-   - Read pre-existing ADRs (`docs/adr/`) as SETTLED constraints — if the plan contradicts one, FLAG it, don't silently override.
-   - Bug fix or small change → skip to step 4.
-4. **Build.** You MUST run `/build` (TDD) as a slash command — do NOT improvise TDD from this prose. The slash command mechanically injects the `tdd` skill via the `skill:` frontmatter pin. If you find yourself writing tests without having run `/build`, STOP and run it first. Follow existing patterns. Don't over-engineer. Python → use `/skill:uv` (not pip/venv). Fix type/LSP errors immediately when detected. Next: type `/review`.
-5. **Test.** Run relevant tests. No tests for changed code → write them (`tdd` skill: test first, see fail, implement, see pass). The `tdd` skill is injected by the `/build` prompt — if you didn't run `/build`, you don't have the skill. Exit 1 from import/syntax error is NOT a real RED — a genuine RED is a behavioral failure. Tests fail → run `/skill:diagnosing-bugs` (build feedback loop, root cause, not symptom) → fix → return to step 5. No hypothesis without a repro loop — build one first (failing test → curl → CLI diff → headless browser → trace replay → throwaway harness → fuzz → git bisect → differential → human last). If no loop can be built, STOP — return BLOCKED. Generate 3-5 ranked hypotheses before testing any. Never simplify away a safety check during refactoring — verify it's dead code with a test first.
-6. **Review.** You MUST run `/review` as a slash command to get the `code-review` skill injected. Do NOT improvise review from this prose. Fan out 2-3 reviewer subagents with different focuses (standards, spec, security). Give reviewers fresh context — only the diff, not the builder's reasoning (anti-anchored review). Before dispatching, grep your own drafted prompt for bias phrases ("do not flag", "should be fine", "no need to check") — if found, rewrite. An APPROVE with zero findings AND <3 file:line citations is a rubber stamp — trigger fallback verification. Critical code → `code-review` skill. Semantic duplicates or shallow modules → `/skill:codebase-hygiene`. Receiving feedback → `/skill:receiving-code-review` (verify before implementing, push back if wrong). Grep changed files for swallowed errors: empty catches, discarded promises, TODO/FIXME, debug logging left in. Architecture issues → `/skill:improve-codebase-architecture` → return to step 4. Next: type `/ship` (or `/build` if findings).
-7. **Verify + commit.** You MUST run `/ship` as a slash command to get the `verification-before-completion` skill injected. Do NOT improvise verification from this prose. You are an independent auditor — a passing test or green build is never sufficient by itself. Before verifying, list every claim from prior steps, mark each UNVERIFIED, then independently check each. Before claiming done → `verification-before-completion` skill: run the project's test/lint/typecheck command, read full output, confirm. Then run `/skill:commit` for clean conventional commits. Run `/skill:github` for PRs, issues, and CI via `gh` CLI. CI fails → `diagnosing-bugs` → fix → return to step 5. Monthly health audit → `/setup-audit` (implements the `setup-maintenance` skill procedure).
-8. **Document.** Prevent unstructured docs — no random markdown files, no duplicating what the code says. Stale docs are worse than no docs — they actively mislead. Classify doc impact first → run `/skill:diff-driven-docs`.
-   - Durable gotcha/workflow change → update repo AGENTS.md.
-   - Domain term resolved → update `CONTEXT.md` (`/skill:domain-modeling`).
-   - Architecture decision made → write ADR in `docs/adr/` (`/skill:domain-modeling`).
-   - User-facing change → update CHANGELOG.
-   - Specs and tickets → GitHub Issues (`/skill:to-spec`, `/skill:to-tickets`), NOT repo filesystem.
-   - Create files lazily — only when you have something non-inferable to write.
-9. **Remember.** Save decisions, gotchas, failures, corrections to memory. Don't save obvious things — save what you'd want to know next time. If memory contradicts current code, trust the code. Capture memory payload from subagents FIRST, before validation — compaction can fire between return and parse. Non-blocking findings go to memory as `Deferred:`, NOT as TODO tasks. Monthly: prune/merge persistent memory → `/skill:memory-compounding`.
-10. **Handoff.** Session getting long → `/skill:compact-safe` (KEEP constraints and errors verbatim, SUMMARIZE resolved decisions, DROP prose and diary) or `/handoff` to create continuation doc. Don't lose context.
+1. **Understand (ORIENT).** If the user wants to understand (not change), explain inline. Do NOT fall through to build. If the user wants to change something: read repo AGENTS.md, relevant files, existing patterns. Search memory. If ambiguous, ask ONE clarifying question.
+2. **Plan** → type `/plan`. Pins `planning-workflow`, which classifies bounded vs foggy, then orchestrates brainstorming → to-spec → to-tickets (bounded) or wayfinder (foggy). The workflow reads each specialist in turn, rereads itself between phases, and requires evidence at each phase (design approval, spec reference, ticket refs + frontier).
+3. **Build** → type `/build <ticket>`. Pins `build-workflow`, which orchestrates tdd (red → green, one slice at a time), with diagnosing-bugs on persistent RED. Complete only when all acceptance criteria have evidence + test/lint/typecheck pass.
+4. **Debug** → type `/debug <issue>`. Pins `debug-workflow`, which routes to diagnosing-bugs (bugs) or resolving-merge-conflicts (merge/rebase). Diagnosis only — the fix happens in `/build`.
+5. **Research** → type `/research <topic>`. Pins `research-workflow`, which routes among research, octocode-research, live-research based on task fit. Returns cited findings.
+6. **Review** → type `/review`. Pins `review-workflow`, which orchestrates code-review (standards + spec + security, parallel reviewers) → receiving-code-review (verify before implementing, push back if wrong).
+7. **Ship** → type `/ship`. Pins `ship-workflow`, which orchestrates verification → diff-driven-docs → commit → github (conditional). Evidence at each phase. Never commit secrets or push main.
+8. **Document.** The ship workflow handles diff-driven-docs. Durable gotcha → update AGENTS.md. Architecture decision → ADR in `docs/adr/`. Specs and tickets → GitHub Issues.
+9. **Remember.** Save decisions, gotchas, failures to memory. If memory contradicts current code, trust the code.
+10. **Handoff.** Session getting long → `/handoff` to create continuation doc.
 
-**Context hygiene:** Keep steps 1-3 in one unbroken context window. Don't compact or clear until after planning is complete — compaction mid-planning loses the thread. Smart zone: if approaching ~120k tokens before to-tickets, `/skill:handoff` and continue fresh. Each `/build` starts fresh, working from the ticket.
+**Workflow skills own the routing.** Each workflow skill reads specialists in turn (using `read` on the specialist's SKILL.md), rereads itself between phases, and tracks a compact state block. The user answers questions and approves inside the workflow — the user never types internal skill commands. Specialist skills own the procedure; the workflow owns the routing.
 
-**The skill pin only fires when a HUMAN types the slash command.** The agent cannot run slash commands — only the human can. Each workflow prompt tells you the next slash command to type (`Next: type /X. You decide.`). Type it, Pi expands it, the skill pin fires. No automatic handoffs, no continuation detection.
+**Compaction is a residual risk.** The state block is best-effort in normal context. If the state is lost, reconstruct from conversation artifacts (spec URL, commit hash, test output). Do not guess.
+
+**Safety baseline:** never commit `.env*`, credentials, secrets, or keys — that is a data-protection baseline, not a workflow gate.
 
 **Safety baseline:** never commit `.env*`, credentials, secrets, or keys — that is a data-protection baseline, not a workflow gate.
 
@@ -50,32 +39,30 @@ When given a task, follow this flow automatically. The workflow IS the skill rou
 
 ```
 MAIN FLOW: idea → ship
-  /plan → /build → /review → /ship
-  /plan: brainstorming drives grill-with-docs → to-spec → to-tickets
-  /build: implement drives tdd (one red-green slice at a time)
-  /review: code-review (standards + spec + security)
-  /ship: verification → diff-driven-docs → commit → github
+  /plan ==planning-workflow==> brainstorming → to-spec → to-tickets (bounded)
+                                  wayfinder (foggy)
+  /build ==build-workflow==> tdd → diagnosing-bugs on RED → tdd
+  /debug ==debug-workflow==> diagnosing-bugs | resolving-merge-conflicts
+  /research ==research-workflow==> research | octocode-research | live-research
+  /review ==review-workflow==> code-review → receiving-code-review
+  /ship ==ship-workflow==> verification → diff-driven-docs → commit → github (conditional)
+  /setup-audit ==setup-maintenance==> (direct pin — 1 specialist)
 
-ON-RAMPS (merge onto main flow):
-  Bug → /debug (diagnosing-bugs) → /build
-  Issues piling up → /skill:triage → /build
-  Foggy huge effort → /skill:wayfinder → /plan → /build
-  RFC needed → /skill:octocode-rfc-generator → /plan
+The workflow skill reads each specialist in turn; the user types one slash command.
 
 VOCABULARY (on-demand, not always-on):
-  /skill:domain-modeling — domain language
-  /skill:codebase-design — deep module vocabulary
+  domain-modeling — domain language
+  codebase-design — deep module vocabulary
 
 CROSSING SESSIONS:
-  /skill:handoff — fork to new session, preserve context
-  /skill:compact-safe — compact in same session, preserve constraints
+  /handoff — fork to new session
 
 CODEBASE HEALTH (upkeep, not feature work):
-  /skill:improve-codebase-architecture → generates ideas → /plan
-  /skill:codebase-hygiene → find semantic duplicates
+  improve-codebase-architecture → generates ideas → /plan
+  codebase-hygiene → find semantic duplicates
 
 BRUTAL CRITIQUE:
-  /skill:octocode-roast — when you want brutally honest code critique
+  octocode-roast — when you want brutally honest code critique
 ```
 
 ## Subagent strategy
@@ -112,7 +99,7 @@ Manual cross-session review via intercom: `intercom ask` to send a diff/design/p
 
 **Swarm limit:** 3-5 agents max via intercom. At 6+ the noise exceeds signal (intercom is 1:1, no broadcast; steelman rule is N² traffic; diminishing returns — 2 reviewers catch ~80%, 5 catch ~90%, 10 catch ~93%). For 6+ agents, use parallel subagents.
 
-If `/skill:to-spec` or `/skill:to-tickets` fails, configure the issue tracker first. External tech → validate APIs before step 4 (see below).
+If `/plan` fails to publish spec/tickets, configure the issue tracker first. External tech → validate APIs before building (see below).
 
 ## Skill routing
 
@@ -178,6 +165,6 @@ Skip only for: pure utility libs with stable APIs (date-fns, zod, lodash). When 
 ## Pi harness (non-obvious infrastructure — don't reinvent what these do)
 
 - **Coach** is the DEFAULT user interface — don't second-guess a steered input; it was routed intentionally.
-- **The skill pin only fires when a HUMAN types the slash command.** The agent cannot run slash commands. Each workflow prompt tells the user the next slash to type.
+- **The skill pin only fires when a HUMAN types the slash command.** The agent cannot run slash commands. Each workflow skill orchestrates the internal phases by reading specialists in turn — the user never types internal skill commands.
 - **Context sidecar** — retrieve oversized output via `context_search` / `context_get`; don't re-run the expensive command.
 - **Observability** dashboard is for the user to watch, not for you to drive.

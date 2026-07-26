@@ -159,7 +159,8 @@ const WORKFLOW_OPTIONS: WorkflowOption[] = [
 	{
 		label: "/debug — Debug an issue (feedback loop, root cause)",
 		command: '/debug "$TASK"',
-		description: "Build a repro loop, find root cause. Pins diagnosing-bugs.",
+		description:
+			"Build a repro loop, find root cause, or resolve merge conflicts. Pins debug-workflow.",
 	},
 	{
 		label: "/plan — Plan a feature (design → spec → tickets, orchestrated)",
@@ -170,7 +171,8 @@ const WORKFLOW_OPTIONS: WorkflowOption[] = [
 	{
 		label: "/research — Research a topic (parallel fan-out)",
 		command: '/research "$TASK"',
-		description: "Web, GitHub, codebase, memory. Pins research skill.",
+		description:
+			"Web, GitHub, codebase, memory. Pins research-workflow (routes to the right specialist).",
 	},
 	{
 		label: "/review — Review current diff (standards + spec + security)",

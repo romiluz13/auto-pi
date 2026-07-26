@@ -1,12 +1,8 @@
 ---
-description: Debug an issue — build feedback loop, find root cause (diagnose only)
+description: Debug an issue — feedback loop, root cause (diagnosis only)
 argument-hint: "<what's wrong>"
-skill: diagnosing-bugs
+skill: debug-workflow
 ---
-Debug the following issue. Follow the `diagnosing-bugs` skill (feedback loop, root cause). This is diagnosis only — do NOT fix the source here.
+Debug the following issue. Follow the `debug-workflow` skill (it routes to diagnosing-bugs for bugs/performance, or resolving-merge-conflicts for merge/rebase conflicts).
 
 Issue: $@
-
-Scope: the fix + regression test happen in `/build` (TDD), not here. If this is a git merge/rebase conflict → `/skill:resolving-merge-conflicts`.
-
-Next: type `/build <fix>`. You decide.

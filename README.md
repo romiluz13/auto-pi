@@ -1,9 +1,9 @@
 # auto-pi
 
 **A workflow OS for [Pi](https://pi.dev).**  
-Type a task → pick a workflow → a pinned skill procedure enters context before the model acts.
+Type a task → pick a workflow → one pinned workflow skill orchestrates the phases by reading specialists in turn.
 
-Not another coding agent. A dress on Pi's minimal harness: Coach, slash workflows, mechanical `skill:` pins.
+Not another coding agent. A dress on Pi's minimal harness: Coach, slash workflows, mechanical `skill:` pins, and workflow skills that orchestrate.
 
 [![Pi](https://img.shields.io/badge/Pi-v0.80+-blue.svg)](https://pi.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -15,7 +15,7 @@ Not another coding agent. A dress on Pi's minimal harness: Coach, slash workflow
 | Is | Is not |
 | --- | --- |
 | An installable Pi config: extensions + prompts + skills + shared `AGENTS.md` | A sealed product competing with Claude Code / Codex / ChatGPT |
-| Seven workflows that **pin** a primary skill via Pi `skill:` frontmatter | A promise that every cascading skill is force-injected |
+| Seven workflows that **pin** a workflow skill via Pi `skill:` frontmatter | A promise that every cascading skill is force-injected |
 | Model-agnostic — point Pi at whatever you pay for | Vendor lock-in |
 
 ---
@@ -47,37 +47,37 @@ Coach shows a fixed menu. You pick. Examples:
 
 | You pick | What happens |
 | --- | --- |
-| `/plan` | **Pins** `brainstorming` — questions, design approval, then steered toward spec/tickets |
-| `/build` | **Pins** `tdd` — red → green → prove. On failure, procedure **steers** toward diagnosing-bugs (or run `/debug`) |
-| `/review` | **Pins** `code-review` — two-axis review procedure; receiving feedback is steered |
-| `/ship` | **Pins** `verification-before-completion` — independent audit, then steered docs → commit → PR |
+| `/plan` | **Pins** `planning-workflow` — classifies bounded vs foggy, then orchestrates brainstorming → to-spec → to-tickets by reading each specialist in turn |
+| `/build` | **Pins** `build-workflow` — tdd (red → green), with diagnosing-bugs on persistent RED |
+| `/debug` | **Pins** `debug-workflow` — routes to diagnosing-bugs (bugs) or resolving-merge-conflicts (merge/rebase) |
+| `/research` | **Pins** `research-workflow` — routes among research, octocode-research, live-research |
+| `/review` | **Pins** `review-workflow` — code-review (standards + spec + security) → receiving-code-review |
+| `/ship` | **Pins** `ship-workflow` — verification → docs → commit → github (conditional) |
 | `Just do it` or `!…` | Raw agent — AGENTS.md only, no workflow pin |
 
-At the end of each workflow, the prompt tells you the next slash command to type. You drive — the agent guides.
+The workflow skill orchestrates the phases. You answer questions and approve inside the workflow. You never type internal skill commands — the workflow handles the routing.
 
 ---
 
 ## How it works
 
-**Pinned (HARD)** — Pi injects the skill body when the slash command declares `skill:`:
+**Pinned (HARD)** — Pi injects the workflow skill body when the slash command declares `skill:`:
 
-| Command | Pinned skill |
-| --- | --- |
-| `/plan` | `brainstorming` |
-| `/build` | `tdd` |
-| `/debug` | `diagnosing-bugs` |
-| `/research` | `research` |
-| `/review` | `code-review` |
-| `/ship` | `verification-before-completion` |
-| `/setup-audit` | `setup-maintenance` |
+| Command | Pinned workflow skill | Specialists it reads |
+| --- | --- | --- |
+| `/plan` | `planning-workflow` | brainstorming → to-spec → to-tickets (bounded); wayfinder (foggy) |
+| `/build` | `build-workflow` | tdd; diagnosing-bugs on RED; uv for Python |
+| `/debug` | `debug-workflow` | diagnosing-bugs; resolving-merge-conflicts |
+| `/research` | `research-workflow` | research / octocode-research / live-research |
+| `/review` | `review-workflow` | code-review → receiving-code-review |
+| `/ship` | `ship-workflow` | verification-before-completion → diff-driven-docs → commit → github |
+| `/setup-audit` | `setup-maintenance` | (direct pin — 1 specialist, no wrapper) |
 
-**Steered** — follow-ons live in procedure text (spec/tickets after plan, diagnosing-bugs on RED, receiving-code-review, docs-before-commit, `/skill:commit` / github). The model is instructed to load them; they are not second frontmatter pins.
+**Orchestration** — the workflow skill reads each specialist `SKILL.md` at its phase boundary, follows only that specialist's procedure, then rereads the workflow skill to route to the next phase. The workflow owns the routing; the specialist owns the procedure.
 
-**Handoff** — at the end of each workflow, the prompt tells you the next slash command to type (`Next: type /review. You decide.`). You type it, Pi expands it, the skill pin fires. No automatic handoffs, no continuation detection — the human is the driver.
+**State block** — each workflow tracks a compact state block (phase, evidence, artifacts) across turns. Before every user wait, the workflow emits the state. On continuation, it reads the latest state. If the state is lost (compaction), the workflow reconstructs from conversation artifacts.
 
-**Observable** — `/trace-skills` shows available vs activated skills (orphan detector).
-
-That split is the product: **pins where it matters, steer for the rest, the human drives the next step** — not a wall of hoped-for skills.
+**Observable** — `/trace-skills` shows available vs activated skills.
 
 ---
 
@@ -86,10 +86,10 @@ That split is the product: **pins where it matters, steer for the rest, the huma
 | Piece | What you get |
 | --- | --- |
 | **Coach** | Plain-English task → fixed workflow menu (7 workflows + raw + palette) |
-| **Prompts** | `/plan` `/build` `/debug` `/research` `/review` `/ship` `/setup-audit` |
+| **Prompts** | `/plan` `/build` `/debug` `/research` `/review` `/ship` `/setup-audit` (thin — entry + task only) |
 | **Extensions** | `coach` · `guardrails` · `trace` · `palette` · `handoff` · `session-status` |
 | **Packages** | 12 npm packages (memory, subagents, context sidecar, lens, rewind, web, etc.) |
-| **Skills** | 14 hand-tuned in-repo + community packs provisioned by install (Matt Pocock, MongoDB, Vercel, Bright Data, Octocode, and related). Catalog size varies with sources; **only pinned skills are mechanically injected.** |
+| **Skills** | 6 workflow skills + 14 hand-tuned in-repo + community packs provisioned by install. Catalog: 88 skills total. **Only pinned workflow skills are mechanically injected; specialists are read on demand by the workflow.** |
 | **Rules** | `config/agents.md` (~183 lines) — installer wires the same file for Pi, Claude Code, and Codex |
 
 ### Extensions (honest)
@@ -101,7 +101,7 @@ That split is the product: **pins where it matters, steer for the rest, the huma
 | `session-status.ts` | Session tracking + auto-naming for unique intercom targeting |
 | `trace.ts` | Activation log + `/trace-skills` orphan gap |
 | `palette.ts` | Fuzzy command search — `Ctrl+Shift+K` or `/palette` |
-| `handoff.ts` | Writes a compact `HANDOFF.md` from recent turns + last compaction summary (deterministic, no extra LLM call) |
+| `handoff.ts` | Writes a compact `HANDOFF.md` from recent turns + last compaction summary |
 
 ### Memory
 
@@ -114,9 +114,9 @@ That split is the product: **pins where it matters, steer for the rest, the huma
 Pi ships a minimal harness on purpose. AutoPi fills the empty layer: **procedure reliability**.
 
 - Rent models (Claude API, ChatGPT Codex subscription, GLM, local — whatever Pi can reach).
-- Own the workflow: which skill is pinned, what counts as "shipped."
-- Prefer one honest pin over fifty silent catalog entries.
-- The human drives the next step — the agent guides.
+- Own the workflow: which workflow skill is pinned, what specialists it reads, what counts as "shipped."
+- Prefer one honest workflow pin over fifty silent catalog entries.
+- The workflow orchestrates; the human answers and approves.
 
 ---
 
@@ -127,8 +127,8 @@ config/agents.md        shared rules (~183 lines)
 config/settings.json    packages, compaction, memory, subagents
 config/models.json      provider / model definitions
 extensions/             coach, guardrails, trace, palette, handoff, session-status
-prompts/                slash workflows (7 standalone + setup-audit)
-skills/                 14 hand-tuned skills
+prompts/                slash workflows (7 — thin entry adapters)
+skills/                 6 workflow skills + 14 hand-tuned skills
 scripts/install.sh      one-command setup
 scripts/sync-live.sh    sync repo → live runtime
 scripts/update.sh       refresh

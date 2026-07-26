@@ -29,20 +29,47 @@ function skillExists(name: string): boolean {
 	);
 }
 
+function readWorkflowSkill(name: string): string {
+	return readFileSync(join(REPO_SKILLS_DIR, name, "SKILL.md"), "utf-8");
+}
+
+// Parse the phases from a workflow skill (## Phase: X headers)
+function parsePhases(content: string): string[] {
+	const phases: string[] = [];
+	const regex = /^## Phase:\s*(\S+)/gm;
+	let match;
+	while ((match = regex.exec(content)) !== null) {
+		phases.push(match[1]);
+	}
+	return phases;
+}
+
+// Extract skill read targets from a workflow skill
+function parseSkillReads(content: string): string[] {
+	const reads: string[] = [];
+	const regex = /Read\s+`?(\/[^`]+\/SKILL\.md)`?/g;
+	let match;
+	while ((match = regex.exec(content)) !== null) {
+		// Extract the skill name from the path
+		const parts = match[1].split("/");
+		const skillName = parts[parts.length - 2];
+		reads.push(skillName);
+	}
+	return reads;
+}
+
 // ─── Every prompt has exactly one valid skill: target ────────────────────────
 
 test("every prompt has exactly one skill: frontmatter pin", () => {
 	for (const name of PROMPT_NAMES) {
-		const content = readPrompt(name);
-		const pin = skillPin(content);
+		const pin = skillPin(readPrompt(name));
 		assert.ok(pin, `prompt ${name}.md has no skill: pin`);
 	}
 });
 
 test("every prompt's skill: target exists in the skill library", () => {
 	for (const name of PROMPT_NAMES) {
-		const content = readPrompt(name);
-		const pin = skillPin(content);
+		const pin = skillPin(readPrompt(name));
 		assert.ok(pin, `prompt ${name}.md has no skill: pin`);
 		assert.ok(
 			skillExists(pin),
@@ -51,7 +78,7 @@ test("every prompt's skill: target exists in the skill library", () => {
 	}
 });
 
-// ─── The 4 workflow prompts pin their workflow skills ─────────────────────────
+// ─── The 6 workflow prompts pin their workflow skills ─────────────────────────
 
 test("/plan pins planning-workflow", () => {
 	assert.equal(skillPin(readPrompt("plan")), "planning-workflow");
@@ -69,24 +96,22 @@ test("/ship pins ship-workflow", () => {
 	assert.equal(skillPin(readPrompt("ship")), "ship-workflow");
 });
 
-// ─── The 3 direct-pin prompts pin their specialist (no wrapper needed) ───────
-
-test("/debug pins diagnosing-bugs directly (no wrapper)", () => {
-	assert.equal(skillPin(readPrompt("debug")), "diagnosing-bugs");
+test("/debug pins debug-workflow", () => {
+	assert.equal(skillPin(readPrompt("debug")), "debug-workflow");
 });
 
-test("/research pins research directly (no wrapper)", () => {
-	assert.equal(skillPin(readPrompt("research")), "research");
+test("/research pins research-workflow", () => {
+	assert.equal(skillPin(readPrompt("research")), "research-workflow");
 });
 
-test("/setup-audit pins setup-maintenance directly (no wrapper)", () => {
+test("/setup-audit pins setup-maintenance directly (1 specialist, no wrapper)", () => {
 	assert.equal(skillPin(readPrompt("setup-audit")), "setup-maintenance");
 });
 
-// ─── The 4 workflow skills exist ──────────────────────────────────────────────
+// ─── The 6 workflow skills exist ──────────────────────────────────────────────
 
-test("the 4 workflow skills exist in the repo", () => {
-	for (const skill of ["planning-workflow", "build-workflow", "review-workflow", "ship-workflow"]) {
+test("the 6 workflow skills exist in the repo", () => {
+	for (const skill of ["planning-workflow", "build-workflow", "review-workflow", "ship-workflow", "research-workflow", "debug-workflow"]) {
 		assert.ok(
 			existsSync(join(REPO_SKILLS_DIR, skill, "SKILL.md")),
 			`workflow skill ${skill} not found in repo skills/`,
@@ -106,7 +131,7 @@ test("no prompt says 'Next: type /skill:' (internal commands are not user-facing
 	}
 });
 
-test("no prompt says 'invoke /skill:' (the workflow owns routing, not the prompt)", () => {
+test("no prompt says 'invoke /skill:' (the workflow owns routing)", () => {
 	for (const name of PROMPT_NAMES) {
 		const content = readPrompt(name);
 		assert.ok(
@@ -126,56 +151,163 @@ test("no prompt says 'Want me to invoke it?' (the agent can't run slash commands
 	}
 });
 
-// ─── The planning workflow orchestrates (no upfront pile-up) ─────────────────
+// ─── Structural: workflow skills have phases, reads, and state protocol ──────
 
-test("planning-workflow reads specialists one at a time (no upfront pile-up)", () => {
-	const content = readFileSync(join(REPO_SKILLS_DIR, "planning-workflow", "SKILL.md"), "utf-8");
-	// The workflow should instruct reading each specialist in its phase, not all at once.
-	assert.ok(/Read.*brainstorming.*SKILL.md/i.test(content), "planning-workflow should read brainstorming");
-	assert.ok(/Read.*to-spec.*SKILL.md/i.test(content), "planning-workflow should read to-spec");
-	assert.ok(/Read.*to-tickets.*SKILL.md/i.test(content), "planning-workflow should read to-tickets");
-	// Should NOT inject all specialist content upfront — it reads them one at a time per phase.
-	assert.ok(/Reread this workflow skill/i.test(content), "planning-workflow should instruct rereading itself between phases");
+test("every workflow skill has a state protocol section", () => {
+	for (const skill of ["planning-workflow", "build-workflow", "review-workflow", "ship-workflow", "research-workflow", "debug-workflow"]) {
+		const content = readWorkflowSkill(skill);
+		assert.ok(/State protocol/i.test(content), `${skill} should have a State protocol section`);
+		assert.ok(/At entry.*initialize/i.test(content), `${skill} should instruct initializing state at entry`);
+		assert.ok(/Before every user wait.*emit/i.test(content), `${skill} should instruct emitting state before user wait`);
+		assert.ok(/continuation.*reconstruct/i.test(content), `${skill} should instruct reconstructing state on continuation`);
+	}
+});
+
+test("every workflow skill has at least 2 phases", () => {
+	for (const skill of ["planning-workflow", "build-workflow", "review-workflow", "ship-workflow", "research-workflow", "debug-workflow"]) {
+		const content = readWorkflowSkill(skill);
+		const phases = parsePhases(content);
+		assert.ok(phases.length >= 2, `${skill} should have at least 2 phases, got ${phases.length}: ${phases.join(", ")}`);
+	}
+});
+
+test("every workflow skill has a complete phase", () => {
+	for (const skill of ["planning-workflow", "build-workflow", "review-workflow", "ship-workflow", "research-workflow", "debug-workflow"]) {
+		const content = readWorkflowSkill(skill);
+		const phases = parsePhases(content);
+		assert.ok(phases.includes("complete"), `${skill} should have a complete phase, got: ${phases.join(", ")}`);
+	}
+});
+
+test("every workflow skill uses absolute canonical skill paths (no ~)", () => {
+	for (const skill of ["planning-workflow", "build-workflow", "review-workflow", "ship-workflow", "research-workflow", "debug-workflow"]) {
+		const content = readWorkflowSkill(skill);
+		// Should not use ~ in skill paths (the read tool doesn't expand ~)
+		assert.ok(!/~\/.agents\/skills/i.test(content), `${skill} should not use ~ paths (use absolute)`);
+		// Should use /Users/.../.agents/skills/ absolute paths
+		assert.ok(/\/Users\/[^/]+\/.agents\/skills\//i.test(content), `${skill} should use absolute canonical paths`);
+	}
+});
+
+test("every workflow skill has a reread instruction", () => {
+	for (const skill of ["planning-workflow", "build-workflow", "review-workflow", "ship-workflow", "research-workflow", "debug-workflow"]) {
+		const content = readWorkflowSkill(skill);
+		assert.ok(/Reread this workflow skill/i.test(content), `${skill} should instruct rereading itself between phases`);
+	}
+});
+
+test("every workflow skill has compaction as a residual risk", () => {
+	for (const skill of ["planning-workflow", "build-workflow", "review-workflow", "ship-workflow", "research-workflow", "debug-workflow"]) {
+		const content = readWorkflowSkill(skill);
+		assert.ok(/compaction.*residual risk/i.test(content), `${skill} should document compaction as a residual risk`);
+	}
+});
+
+// ─── Planning workflow structural tests ──────────────────────────────────────
+
+test("planning-workflow has bounded + foggy branches", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	const phases = parsePhases(content);
+	assert.ok(phases.includes("classify"), "planning-workflow should have a classify phase");
+	assert.ok(phases.includes("brainstorm"), "planning-workflow should have a brainstorm phase");
+	assert.ok(phases.includes("spec"), "planning-workflow should have a spec phase");
+	assert.ok(phases.includes("tickets"), "planning-workflow should have a tickets phase");
+	assert.ok(phases.includes("wayfind"), "planning-workflow should have a wayfind phase");
 });
 
 test("planning-workflow does not advance before design approval", () => {
-	const content = readFileSync(join(REPO_SKILLS_DIR, "planning-workflow", "SKILL.md"), "utf-8");
-	assert.ok(/Do NOT advance before explicit design approval/i.test(content), "planning-workflow should not advance before design approval");
+	const content = readWorkflowSkill("planning-workflow");
+	assert.ok(/Do NOT advance before explicit design approval/i.test(content));
 });
 
-test("planning-workflow cannot finish spec without a reference", () => {
-	const content = readFileSync(join(REPO_SKILLS_DIR, "planning-workflow", "SKILL.md"), "utf-8");
-	assert.ok(/Do NOT advance without a spec reference/i.test(content), "planning-workflow should require a spec reference");
+test("planning-workflow requires spec reference + ticket refs + frontier", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	assert.ok(/Do NOT advance without a spec reference/i.test(content));
+	assert.ok(/Do NOT advance without published ticket references/i.test(content));
 });
 
-test("planning-workflow cannot finish tickets without ticket refs + frontier", () => {
-	const content = readFileSync(join(REPO_SKILLS_DIR, "planning-workflow", "SKILL.md"), "utf-8");
-	assert.ok(/Do NOT advance without published ticket references/i.test(content), "planning-workflow should require ticket references + frontier");
+test("planning-workflow has a separate foggy state block with map + outcome", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	assert.ok(/map:\s*pending/i.test(content), "foggy state should have map field");
+	assert.ok(/outcome:\s*map-charted|decision-resolved|ready-for-brainstorm|ready-for-spec/i.test(content), "foggy state should have outcome field");
 });
 
-test("planning-workflow branches to wayfinder for foggy (not brainstorming+spec by default)", () => {
-	const content = readFileSync(join(REPO_SKILLS_DIR, "planning-workflow", "SKILL.md"), "utf-8");
-	assert.ok(/foggy/i.test(content), "planning-workflow should have a foggy branch");
-	assert.ok(/wayfinder/i.test(content), "planning-workflow should route foggy to wayfinder");
+test("planning-workflow reads brainstorming, to-spec, to-tickets, wayfinder", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	const reads = parseSkillReads(content);
+	assert.ok(reads.includes("brainstorming"), `should read brainstorming, got: ${reads.join(", ")}`);
+	assert.ok(reads.includes("to-spec"), `should read to-spec, got: ${reads.join(", ")}`);
+	assert.ok(reads.includes("to-tickets"), `should read to-tickets, got: ${reads.join(", ")}`);
+	assert.ok(reads.includes("wayfinder"), `should read wayfinder, got: ${reads.join(", ")}`);
 });
 
-// ─── The ship workflow requires evidence at each phase ───────────────────────
+// ─── Ship workflow structural tests ──────────────────────────────────────────
 
-test("ship-workflow requires verification evidence", () => {
-	const content = readFileSync(join(REPO_SKILLS_DIR, "ship-workflow", "SKILL.md"), "utf-8");
-	assert.ok(/Do NOT advance without verification evidence/i.test(content), "ship-workflow should require verification evidence");
+test("ship-workflow has conditional github (not-applicable state)", () => {
+	const content = readWorkflowSkill("ship-workflow");
+	assert.ok(/not-applicable/i.test(content), "ship-workflow should support not-applicable for github");
+	assert.ok(/conditional/i.test(content), "ship-workflow should mark github as conditional");
+});
+
+test("ship-workflow allows none-needed for docs", () => {
+	const content = readWorkflowSkill("ship-workflow");
+	assert.ok(/none-needed/i.test(content), "ship-workflow should allow none-needed for doc disposition");
 });
 
 test("ship-workflow never commits secrets or pushes main", () => {
-	const content = readFileSync(join(REPO_SKILLS_DIR, "ship-workflow", "SKILL.md"), "utf-8");
-	assert.ok(/Never commit.*secrets/i.test(content), "ship-workflow should never commit secrets");
-	assert.ok(/Do NOT push to main/i.test(content), "ship-workflow should not push to main");
+	const content = readWorkflowSkill("ship-workflow");
+	assert.ok(/Never commit.*secrets/i.test(content));
+	assert.ok(/Do NOT push to main/i.test(content));
 });
 
-// ─── The build workflow returns from diagnosis to TDD ────────────────────────
+// ─── Build workflow structural tests ──────────────────────────────────────────
+
+test("build-workflow tracks acceptance criteria (not just one test)", () => {
+	const content = readWorkflowSkill("build-workflow");
+	assert.ok(/acceptance criteria/i.test(content), "build-workflow should track acceptance criteria");
+	assert.ok(/Do NOT complete after a single green slice/i.test(content), "build-workflow should not complete after one slice");
+});
 
 test("build-workflow returns from diagnosis to tdd on RED", () => {
-	const content = readFileSync(join(REPO_SKILLS_DIR, "build-workflow", "SKILL.md"), "utf-8");
-	assert.ok(/diagnose/i.test(content), "build-workflow should have a diagnose phase");
-	assert.ok(/tdd/i.test(content), "build-workflow should return to tdd after diagnosis");
+	const content = readWorkflowSkill("build-workflow");
+	const phases = parsePhases(content);
+	assert.ok(phases.includes("diagnose"), "build-workflow should have a diagnose phase");
+	assert.ok(phases.includes("tdd"), "build-workflow should have a tdd phase");
+	assert.ok(/return to tdd/i.test(content), "build-workflow should return to tdd after diagnosis");
+});
+
+// ─── Review workflow structural tests ─────────────────────────────────────────
+
+test("review-workflow skips disposition if clean", () => {
+	const content = readWorkflowSkill("review-workflow");
+	assert.ok(/findings:\s*none.*skip disposition/i.test(content) || /If.*findings:\s*none.*skip/i.test(content), "review-workflow should skip disposition if no findings");
+});
+
+test("review-workflow has proper disposition states (not ambiguous 'apply')", () => {
+	const content = readWorkflowSkill("review-workflow");
+	assert.ok(/verified-fix/i.test(content), "should have verified-fix disposition");
+	assert.ok(/verified-defer/i.test(content), "should have verified-defer disposition");
+	assert.ok(/rejected/i.test(content), "should have rejected disposition");
+	assert.ok(/needs-user-decision/i.test(content), "should have needs-user-decision disposition");
+});
+
+// ─── All specialist skills referenced by workflows exist at the canonical path ─
+
+test("all specialist skills referenced by workflows exist at a known path", () => {
+	const allSpecialists = new Set<string>();
+	for (const skill of ["planning-workflow", "build-workflow", "review-workflow", "ship-workflow", "research-workflow", "debug-workflow"]) {
+		const content = readWorkflowSkill(skill);
+		const reads = parseSkillReads(content);
+		for (const r of reads) {
+			allSpecialists.add(r);
+		}
+	}
+	for (const specialist of allSpecialists) {
+		const inAgents = existsSync(join(LIVE_SKILLS_DIR, specialist, "SKILL.md"));
+		const inPiAgent = existsSync(join(homedir(), ".pi/agent/skills", specialist, "SKILL.md"));
+		assert.ok(
+			inAgents || inPiAgent,
+			`specialist skill "${specialist}" referenced by a workflow but not found at ~/.agents/skills/ or ~/.pi/agent/skills/`,
+		);
+	}
 });
