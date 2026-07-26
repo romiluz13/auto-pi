@@ -162,10 +162,28 @@ const WORKFLOW_OPTIONS: WorkflowOption[] = [
 			"Build a repro loop, find root cause, fix. Pins diagnosing-bugs.",
 	},
 	{
-		label: "/plan — Plan only (no code, design + spec + tickets)",
+		label: "/plan — Plan a bounded idea (design approval, no spec/tickets yet)",
 		command: '/plan "$TASK"',
 		description:
-			"Understand, brainstorm, write spec + tickets. Pins brainstorming.",
+			"Understand, brainstorm, get design approval. Pins brainstorming. Next: /spec.",
+	},
+	{
+		label: "/wayfind — Chart a map for a foggy, large effort",
+		command: '/wayfind "$TASK"',
+		description:
+			"For efforts too large/foggy for one planning session. Pins wayfinder.",
+	},
+	{
+		label: "/spec — Publish the approved design to the issue tracker",
+		command: '/spec "$TASK"',
+		description:
+			"Synthesize the approved conversation into a tracker spec. Pins to-spec. Next: /tickets.",
+	},
+	{
+		label: "/tickets — Break the approved spec into implementation tickets",
+		command: '/tickets "$TASK"',
+		description:
+			"Publish the approved slices as tickets. Pins to-tickets. Next: /build.",
 	},
 	{
 		label: "/research — Research a topic (parallel fan-out)",

@@ -5,7 +5,7 @@ description: "You MUST use this before any creative work - creating features, bu
 
 # Brainstorming Ideas Into Designs
 
-Help turn ideas into fully formed designs and specs through natural collaborative dialogue.
+Help turn ideas into fully formed designs through natural collaborative dialogue.
 
 Start by understanding the current project context, then ask questions one at a time to refine the idea. Once you understand what you're building, present the design and get user approval.
 
@@ -26,10 +26,10 @@ You MUST create a task for each of these items and complete them in order:
 3. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
 4. **Propose 2-3 approaches** — with trade-offs and your recommendation
 5. **Present design** — in sections scaled to their complexity, get user approval after each section
-6. **Write design doc** — publish to GitHub Issues via `/skill:to-spec` (or save as ADR in `docs/adr/` for architecture decisions). Do NOT create random markdown files in `docs/specs/` — specs live in the issue tracker.
-7. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
-8. **User reviews written spec** — ask user to review the spec file before proceeding
-9. **Transition to implementation** — invoke `/skill:to-spec` to publish the spec, then `/skill:to-tickets` to break it into tickets
+6. **Self-review the approved design** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
+7. **Return the approved-design handoff** — a concise summary in the conversation; stop
+
+Brainstorming does NOT publish the spec, commit anything, create tickets, or name the next command. The `/plan` prompt owns the human-visible navigation ("Next: type /spec").
 
 ## Process Flow
 
@@ -40,25 +40,18 @@ digraph brainstorming {
     "Propose 2-3 approaches" [shape=box];
     "Present design sections" [shape=box];
     "User approves design?" [shape=diamond];
-    "Write design doc" [shape=box];
-    "Spec self-review\n(fix inline)" [shape=box];
-    "User reviews spec?" [shape=diamond];
-    "Invoke /skill:to-spec + /skill:to-tickets" [shape=doublecircle];
+    "Self-review" [shape=box];
+    "Return approved-design handoff + stop" [shape=doublecircle];
 
     "Explore project context" -> "Ask clarifying questions";
     "Ask clarifying questions" -> "Propose 2-3 approaches";
     "Propose 2-3 approaches" -> "Present design sections";
     "Present design sections" -> "User approves design?";
     "User approves design?" -> "Present design sections" [label="no, revise"];
-    "User approves design?" -> "Write design doc" [label="yes"];
-    "Write design doc" -> "Spec self-review\n(fix inline)";
-    "Spec self-review\n(fix inline)" -> "User reviews spec?";
-    "User reviews spec?" -> "Write design doc" [label="changes requested"];
-    "User reviews spec?" -> "Invoke /skill:to-spec + /skill:to-tickets" [label="approved"];
+    "User approves design?" -> "Self-review" [label="yes"];
+    "Self-review" -> "Return approved-design handoff + stop";
 }
 ```
-
-**The terminal state is transitioning to `/skill:to-spec`.** Do NOT invoke frontend-design, impeccable, or any other implementation skill. The ONLY skills you invoke after brainstorming are `/skill:to-spec` (to publish the spec) then `/skill:to-tickets` (to break it into tickets).
 
 ## The Process
 
@@ -66,7 +59,7 @@ digraph brainstorming {
 
 - Check out the current project state first (files, docs, recent commits)
 - Before asking detailed questions, assess scope: if the request describes multiple independent subsystems (e.g., "build a platform with chat, file storage, billing, and analytics"), flag this immediately. Don't spend questions refining details of a project that needs to be decomposed first.
-- If the project is too large for a single spec, help the user decompose into sub-projects: what are the independent pieces, how do they relate, what order should they be built? Then brainstorm the first sub-project through the normal design flow. Each sub-project gets its own spec → plan → implementation cycle.
+- If the project is too large for a single spec, help the user decompose into sub-projects: what are the independent pieces, how do they relate, what order should they be built? Then brainstorm the first sub-project through the normal design flow.
 - For appropriately-scoped projects, ask questions one at a time to refine the idea
 - Prefer multiple choice questions when possible, but open-ended is fine too
 - Only one question per message - if a topic needs more exploration, break it into multiple questions
@@ -101,15 +94,7 @@ digraph brainstorming {
 
 ## After the Design
 
-**Documentation:**
-
-- Write the validated design (spec) to the issue tracker via `/skill:to-spec`, or save as an ADR in `docs/adr/` if it's an architecture decision
-  - (User preferences for spec location override this default)
-- Use elements-of-style:writing-clearly-and-concisely skill if available
-- Commit the design document to git
-
-**Spec Self-Review:**
-After writing the spec document, look at it with fresh eyes:
+**Self-review the approved design:** look at it with fresh eyes:
 
 1. **Placeholder scan:** Any "TBD", "TODO", incomplete sections, or vague requirements? Fix them.
 2. **Internal consistency:** Do any sections contradict each other? Does the architecture match the feature descriptions?
@@ -118,17 +103,11 @@ After writing the spec document, look at it with fresh eyes:
 
 Fix any issues inline. No need to re-review — just fix and move on.
 
-**User Review Gate:**
-After the spec review loop passes, ask the user to review the written spec before proceeding:
+**Return the approved-design handoff:** a concise summary in the conversation:
 
-> "Spec written and committed to `<path>`. Please review it and let me know if you want to make any changes before we start writing out the implementation plan."
+> Approved design: <one-line summary>. Key decisions: <the non-obvious ones>. Next: the `/plan` prompt tells you what to type.
 
-Wait for the user's response. If they request changes, make them and re-run the spec review loop. Only proceed once the user approves.
-
-**Implementation:**
-
-- Invoke `/skill:to-spec` to publish the spec to the issue tracker, then `/skill:to-tickets` to break it into tickets
-- Do NOT invoke any other implementation skill. `/skill:to-spec` is the next step.
+Then **stop**. Do not publish the spec, commit, create tickets, or name the next command. The prompts own the navigation.
 
 ## Key Principles
 
