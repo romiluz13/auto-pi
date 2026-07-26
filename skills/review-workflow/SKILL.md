@@ -41,14 +41,14 @@ dispositions: pending | not-applicable | [<disposition + reason>]
 1. Read `/Users/rom.iluz/.agents/skills/receiving-code-review/SKILL.md` completely.
 2. Follow the receiving-code-review procedure: verify each suggestion before implementing. Push back if wrong. Don't blindly agree.
 3. For each finding, record the disposition:
-   - `verified-fix` — the finding is correct, apply the fix.
+   - `verified-fix` — the finding is correct; verified and queued for `/build`. Do NOT apply changes during review — the fix happens in `/build` (TDD).
    - `verified-defer` — the finding is correct but should be a separate ticket.
    - `rejected` — the finding is wrong, push back with a reason.
    - `needs-user-decision` — the finding is ambiguous, ask the user.
 4. Set `dispositions: [<disposition + reason per finding>]`.
-5. Do NOT use ambiguous "apply" — be explicit about the disposition.
-6. Unresolved user decisions must be preserved — do not treat disposition as complete if any finding is `needs-user-decision`.
-7. Emit the state block. Reread this workflow skill.
+5. Do NOT use ambiguous "apply" — be explicit about the disposition. Do NOT apply changes during review — review is review-only; fixes happen in `/build`.
+6. If any disposition is `needs-user-decision` → emit the state block, ask the user, and REMAIN in disposition until all decisions are resolved. Do NOT go to complete with unresolved user decisions.
+7. When all dispositions are resolved (no `needs-user-decision` remaining) → emit the state block. Reread this workflow skill.
 8. Go to **complete**.
 
 ## Phase: complete

@@ -33,8 +33,6 @@ When given a task, follow this flow. Each step is a user-facing workflow — typ
 
 **Safety baseline:** never commit `.env*`, credentials, secrets, or keys — that is a data-protection baseline, not a workflow gate.
 
-**Safety baseline:** never commit `.env*`, credentials, secrets, or keys — that is a data-protection baseline, not a workflow gate.
-
 ## Skill flow graph
 
 ```

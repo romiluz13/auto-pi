@@ -103,7 +103,13 @@ Tell the user: "Planning complete. Spec: <URL>. Tickets: <URLs>. First unblocked
 
 Finish with: map reference, wayfind frontier, outcome.
 
-Tell the user: "Planning (foggy) complete. Map: <reference>. Frontier: <refs>. Outcome: <outcome>. Next: <based on outcome — type `/plan` to resume, or `/build` if the destination is clear>."
+Tell the user (based on the outcome):
+- `outcome: map-charted` → "Planning (foggy) complete. Map: <reference>. Frontier: <refs>. Next: type `/plan <map>` to resume planning from the map."
+- `outcome: decision-resolved` → "Planning (foggy) complete. Map: <reference>. Decisions resolved. Next: type `/plan <map>` to resume, or continue wayfinding if the destination is still unclear."
+- `outcome: ready-for-brainstorm` → (already routed to brainstorm internally — this completion is not reached)
+- `outcome: ready-for-spec` → (already routed to spec internally — this completion is not reached)
+
+Do NOT suggest `/build` from foggy completion — a map is not an implementation ticket. `/build` requires a ready ticket, which the foggy state does not track.
 
 ## Rules
 

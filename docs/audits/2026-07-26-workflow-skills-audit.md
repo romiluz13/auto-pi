@@ -1,15 +1,15 @@
 # Workflow Skills Audit (v0.3)
 
 **Date:** 2026-07-26
-**Status:** Built, pending GPT-5.6 review (do NOT ship until reviewed)
-**Exhaustive inventory:** see `docs/audits/2026-07-26-skill-inventory-appendix.md` (all 88 installed skills classified)
+**Status:** Built, pending GPT-5.6 final review (do NOT ship until reviewed)
+**Inventory appendix:** see `docs/audits/2026-07-26-skill-inventory-appendix.md` (all installed skills classified)
 
 ## The architecture (v0.3)
 
 One thin **workflow skill** per user-facing workflow. Each prompt pins its workflow skill mechanically. The workflow skill is an orchestrator/map — it reads each specialist skill in turn, rereading itself between phases. The user types ONE slash command (`/plan`); the workflow handles everything. The user never types internal skill commands.
 
 | Layer | Owns |
-| ------- | ------ |
+|-------|------|
 | **Workflow skill** | Phase ordering, branching, completion evidence, the reread protocol, state block |
 | **Specialist skill** | How to perform one phase (brainstorming, to-spec, tdd, etc.) |
 | **Prompt** | Workflow entry + task input only |
@@ -27,7 +27,7 @@ One thin **workflow skill** per user-facing workflow. Each prompt pins its workf
       complete: spec URL, ticket URLs, first unblocked ticket
     foggy:
       read wayfinder → map/decisions → reread workflow
-      complete: map reference + outcome (NOT spec/tickets)
+      complete: map reference + outcome (NOT spec/tickets; NOT /build)
       route to brainstorm/spec only when the destination becomes clear
 
   /build ==PIN==> build-workflow
@@ -47,39 +47,54 @@ One thin **workflow skill** per user-facing workflow. Each prompt pins its workf
 
   /review ==PIN==> review-workflow
     read code-review (standards + spec + security) → findings → reread workflow
-    if findings: read receiving-code-review → disposition (verified-fix/verified-defer/rejected/needs-user-decision) → reread workflow
+    if findings: read receiving-code-review → disposition (verified-fix=queued for /build, verified-defer, rejected, needs-user-decision; wait for user decisions) → reread workflow
     if clean: skip disposition
+    review is review-only — do NOT apply changes during review
 
   /ship ==PIN==> ship-workflow
     read verification-before-completion → evidence → reread workflow
     read diff-driven-docs → doc disposition (or none-needed) → reread workflow
-    read commit → commit hash → reread workflow
-    github (CONDITIONAL: only if GitHub remote + user intent) → PR URL or not-applicable
-    complete: commit hash + PR URL/NA
+    read commit → commit hash (commit always authorized; skip if already committed) → reread workflow
+    github (CONDITIONAL: only if GitHub remote + user intent) → PR URL or not-applicable; CI: pass/fail/not-applicable
+    complete: commit hash + PR URL/NA + CI status
 
   /setup-audit ==PIN==> setup-maintenance (direct — 1 specialist, no wrapper)
     read-only audit report → recommend action if findings
 ```
 
-## Skill-library classification (summary)
+## Skill-library classification
 
 | Type | Count | Role |
-| ------ | ------- | ------ |
+|------|-------|------|
 | **Workflow orchestrator** | 6 (new, auto-pi's) | planning, build, review, ship, research, debug |
-| **Core phase specialist** | 17 | brainstorming, to-spec, to-tickets, wayfinder, tdd, diagnosing-bugs, code-review, receiving-code-review, verification-before-completion, diff-driven-docs, commit, github, research, octocode-research, live-research, resolving-merge-conflicts, uv, setup-maintenance |
-| **Operational utility (repo)** | 7 | bearings, codebase-hygiene, decision-hold-lifecycle, grilling, memory-compounding, session-handoff, setup-matt-pocock-skills |
-| **Community (excluded from workflows)** | ~58 | Available on-demand via `/skill:` or Coach; not on the normal path |
+| **Core phase specialist** | 18 | brainstorming, to-spec, to-tickets, wayfinder, tdd, diagnosing-bugs, uv, code-review, receiving-code-review, verification-before-completion, diff-driven-docs, commit, github, research, octocode-research, live-research, resolving-merge-conflicts, setup-maintenance |
+| **Operational utility (repo)** | 8 | bearings, codebase-hygiene, decision-hold-lifecycle, grilling, memory-compounding, session-handoff, setup-matt-pocock-skills, verification-before-completion (also a specialist) |
+| **Community (excluded from workflows)** | ~80 | Available on-demand via `/skill:` or Coach; not on the normal path |
 
-**Exhaustive per-skill classification:** see `docs/audits/2026-07-26-skill-inventory-appendix.md`.
+**Total installed:** 90 at `~/.agents/skills/` + 4 at `~/.pi/agent/skills/` (bright-data-best-practices, brightdata-cli, data-feeds, discover-api, live-research, etc.). Some overlap; see the inventory appendix for the per-skill breakdown.
 
-### Why community skills are excluded
+## Candidate analysis (likely workflow enhancers — the user asked if the library is leveraged optimally)
 
-The ~58 community skills (MongoDB, Cloudflare, Vercel, Bright Data, Octocode tools, etc.) are situational — they're not on any workflow's normal path. They're available on-demand via `/skill:` or Coach's skill hints. No workflow bundles them — bundling all 88 would be wrong (the genius's finding: "Do not bundle all 88—that would be wrong").
+The genius's review said: "blanket exclusion does not answer whether the library is leveraged optimally." Here's the candidate analysis for skills that COULD improve the normal path:
+
+| Skill | Could enhance | Decision |
+|-------|--------------|----------|
+| `ask-matt` | A router over the skills — could be a Coach alternative | **Excluded.** Coach is auto-pi's entry menu; ask-matt is Matt Pocock's router. Adding it would create two competing entry points. |
+| `implement` | A build specialist (Matt's version of tdd) | **Excluded.** `tdd` is already the build specialist. `implement` is Matt's thinner wrapper; `tdd` is the procedure. |
+| `codebase-design` | Deep module vocabulary for planning | **Excluded from workflow.** It's on-demand vocabulary, not a phase procedure. The planning-workflow doesn't need it on every plan — only when designing module interfaces. Available via `/skill:codebase-design` when needed. |
+| `domain-modeling` | Domain language + ADRs for planning | **Excluded from workflow.** Same as codebase-design — on-demand, not every plan. Available via `/skill:domain-modeling` when needed. |
+| `frontend-design` | UI design direction for planning | **Excluded from workflow.** Not every plan involves UI. Available via `/skill:frontend-design` when the brainstorming phase identifies a UI design question. |
+| `octocode-brainstorming` | Brainstorm with evidence (validate against data) | **Excluded from workflow.** The planning-workflow uses `brainstorming` (interview-based). `octocode-brainstorming` is for evidence-based validation — a different approach. Could be a situational branch, but adding it complicates the classify phase. Available via `/skill:octocode-brainstorming`. |
+| `prototype` | Throwaway prototype to answer a design question | **Excluded from workflow.** Prototyping is a separate on-ramp, not part of the normal plan→build path. Available via `/skill:prototype`. |
+| `compact-safe` | Compact the conversation preserving constraints | **Excluded from workflow.** This is a session management tool, not a workflow phase. Available via `/skill:compact-safe` when the session is getting long. |
+| `decision-hold-lifecycle` | Persist unresolved decisions | **Excluded from workflow.** This is an operational utility (repo skill), not a workflow phase. Available on-demand. |
+| `grill-with-docs` | Relentless interview to stress-test a plan | **Excluded from planning-workflow.** Grilling is a separate on-ramp for stress-testing a plan before building. Adding it to every plan would be overkill. Available via `/skill:grill-with-docs` when the user wants to stress-test. |
+
+**Conclusion:** the library IS leveraged optimally. The 6 workflow skills bundle only the normal-path specialists. The situational/on-demand skills (codebase-design, domain-modeling, frontend-design, prototype, grill-with-docs, etc.) are available via `/skill:` when the workflow or user identifies the need — but they're NOT on every plan/build/review/ship because that would bloat the normal path with skills that aren't always relevant.
 
 ## State protocol (all 6 workflows)
 
 Every workflow skill follows the same state protocol:
-
 1. **At entry:** initialize the state block and print it.
 2. **Before every user wait:** emit the current state block.
 3. **On every continuation:** read the latest state block. If missing/ambiguous, STOP — reconstruct from conversation artifacts. Never guess.
@@ -88,35 +103,34 @@ Every workflow skill follows the same state protocol:
 
 ## Path resolution (deterministic)
 
-All skill reads use absolute canonical paths: `/Users/rom.iluz/.agents/skills/<name>/SKILL.md`. No `~` expansion (the `read` tool doesn't expand `~`). All 16 specialist skills + the 6 workflow skills are at this path (repo skills are synced to `~/.agents/skills/` by `scripts/sync-live.sh`; the installer makes repo skills authoritative for collisions).
+All skill reads use absolute canonical paths: `/Users/rom.iluz/.agents/skills/<name>/SKILL.md`. Exception: `live-research` is at `/Users/rom.iluz/.pi/agent/skills/live-research/SKILL.md` (a pi-specific package). The test suite verifies all 18 specialist skills exist at a known path.
 
 ## Conflicts requiring overrides
 
 | Skill | Conflict | Resolution |
 |-------|----------|------------|
-| `brainstorming` | Says "invoke /skill:to-spec" (stale routing prose) | planning-workflow explicitly overrides: "Ignore brainstorming's routing prose — this workflow owns the routing." |
+| (none) | brainstorming was cleaned of routing prose in d6e6f56 | No override needed — the current brainstorming skill has no "invoke /skill:to-spec" routing prose. The planning-workflow's "ignore specialist routing prose" rule is a defensive measure, not a live conflict. |
 
 ## What was removed (vs v0.2)
 
-- `/spec`, `/tickets`, `/wayfind` prompts — internal phases now, not user-facing. The planning-workflow handles them internally.
-- The "Next: type /spec" handoff in the prompts — the workflow skills own the routing now.
-- The "Next: type /X" in ALL prompts — workflows own routing, prompts are thin entry adapters.
+- `/spec`, `/tickets`, `/wayfind` prompts — internal phases now, not user-facing.
+- The "Next: type /X" handoff in ALL prompts — workflows own routing, prompts are thin entry adapters.
 
 ## What was kept
 
 - The 6 extensions (coach, guardrails, session-status, handoff, trace, palette)
-- The 7 user-facing prompts (now thin — entry + task only, pinning the workflow skills)
+- The 7 user-facing prompts (thin — entry + task only, pinning the workflow skills)
 - The intercom boundary rule in AGENTS.md
 
 ## Acceptance test results
 
 ```
 $ npm test
-21/21 pass, 0 fail (structural + policy tests)
+34/34 pass, 0 fail (structural + policy + conditional state tests)
 ```
 
 ## Known residual risks (honest)
 
 1. **Compaction is a residual risk.** The state block is best-effort in normal context. If the agent doesn't reread the workflow skill after compaction, the state may be lost. The workflow skills instruct rereading, but this is prose, not mechanical enforcement. A behavioral test would be needed to prove compaction survival — not added preemptively (per the agreed contract: "Add extension state/reinjection only if a concrete test shows the pure skill approach fails").
 2. **The state block is in the conversation**, not a file. Compaction may lose it. Reconstruct from conversation artifacts (spec URL, commit hash, test output) if the state is lost.
-3. **No self-location mechanism.** The workflow skills use absolute paths (`/Users/rom.iluz/.agents/skills/...`). This is not portable to other users, but this is a personal installation, not a distributed product.
+3. **Absolute paths are not portable** to other users (this is a personal installation, not a distributed product).

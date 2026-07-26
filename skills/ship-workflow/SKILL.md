@@ -22,9 +22,10 @@ All skill paths are absolute canonical: `/Users/rom.iluz/.agents/skills/<name>/S
 workflow: ship
 phase: verify | docs | commit | github | complete
 verification: pending | <command + exit code + output>
-doc disposition: pending | not-applicable | none-needed | <what docs updated>
-commit hash: pending | not-applicable | <hash>
+doc disposition: pending | none-needed | <what docs updated>
+commit hash: pending | <hash>
 pr url: pending | not-applicable | <url>
+ci: pending | not-applicable | pass | fail
 ```
 
 ## Phase: verify
@@ -48,6 +49,8 @@ pr url: pending | not-applicable | <url>
 
 ## Phase: commit
 
+`/ship` authorizes commit (the user chose Ship). If the working tree is already committed (no changes to stage), skip to **github** with `commit hash: <existing hash>`.
+
 1. Read `/Users/rom.iluz/.agents/skills/commit/SKILL.md` completely.
 2. Follow the procedure: clean conventional commits. Stage relevant files INCLUDING doc changes from the docs phase.
 3. Set `commit hash: <hash>`.
@@ -59,9 +62,9 @@ pr url: pending | not-applicable | <url>
 ## Phase: github (conditional)
 
 1. Check: does the repo have a GitHub remote? Does the user want to push/PR?
-2. If YES (GitHub remote + user intent to push) → read `/Users/rom.iluz/.agents/skills/github/SKILL.md` completely. Follow the procedure: push to a branch (not main), create a PR with a clear description linking to the spec/issue. Set `pr url: <url>`.
-3. If NO (no GitHub remote, or user wants commit-only) → set `pr url: not-applicable` (with reason).
-4. If CI fails → reread this workflow, go to **verify** (return to verification with the CI failure).
+2. If YES (GitHub remote + user intent to push) → read `/Users/rom.iluz/.agents/skills/github/SKILL.md` completely. Follow the procedure: push to a branch (not main), create a PR with a clear description linking to the spec/issue. Set `pr url: <url>`, `ci: pending`.
+3. If NO (no GitHub remote, or user wants commit-only) → set `pr url: not-applicable`, `ci: not-applicable` (with reason).
+4. If a PR was created → wait for CI. Set `ci: pass` or `ci: fail`. If CI fails → reread this workflow, go to **verify** (return to verification with the CI failure).
 5. Emit the state block. Reread this workflow skill.
 6. Go to **complete**.
 
@@ -76,7 +79,7 @@ Tell the user: "Ship complete. Commit: <hash>. PR: <url or not-applicable>. CI: 
 - **The workflow owns the routing.** Each specialist owns its procedure. Do not follow their routing prose — this workflow determines the next phase.
 - **Reread this workflow skill** after each phase + after compaction.
 - **Never ask the user to type an internal `/skill:*` command.**
-- **Do not advance without explicit evidence** (verification output, doc disposition, commit hash, PR URL or not-applicable).
+- **Do not advance without explicit evidence** (verification output, doc disposition, commit hash, PR URL or not-applicable, CI status).
 - **Never commit secrets or push main.**
 - **GitHub is conditional** — not all repos have a GitHub remote. Do not force a PR.
 - **Follow only the active phase's specialist.**
