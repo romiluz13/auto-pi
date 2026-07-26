@@ -26,6 +26,7 @@ export const PHASE_SCHEMAS: Record<string, Record<string, unknown>> = {
 			},
 		},
 		required: ["planPath", "contract", "openDecisions"],
+		additionalProperties: false,
 	},
 	build: {
 		type: "object",
@@ -40,6 +41,7 @@ export const PHASE_SCHEMAS: Record<string, Record<string, unknown>> = {
 			output: { type: "string", description: "Last 20 lines of test output" },
 		},
 		required: ["status", "command", "exitCode", "output"],
+		additionalProperties: false,
 	},
 	review: {
 		type: "object",
@@ -58,6 +60,8 @@ export const PHASE_SCHEMAS: Record<string, Record<string, unknown>> = {
 						issue: { type: "string" },
 						recommendation: { type: "string" },
 					},
+					required: ["severity", "file", "line", "issue", "recommendation"],
+					additionalProperties: false,
 				},
 			},
 			severity: {
@@ -67,6 +71,7 @@ export const PHASE_SCHEMAS: Record<string, Record<string, unknown>> = {
 			verdict: { type: "string", enum: ["approve", "changes-requested"] },
 		},
 		required: ["findings", "severity", "verdict"],
+		additionalProperties: false,
 	},
 	verify: {
 		type: "object",
@@ -84,6 +89,7 @@ export const PHASE_SCHEMAS: Record<string, Record<string, unknown>> = {
 			},
 		},
 		required: ["score", "converged", "honestyHits", "evidence"],
+		additionalProperties: false,
 	},
 	ship: {
 		type: "object",
@@ -96,6 +102,7 @@ export const PHASE_SCHEMAS: Record<string, Record<string, unknown>> = {
 			},
 		},
 		required: ["commitHash", "pushed", "prUrl"],
+		additionalProperties: false,
 	},
 };
 

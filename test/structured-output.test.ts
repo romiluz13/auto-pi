@@ -87,4 +87,27 @@ describe("structured-output", () => {
 		const dir = ext.path.substring(0, ext.path.lastIndexOf("/"));
 		assert.ok(!existsSync(dir), "directory removed after cleanup");
 	});
+
+	it("generated emit_result opts into constrainedSampling (pi 0.82+ strict-prefer)", async () => {
+		const ext = await createStructuredOutputExtension({
+			type: "object",
+			properties: { score: { type: "number" } },
+			required: ["score"],
+		});
+		cleanups.push(ext.cleanup);
+
+		const source = readFileSync(ext.path, "utf-8");
+		assert.ok(
+			source.includes("constrainedSampling"),
+			"emit_result should opt into constrainedSampling",
+		);
+		assert.ok(
+			source.includes('"json_schema"'),
+			"constrainedSampling should target json_schema",
+		);
+		assert.ok(
+			source.includes('"prefer"'),
+			"strict should be 'prefer' (safe fallback on models without strict support)",
+		);
+	});
 });
