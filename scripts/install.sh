@@ -207,15 +207,6 @@ for prompt in "$SCRIPT_DIR"/prompts/*.md; do
 done
 info "Prompt templates installed ($(ls "$PI_AGENT_DIR/prompts"/*.md 2>/dev/null | wc -l | tr -d ' ') commands)"
 
-# ── Agent Types (for /loop --mode=agents) ───────────────────────────────────
-step "Installing agent types"
-mkdir -p "$PI_AGENT_DIR/agents"
-for agent in "$SCRIPT_DIR"/agents/*.md; do
-	[ -f "$agent" ] || continue
-	cp "$agent" "$PI_AGENT_DIR/agents/$(basename "$agent")"
-done
-info "Agent types installed ($(ls "$PI_AGENT_DIR/agents"/*.md 2>/dev/null | wc -l | tr -d ' ') agent types)"
-
 # ── Repo Skills (installed AFTER community skills so auto-pi wins collisions) ─
 # auto-pi's hand-tuned skills (code-review, diagnosing-bugs, brainstorming,
 # grilling) are enhanced forks of Matt Pocock's originals. They MUST be copied

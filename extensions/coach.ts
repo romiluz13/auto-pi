@@ -20,14 +20,13 @@
  *   DOES hook `input` (the interception point) and `session_start` (status indicator).
  * - The `input` event is NOT used by any installed package. This is a free axis.
  * - Skips source:"extension" messages (agent-injected steers).
- * - C1 fix: skips when the loop is paused for human input (imports isLoopPausedForHuman).
+ * - C1 fix: skips when the input is from an extension (avoid self-steer loops).
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { complete, type Message } from "@earendil-works/pi-ai/compat";
-import { isLoopPausedForHuman } from "./loop.ts";
 import type {
 	ExtensionAPI,
 	ExtensionContext,
@@ -157,29 +156,10 @@ const WORKFLOW_OPTIONS: WorkflowOption[] = [
 		description: "Implement + test. Pins the tdd skill mechanically.",
 	},
 	{
-		label:
-			"/feature — Fast chain: plan → build → review → ship (no human gates)",
-		command: '/feature "$TASK"',
-		description:
-			"End-to-end feature. Runs all phases back-to-back. No pause for approval.",
-	},
-	{
-		label:
-			"/loop — Bounded loop: plan → build → review → verify → ship (hard tasks)",
-		command: '/loop --mode=agents "$TASK"',
-		description:
-			"Contract gate → plan → build → review → verify → ship. Each phase spawns a fresh-context sub-agent. Phase gates pause for human input. Structured output + journal + budget control.",
-	},
-	{
 		label: "/debug — Debug an issue (feedback loop, root cause)",
 		command: '/debug "$TASK"',
 		description:
 			"Build a repro loop, find root cause, fix. Pins diagnosing-bugs.",
-	},
-	{
-		label: "/fix — Fast chain: debug → build → review → ship (for bugs)",
-		command: '/fix "$TASK"',
-		description: "End-to-end bug fix. Runs all phases back-to-back.",
 	},
 	{
 		label: "/plan — Plan only (no code, design + spec + tickets)",
@@ -219,7 +199,6 @@ export default function coachExtension(pi: ExtensionAPI): void {
 	pi.on("input", async (event, ctx) => {
 		if (!isCoachEnabled(ctx)) return { action: "continue" };
 		if (event.source === "extension") return { action: "continue" };
-		if (isLoopPausedForHuman()) return { action: "continue" };
 
 		const text = event.text.trim();
 		if (!text) return { action: "continue" };

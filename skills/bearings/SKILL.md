@@ -18,14 +18,14 @@ Inspired by FirstMate's `bearings` skill (kunchenguid/firstmate), adapted for au
    {"sessionId":"abc","project":"/path","phase":"build","task":"add pagination","status":"working","ts":"2026-07-20T..."}
    ```
 
-   Also read `~/.pi/agent/decisions.json` for open decisions, and `~/.pi/workflows/*.json` for active loop states.
+   Also read `~/.pi/agent/decisions.json` for open decisions.
 
 2. **Compose the 4-section digest.** Every section ALWAYS renders, even when empty:
 
    - **Your Call** — decisions that need your action now. Open items from `decisions.json` that are unresolved. Empty-state: "Nothing needs your action right now."
    - **Recently Landed** — completed work since last bearings. Check `git log --oneline -5` in each project with active state. Empty-state: "No recent completions."
    - **Underway** — live sessions currently working. One line per session: project, phase, task, status. Empty-state: "Nothing is underway."
-   - **Charted Next** — queued or blocked work from loop states (`.loop-plan.md` files, paused workflows). Empty-state: "Nothing is queued."
+   - **Charted Next** — check open issues for what to tackle next. Empty-state: "Nothing is queued."
 
 3. **Write the dated report** to `~/.pi/agent/bearings/<YYYY-MM-DD>.md` and surface the concise digest in chat.
 

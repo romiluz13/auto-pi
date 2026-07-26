@@ -208,37 +208,8 @@ export default function sessionStatusExtension(pi: ExtensionAPI): void {
 
 				// Charted Next
 				sections.push("### Charted Next");
-				// Check for active loop workflows
-				const workflowsDir = join(homedir(), ".pi", "workflows");
-				let queuedCount = 0;
-				try {
-					if (existsSync(workflowsDir)) {
-						const { readdirSync } = require("node:fs");
-						for (const f of readdirSync(workflowsDir) as string[]) {
-							if (f.endsWith(".json")) {
-								const wf = JSON.parse(
-									readFileSync(join(workflowsDir, f), "utf-8"),
-								);
-								if (
-									wf.status &&
-									wf.status !== "done" &&
-									wf.status !== "rejected"
-								) {
-									queuedCount++;
-								}
-							}
-						}
-					}
-				} catch {
-					// fail silently
-				}
-				if (queuedCount > 0) {
-					sections.push(
-						`${queuedCount} active loop workflow(s). Run /loop-status for details.`,
-					);
-				} else {
-					sections.push("Nothing is queued.");
-				}
+				sections.push("Check open issues for what to tackle next.");
+				sections.push("");
 
 				ctx.ui.notify(sections.join("\n"), "info");
 			} catch (err) {

@@ -2,28 +2,8 @@
 description: Ship — verify, commit, document (workflow steps 7-8)
 skill: verification-before-completion
 ---
-Ship the current work. Follow workflow steps 7-8.
+Ship the current work. Follow the `verification-before-completion` skill (independent verification — evidence before claims).
 
-1. **Independent verification.** You are an independent auditor — a passing test or green build is never sufficient by itself.
-   - List every claim from prior steps (what was built, what was tested, what was fixed).
-   - Mark each claim UNVERIFIED.
-   - Run the project's test/lint/typecheck command. Read the FULL output. Don't scan for "passed" — read the details.
-   - For each claim, mark it VERIFIED or CONTRADICTED. If any is CONTRADICTED, stop and fix before proceeding.
+Scope: classify doc impact first → `/skill:diff-driven-docs`. Commit via `/skill:commit` (clean conventional). Push + PR via `/skill:github`. Do NOT push to main directly.
 
-2. **Document.** Classify doc impact first → run `/skill:diff-driven-docs` to determine what docs need updating.
-   - Durable gotcha/workflow change → update repo AGENTS.md.
-   - Domain term resolved → update `CONTEXT.md` (`/skill:domain-modeling`).
-   - Architecture decision → write ADR in `docs/adr/` (`/skill:domain-modeling`).
-   - User-facing change → update CHANGELOG.
-   - Don't create random markdown files.
-
-3. **Commit.** Run `/skill:commit` for clean conventional commits. Stage relevant files INCLUDING doc changes from step 2. Write a clear commit message:
-   - Subject: imperative mood, under 72 chars.
-   - Body: what changed, why it changed, what was tested.
-
-4. **Push + PR.** Run `/skill:github` via `gh` CLI:
-   - Push to a branch (not main).
-   - Create a PR with a clear description linking to the spec/issue.
-   - If CI fails → `diagnosing-bugs` → fix → return to step 1.
-
-Do NOT push to main directly. Do NOT skip verification. Evidence before claims.
+Next: you're done. No next step — ship is terminal.

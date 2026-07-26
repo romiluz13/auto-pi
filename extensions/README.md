@@ -41,43 +41,6 @@ pi-observational-memory background work).
   generation. Does NOT touch compaction (pi-observational-memory) or search
   (pi-hermes-memory).
 
-### `loop.ts` — Bounded autonomous loop engine (`/loop`)
-
-The one structural capability auto-pi was missing: a real **loop engine**, not a
-forward-only pipeline. Pre-flight contract gate → PLAN → BUILD → REVIEW →
-VERIFY → SHIP, with bounded remediation loop-back (cap 3), plateau detection
-(`iteration ≥ 3` AND no improvement in last 2), independent verifier
-convergence (santa-method, cross-model opt-in), test-honesty gates, and
-reconciliation over assertion. **Three exits: PASS / CAP / WEDGE.**
-
-- **Trigger:** `/loop "<task>"` or `Ctrl+Shift+L`. Flags: `--max-iterations N`
-  (default 3), `--cross-model` (santa cross-model review). `/loop-status`,
-  `/loop-abort`.
-- **Harmony contract:** owns ONE new axis (durable workflow state + phase gates
-  - iteration control). Registers ZERO tools. Pi has no `executeTool` API, so
-  the engine COMPOSES on pi-subagents/pi-lens/hermes by STEERING the agent
-  (`sendUserMessage({deliverAs:'steer'})` + `setActiveTools` per phase +
-  `on('tool_call')` gates) — it never re-implements delegation. Durable state
-  at `~/.pi/workflows/{wf}.json` + `.events.jsonl` (separate from hermes SQLite
-  - observational ledger). The `tool_call` hook is additive (pi-rewind and
-  pi-hypa hook the same event for different concerns; this one only blocks
-  tools outside the phase allowlist).
-- **7 design principles:** five-mode pre-flight, plateau-aware, GAN-shaped (3
-  exits), convergence (santa), liveness (wedge detection), reconciliation over
-  assertion, thought-it-through gate (pre-loop contract).
-- **5 prompt techniques stolen from Archon** (all steering-text — zero new moving
-  parts): (1) 5 specialized parallel reviewers + synthesis (code-review /
-  error-handling / test-coverage / comment-quality / docs-impact) instead of
-  generic "2-3 reviewers"; (2) per-phase CHECKPOINT gates (visible evidence
-  before signaling completion); (3) "Patterns to Mirror" with actual file:line
-  code snippets extracted in PLAN, referenced as MIRROR on each BUILD task; (4)
-  honor the contract's `nonGoals` in review (anti-scope-creep — don't flag
-  intentional exclusions); (5) per-task validation in BUILD (type-check after
-  every file change — "never accumulate broken state"). See
-  `docs/archon-learnings.md`.
-- **Design doc:** `docs/loop-engine-design.md` (or `/tmp/pi-loop/DESIGN.md` in
-  dev). Full rationale + cc10x comparison in `docs/audits/`.
-
 ### `guardrails.ts` — AGENTS.md prominence re-injection
 
 Solves the known failure: "the agent says it didn't pay attention to AGENTS.md."
@@ -104,23 +67,21 @@ retried turn). Plus `session_compact` audit + `/guardrails on|off|test`.
 
 Solves the adoption problem: "I can't remember all the commands."
 You type a task in plain English. Before the agent runs, Coach classifies it
-(build / debug / plan / research / review / ship / loop / feature / fix / trivial)
+(build / debug / plan / research / review / ship / trivial)
 and shows a one-tap suggestion of the right workflow. You press Enter to accept —
 Coach transforms your input into the matching slash command. You never have to
-remember /loop, /feature, /research — Coach tells you which fits THIS task.
+remember which command fits — Coach tells you which fits THIS task.
 
 - **Trigger:** automatic — intercepts every user input via the `input` event.
   Skip with: prefix `!` (raw) or `/` (already a command). `/coach on|off|test`.
 - **Harmony contract:** owns NO axis, registers NO tools, hooks NO tool_call,
   NO before_agent_start. The `input` event is NOT used by any installed
   package or other extension — it's a free axis. Skips `source:"extension"`
-  messages so it never interferes with loop steering or hermes background work.
-  Skips when the loop is paused for human input (C1 fix: imports
-  `isLoopPausedForHuman` from loop.ts so it never swallows a pause-response).
+  messages so it never interferes with hermes background work.
   Trivial tasks pass through untouched (zero friction for the common case).
-- **Why this exists:** a system you don't use is worth zero. 8 slash commands +
-  4 extension triggers is past the human instruction ceiling. Coach inverts
-  the interface — the system surfaces the command, you don't recall it.
+- **Why this exists:** a system you don't use is worth zero. 7 slash commands
+  is past the human instruction ceiling. Coach inverts the interface — the
+  system surfaces the command, you don't recall it.
 
 ### `trace.ts` — Activation observability (`/trace`, `/trace-skills`)
 
