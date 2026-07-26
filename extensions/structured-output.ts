@@ -75,6 +75,10 @@ export default function (pi: ExtensionAPI) {
       "Emit the final structured result for this task. Call this exactly once, as your last action, with the complete answer matching the required schema.",
     promptSnippet: "Emit the final structured result (required last action)",
     parameters: schema,
+    // strict:"prefer" (not "require") — the default model (FW-GLM-5.2) lacks
+    // supportsStrictMode; "require" would fail the request. "prefer" falls back
+    // to client-side validation on unsupported models, engages server-side on Claude/GPT.
+    constrainedSampling: { type: "json_schema", strict: "prefer" },
     async execute(_toolCallId: string, params: unknown) {
       return {
         content: [{ type: "text", text: JSON.stringify(params) }],

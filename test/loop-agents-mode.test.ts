@@ -93,4 +93,32 @@ describe("loop agents-mode dispatch", () => {
 		const agent = loadAgentType("nonexistent-agent");
 		assert.equal(agent, null);
 	});
+
+	it("all 5 phase schemas are strict-compatible (additionalProperties: false)", () => {
+		for (const phase of ["plan", "build", "review", "verify", "ship"]) {
+			const schema = PHASE_SCHEMAS[phase] as Record<string, unknown>;
+			assert.equal(
+				schema["additionalProperties"],
+				false,
+				`${phase} schema must set additionalProperties: false for strict constrained sampling`,
+			);
+		}
+	});
+
+	it("review findings items are strict-compatible (required + additionalProperties: false)", () => {
+		const review = PHASE_SCHEMAS["review"] as Record<string, unknown>;
+		const props = review["properties"] as Record<string, unknown>;
+		const findings = props["findings"] as Record<string, unknown>;
+		const items = findings["items"] as Record<string, unknown>;
+		const required = items["required"] as string[];
+		assert.ok(
+			Array.isArray(required) && required.length === 5,
+			"review findings items must list all 5 properties as required",
+		);
+		assert.equal(
+			items["additionalProperties"],
+			false,
+			"review findings items must set additionalProperties: false",
+		);
+	});
 });
