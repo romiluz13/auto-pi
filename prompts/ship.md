@@ -1,9 +1,5 @@
 ---
-description: Ship — verify, commit, document (workflow steps 7-8)
-skill: verification-before-completion
+description: Ship — verify, document, commit, PR (orchestrated)
+skill: ship-workflow
 ---
-Ship the current work. Follow the `verification-before-completion` skill (independent verification — evidence before claims).
-
-Scope: classify doc impact first → `/skill:diff-driven-docs`. Commit via `/skill:commit` (clean conventional). Push + PR via `/skill:github`. Do NOT push to main directly.
-
-Next: you're done. No next step — ship is terminal.
+Ship the current work. Follow the `ship-workflow` skill (it orchestrates verification → diff-driven-docs → commit → github, with evidence at each phase).

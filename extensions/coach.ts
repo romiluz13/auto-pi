@@ -153,37 +153,19 @@ const WORKFLOW_OPTIONS: WorkflowOption[] = [
 	{
 		label: "/build — Build with TDD (red → green → prove it)",
 		command: '/build "$TASK"',
-		description: "Implement + test. Pins the tdd skill mechanically.",
+		description:
+			"Implement + test, with diagnosis on RED. Pins build-workflow.",
 	},
 	{
 		label: "/debug — Debug an issue (feedback loop, root cause)",
 		command: '/debug "$TASK"',
-		description:
-			"Build a repro loop, find root cause, fix. Pins diagnosing-bugs.",
+		description: "Build a repro loop, find root cause. Pins diagnosing-bugs.",
 	},
 	{
-		label: "/plan — Plan a bounded idea (design approval, no spec/tickets yet)",
+		label: "/plan — Plan a feature (design → spec → tickets, orchestrated)",
 		command: '/plan "$TASK"',
 		description:
-			"Understand, brainstorm, get design approval. Pins brainstorming. Next: /spec.",
-	},
-	{
-		label: "/wayfind — Chart a map for a foggy, large effort",
-		command: '/wayfind "$TASK"',
-		description:
-			"For efforts too large/foggy for one planning session. Pins wayfinder.",
-	},
-	{
-		label: "/spec — Publish the approved design to the issue tracker",
-		command: '/spec "$TASK"',
-		description:
-			"Synthesize the approved conversation into a tracker spec. Pins to-spec. Next: /tickets.",
-	},
-	{
-		label: "/tickets — Break the approved spec into implementation tickets",
-		command: '/tickets "$TASK"',
-		description:
-			"Publish the approved slices as tickets. Pins to-tickets. Next: /build.",
+			"Brainstorming → to-spec → to-tickets (bounded) or wayfinder (foggy). Pins planning-workflow.",
 	},
 	{
 		label: "/research — Research a topic (parallel fan-out)",
@@ -191,14 +173,14 @@ const WORKFLOW_OPTIONS: WorkflowOption[] = [
 		description: "Web, GitHub, codebase, memory. Pins research skill.",
 	},
 	{
-		label: "/review — Review current diff (parallel reviewers)",
+		label: "/review — Review current diff (standards + spec + security)",
 		command: "/review",
-		description: "Standards + spec + security. Pins code-review skill.",
+		description: "Two-axis review + disposition. Pins review-workflow.",
 	},
 	{
 		label: "/ship — Ship (verify, document, commit, PR)",
 		command: "/ship",
-		description: "Independent verification + commit. Pins verification skill.",
+		description: "Verify → docs → commit → github. Pins ship-workflow.",
 	},
 	{
 		label: "Browse all commands (/palette)",

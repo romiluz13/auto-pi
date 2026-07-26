@@ -1,12 +1,8 @@
 ---
-description: Plan a feature — understand, brainstorm, get design approval
+description: Plan a feature — design, spec, tickets (orchestrated)
 argument-hint: "<feature description>"
-skill: brainstorming
+skill: planning-workflow
 ---
-Plan the following feature. Follow the `brainstorming` skill (understand → brainstorm → present design → get approval). This is planning only — do NOT write production code, publish a spec, or create tickets.
+Plan the following feature. Follow the `planning-workflow` skill (it orchestrates brainstorming → to-spec → to-tickets, or wayfinder for foggy efforts).
 
 Feature: $@
-
-Scope: brainstorming returns an approved-design handoff (a concise summary in the conversation). It does NOT publish the spec or create tickets — the `/spec` and `/tickets` prompts do that.
-
-Next: type `/spec`. You decide.

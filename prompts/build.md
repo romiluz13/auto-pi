@@ -1,12 +1,8 @@
 ---
-description: Build a feature — implement, test, fix (workflow steps 4-5)
+description: Build a feature — implement, test, fix (TDD, with diagnosis on RED)
 argument-hint: "<what to build>"
-skill: tdd
+skill: build-workflow
 ---
-Build the following. Follow the `tdd` skill (red → green → prove it).
+Build the following. Follow the `build-workflow` skill (it orchestrates tdd, with diagnosing-bugs on persistent RED).
 
 Task: $@
-
-Scope: Python → use `/skill:uv`. Fix type/LSP errors immediately when detected. If tests fail → use the `diagnosing-bugs` skill.
-
-Next: type `/review`. You decide.
