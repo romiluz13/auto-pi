@@ -17,7 +17,7 @@ REPO_ROOT="${REPO_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 UPSTREAM_REPO="${MATTPocOCK_REPO:-/Users/rom.iluz/Dev/mattpocock-skills}"
 
 # The local forks with known drift
-LOCAL_FORKS=("code-review" "diagnosing-bugs")
+LOCAL_FORKS=(${LOCAL_FORK_NAMES:-code-review diagnosing-bugs})
 
 echo "=== Three-way drift check for local forks ==="
 echo "Repo root: $REPO_ROOT"
@@ -73,9 +73,18 @@ for skill in "${LOCAL_FORKS[@]}"; do
 
 	# Three-way comparison
 	# 1. base vs upstream-HEAD: did upstream change since the recorded commit?
-	# 2. base vs local: did the local fork change from the base?
+	# 2. base vs local (content only, stripping the provenance frontmatter): did the local fork change the content?
 	upstream_changed=$(diff -q "$base_file" "$upstream_head_file" >/dev/null 2>&1 && echo "no" || echo "yes")
-	local_changed=$(diff -q "$base_file" "$local_file" >/dev/null 2>&1 && echo "no" || echo "yes")
+
+	# For local comparison: strip the YAML frontmatter from BOTH the local file and the base file
+	# to compare content only (the provenance frontmatter is the local patch; the content is what matters for drift)
+	local_content_file=$(mktemp)
+	base_content_file=$(mktemp)
+	# Strip everything between the first two --- lines (the frontmatter)
+	awk 'BEGIN{in_fm=0} /^---$/{if(in_fm){in_fm=0; next} else {in_fm=1; next}} !in_fm' "$local_file" >"$local_content_file"
+	awk 'BEGIN{in_fm=0} /^---$/{if(in_fm){in_fm=0; next} else {in_fm=1; next}} !in_fm' "$base_file" >"$base_content_file"
+	local_changed=$(diff -q "$base_content_file" "$local_content_file" >/dev/null 2>&1 && echo "no" || echo "yes")
+	rm -f "$local_content_file" "$base_content_file"
 
 	if [ "$upstream_changed" = "no" ] && [ "$local_changed" = "no" ]; then
 		echo "  ✓ matches upstream (no drift — local = base = upstream-HEAD)"
