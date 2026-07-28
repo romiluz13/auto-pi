@@ -1770,8 +1770,14 @@ test("session-handoff is classified as standalone-utility", () => {
 test("planning workflow has stateDomains", () => {
 	const planning = WORKFLOWS_V2.find((w) => w.name === "planning-workflow");
 	assert.ok(planning?.stateDomains, "planning should have stateDomains");
-	assert.ok(planning?.stateDomains?.["mode"], "planning should have mode domain");
-	assert.ok(planning?.stateDomains?.["prototype"], "planning should have prototype domain");
+	assert.ok(
+		planning?.stateDomains?.["mode"],
+		"planning should have mode domain",
+	);
+	assert.ok(
+		planning?.stateDomains?.["prototype"],
+		"planning should have prototype domain",
+	);
 });
 
 // Check: state constraint values are valid members of state domains
@@ -1798,14 +1804,25 @@ test("planning state constraint values are valid members of state domains", () =
 
 // Check: ASK_MATT_SOURCE has SHA-256
 test("ASK_MATT_SOURCE has a SHA-256 hash", () => {
-	assert.ok(ASK_MATT_SOURCE.sha256, "ASK_MATT_SOURCE should have a sha256 field");
-	assert.ok(ASK_MATT_SOURCE.sha256.length >= 16, "sha256 should be at least 16 chars");
+	assert.ok(
+		ASK_MATT_SOURCE.sha256,
+		"ASK_MATT_SOURCE should have a sha256 field",
+	);
+	assert.ok(
+		ASK_MATT_SOURCE.sha256.length >= 16,
+		"sha256 should be at least 16 chars",
+	);
 });
 
 // Check: triage outcomes have evidence fields
 test("triage outcomes have evidence fields", () => {
-	const readyForAgent = TRIAGE_OUTCOMES.find((o) => o.outcome === "ready-for-agent");
-	assert.ok(readyForAgent?.evidenceFields, "ready-for-agent should have evidence fields");
+	const readyForAgent = TRIAGE_OUTCOMES.find(
+		(o) => o.outcome === "ready-for-agent",
+	);
+	assert.ok(
+		readyForAgent?.evidenceFields,
+		"ready-for-agent should have evidence fields",
+	);
 	assert.ok(
 		readyForAgent!.evidenceFields!.includes("issue ref"),
 		"ready-for-agent should require issue ref evidence",
@@ -1815,8 +1832,61 @@ test("triage outcomes have evidence fields", () => {
 // Check: prototype state mutations are explicit in the SKILL.md
 test("planning SKILL.md has explicit prototype state mutations", () => {
 	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(/prototype: proposed/i.test(content), "should set prototype: proposed when asking permission");
-	assert.ok(/prototype: declined/i.test(content), "should set prototype: declined when user declines");
-	assert.ok(/prototype: running/i.test(content), "should set prototype: running when user approves");
-	assert.ok(/prototype: complete/i.test(content), "should set prototype: complete when prototype is done");
+	assert.ok(
+		/prototype: proposed/i.test(content),
+		"should set prototype: proposed when asking permission",
+	);
+	assert.ok(
+		/prototype: declined/i.test(content),
+		"should set prototype: declined when user declines",
+	);
+	assert.ok(
+		/prototype: running/i.test(content),
+		"should set prototype: running when user approves",
+	);
+	assert.ok(
+		/prototype: complete/i.test(content),
+		"should set prototype: complete when prototype is done",
+	);
+});
+
+// ─── Contract v6: full SHA-256 + prototype state reset ───────────────────────
+
+import { createHash } from "node:crypto";
+
+// Check: ASK_MATT_SOURCE.sha256 is a full 64-char hex digest matching the actual file
+test("ASK_MATT_SOURCE.sha256 is a full 64-char hex digest matching the actual upstream file", () => {
+	const sha256 = ASK_MATT_SOURCE.sha256;
+	assert.ok(/^[a-f0-9]{64}$/.test(sha256), `sha256 should be a 64-char hex digest, got: ${sha256}`);
+	// Compute the actual SHA-256 of the upstream ask-matt file
+	const upstreamPath = "/Users/rom.iluz/Dev/mattpocock-skills/skills/engineering/ask-matt/SKILL.md";
+	if (existsSync(upstreamPath)) {
+		const fileContent = readFileSync(upstreamPath);
+		const computed = createHash("sha256").update(fileContent).digest("hex");
+		assert.equal(sha256, computed, `ASK_MATT_SOURCE.sha256 should match the actual file hash`);
+	}
+});
+
+// Check: prototype completion resets resume phase + uncertainty
+test("planning SKILL.md resets resume phase + uncertainty on prototype completion", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	// On completion: set unresolved design uncertainty: none + resume phase: not-applicable after resuming
+	assert.ok(
+		/unresolved design uncertainty: none/i.test(content),
+		"prototype completion should set 'unresolved design uncertainty: none'",
+	);
+	assert.ok(
+		/resume phase: not-applicable/i.test(content),
+		"prototype completion should reset 'resume phase: not-applicable' after resuming",
+	);
+});
+
+// Check: prototype decline resets conclusion + resume phase
+test("planning SKILL.md resets conclusion + resume phase on prototype decline", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	// On decline: set prototype conclusion: not-applicable + resume phase: not-applicable
+	assert.ok(
+		/prototype conclusion: not-applicable/i.test(content),
+		"prototype decline should set 'prototype conclusion: not-applicable'",
+	);
 });

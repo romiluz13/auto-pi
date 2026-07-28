@@ -92,12 +92,13 @@ Emit the state block. Reread this workflow skill. Go to **brainstorm**.
 During the design phase, if a material question cannot be settled by reasoning or evidence alone (it needs a runnable answer — state logic, a UI you have to see, business logic behavior):
 
 1. Explain the design question the prototype would answer, and **ask permission once**. This is a high-friction transition (discussion → runnable code) that requires explicit user consent. Set `prototype: proposed`, `prototype question: <question>`.
-2. If the user **declines** → set `prototype: declined`, `unresolved design uncertainty: <text>`. Continue or stop. Do NOT pretend the question was resolved.
+2. If the user **declines** → set `prototype: declined`, `prototype conclusion: not-applicable`, `unresolved design uncertainty: <text>`, `resume phase: not-applicable`. Continue or stop. Do NOT pretend the question was resolved.
 3. If the user **approves** → set `prototype: running`, `resume phase: brainstorm`.
    - Checkpoint the current design state (update the state block with the current design progress).
    - Read `/Users/rom.iluz/.agents/skills/prototype/SKILL.md` completely.
    - Build the throwaway answer (one command, no persistence, no polish — the prototype skill's rules).
-   - Capture the conclusion: set `prototype: complete`, `prototype conclusion: <conclusion>`.
+   - Capture the conclusion: set `prototype: complete`, `prototype conclusion: <conclusion>`, `unresolved design uncertainty: none`.
+   - After resuming the design phase with the conclusion, set `resume phase: not-applicable`.
    - Delete or isolate the prototype code (keep only the validated decision).
    - Reread this workflow skill.
    - Resume the same design phase (brainstorm or grill) with the conclusion.
