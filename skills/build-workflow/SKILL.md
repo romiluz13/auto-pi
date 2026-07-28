@@ -32,6 +32,11 @@ verification: pending | <command + exit code + output>
 
 ## Phase: tdd
 
+**Entry invariant (check before starting):**
+- One invocation accepts exactly one ticket/slice-sized unit. If the user supplied multiple tickets, refuse — tell them to break them apart and run `/build` once per ticket.
+- Detect inherited unrelated context: if the conversation contains substantial unrelated work (other features, prior planning, unrelated debugging), recommend a fresh session or `/handoff` before starting. The ticket itself is the durable handoff — a full conversation handoff may be unnecessary if the ticket is self-contained.
+- If the working context is clean (one ticket, no unrelated context), proceed.
+
 1. Read `/Users/rom.iluz/.agents/skills/tdd/SKILL.md` completely.
 2. Follow the tdd procedure: one red-green slice at a time (write the test first, see it fail, implement, see it pass).
 3. **Situational:** if the project is Python, read `/Users/rom.iluz/.agents/skills/uv/SKILL.md` for the environment runner.

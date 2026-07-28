@@ -23,6 +23,8 @@ workflow: plan
 mode: bounded
 phase: brainstorm | spec | tickets | complete
 design: pending | approved
+style: brainstorming | grilling
+domain capture: on | off
 spec: pending | not-applicable | <tracker reference>
 tickets: pending | not-applicable | [<references>]
 frontier: pending | not-applicable | <first unblocked ticket>
@@ -43,19 +45,57 @@ outcome: map-charted | decision-resolved | ready-for-brainstorm | ready-for-spec
 
 Read the task. Is it bounded or foggy?
 
-- **Bounded** (can design in one session, the idea is clear enough to brainstorm) → set `mode: bounded`, go to **brainstorm**.
+- **Bounded** (can design in one session, the idea is clear enough to brainstorm) → set `mode: bounded`, go to **setup**.
 - **Foggy** (too large or unclear for one planning session, greenfield or huge) → set `mode: foggy`, go to **wayfind**.
+
+## Phase: setup (bounded only, after classify)
+
+**Choose the conversational style:**
+
+- Default: `style: brainstorming` (collaborative dialogue, design approval).
+- If the user explicitly asks to grill / stress-test / relentless interview → `style: grilling`.
+- If the agent detects high ambiguity that would benefit from grilling → explain why briefly and **ask permission once**. If yes → `style: grilling`. If no → `style: brainstorming`. Never silently switch to grilling — it's a high-friction transition that requires explicit user consent.
+
+**Decide the durable domain capture:**
+
+- Default: `domain capture: off`.
+- Set `domain capture: on` when these triggers apply:
+  - ambiguous/overloaded domain terms materially affect the design;
+  - existing CONTEXT.md / ADRs constrain the change;
+  - cross-module / domain contracts are being changed;
+  - a hard-to-reverse, surprising trade-off with genuine alternatives is likely;
+  - the user explicitly asks to document / stress-test with durable records.
+- No ceremony merely because the domain is "complex" — `domain-modeling`'s own thresholds constrain: glossary updates only when terminology is actually resolved; ADR only when hard-to-reverse + surprising + genuine trade-off.
+
+Emit the state block. Reread this workflow skill. Go to **brainstorm**.
 
 ## Phase: brainstorm (bounded only)
 
 1. Read `/Users/rom.iluz/.agents/skills/brainstorming/SKILL.md` completely.
-2. Follow the brainstorming procedure: explore context, ask questions one at a time, propose 2-3 approaches, present the design, get user approval.
-3. **Ignore brainstorming's routing prose** ("invoke /skill:to-spec", "terminal state"). This workflow owns the routing — brainstorming owns only the procedure.
-4. When the user explicitly approves the design → set `design: approved`.
-5. Emit the state block. Reread this workflow skill.
-6. Go to **spec**.
+2. If `style: grilling` → read `/Users/rom.iluz/.agents/skills/grilling/SKILL.md` as well and run the grilling interview (relentless, one question at a time, with your recommended answer for each). If `style: brainstorming` → follow the brainstorming procedure (collaborative dialogue, questions one at a time, 2-3 approaches, present design, get approval).
+3. If `domain capture: on` → read `/Users/rom.iluz/.agents/skills/domain-modeling/SKILL.md` and use it as an underlay: resolve domain terms into a glossary (only when terminology is actually resolved), write ADRs (only when hard-to-reverse + surprising + genuine trade-off). The durable records (CONTEXT.md, ADRs) survive the planning session.
+4. **Ignore brainstorming's routing prose** ("invoke /skill:to-spec", "terminal state"). This workflow owns the routing — brainstorming owns only the procedure.
+5. When the user explicitly approves the design → set `design: approved`.
+6. Emit the state block. Reread this workflow skill.
+7. Go to **spec**.
 
 **Do NOT advance before explicit design approval in the conversation.**
+
+## Prototype interrupt (available from brainstorm or grill)
+
+During the design phase, if a material question cannot be settled by reasoning or evidence alone (it needs a runnable answer — state logic, a UI you have to see, business logic behavior):
+
+1. Explain the design question the prototype would answer, and **ask permission once**. This is a high-friction transition (discussion → runnable code) that requires explicit user consent.
+2. If the user **declines** → record the uncertainty in the state block and continue or stop. Do NOT pretend the question was resolved.
+3. If the user **approves** →
+   - Checkpoint the current design state (update the state block with the current design progress).
+   - Read `/Users/rom.iluz/.agents/skills/prototype/SKILL.md` completely.
+   - Build the throwaway answer (one command, no persistence, no polish — the prototype skill's rules).
+   - Capture the conclusion (the verdict + the question it settled).
+   - Delete or isolate the prototype code (keep only the validated decision).
+   - Reread this workflow skill.
+   - Resume the same design phase (brainstorm or grill) with the conclusion.
+4. Handoff to a fresh session only if context pressure or isolation demands it. Do not mechanically handoff every small prototype.
 
 ## Phase: spec (bounded only, after design approval)
 
@@ -97,13 +137,14 @@ Read the task. Is it bounded or foggy?
 
 Finish with: spec URL, ticket URLs, first unblocked ticket (the frontier).
 
-Tell the user: "Planning complete. Spec: <URL>. Tickets: <URLs>. First unblocked ticket: <frontier>. Next: type `/build <frontier>` to start implementation."
+Tell the user: "Planning complete. Spec: <URL>. Tickets: <URLs>. First unblocked ticket: <frontier>. Each ticket is a separate build session — start fresh for each one. Next: type `/build <frontier>` in a fresh session to start implementation."
 
 ## Phase: complete (foggy)
 
 Finish with: map reference, wayfind frontier, outcome.
 
 Tell the user (based on the outcome):
+
 - `outcome: map-charted` → "Planning (foggy) complete. Map: <reference>. Frontier: <refs>. Next: type `/plan <map>` to resume planning from the map."
 - `outcome: decision-resolved` → "Planning (foggy) complete. Map: <reference>. Decisions resolved. Next: type `/plan <map>` to resume, or continue wayfinding if the destination is still unclear."
 - `outcome: ready-for-brainstorm` → (already routed to brainstorm internally — this completion is not reached)

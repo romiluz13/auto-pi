@@ -1,6 +1,13 @@
 ---
 name: diagnosing-bugs
 description: Diagnosis loop for hard bugs and performance regressions. Use when the user says "diagnose"/"debug this", or reports something broken/throwing/failing/slow.
+upstream:
+  repo: https://github.com/mattpocock/skills.git
+  path: skills/engineering/diagnosing-bugs/SKILL.md
+  commit: ed37663
+local-patch:
+  intent: "AI-agent failure-mode guards (hypothesis quality criteria, causal chain gate, debug attempt tracking) — added because AI agents prematurely fix and repeat hypotheses without these gates."
+  owner: auto-pi
 ---
 
 # Diagnosing Bugs

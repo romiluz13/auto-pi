@@ -47,7 +47,7 @@ function parsePhases(content: string): string[] {
 // Extract skill read targets from a workflow skill
 function parseSkillReads(content: string): string[] {
 	const reads: string[] = [];
-	const regex = /Read\s+`?(\/[^`]+\/SKILL\.md)`?/g;
+	const regex = /[Rr]ead\s+`?(\/[^`]+\/SKILL\.md)`?/g;
 	let match;
 	while ((match = regex.exec(content)) !== null) {
 		// Extract the skill name from the path
@@ -339,7 +339,9 @@ test("planning-workflow has a separate foggy state block with map + outcome", ()
 test("planning-workflow foggy complete does not suggest /build", () => {
 	const content = readWorkflowSkill("planning-workflow");
 	// Find the foggy complete section
-	const foggyCompleteMatch = content.match(/Phase: complete \(foggy\)([\s\S]*?)(?=\n## |\nRules|$)/);
+	const foggyCompleteMatch = content.match(
+		/Phase: complete \(foggy\)([\s\S]*?)(?=\n## |\nRules|$)/,
+	);
 	if (foggyCompleteMatch) {
 		const foggyComplete = foggyCompleteMatch[1];
 		assert.ok(
@@ -348,7 +350,6 @@ test("planning-workflow foggy complete does not suggest /build", () => {
 		);
 	}
 });
-
 
 // ─── Ship workflow structural tests ──────────────────────────────────────────
 
@@ -374,19 +375,27 @@ test("ship-workflow allows none-needed for docs", () => {
 
 test("ship-workflow has ci state field", () => {
 	const content = readWorkflowSkill("ship-workflow");
-	assert.ok(/ci:\s*pending.*not-applicable.*pass.*fail/i.test(content), "ship-workflow should have ci state with pending/not-applicable/pass/fail");
+	assert.ok(
+		/ci:\s*pending.*not-applicable.*pass.*fail/i.test(content),
+		"ship-workflow should have ci state with pending/not-applicable/pass/fail",
+	);
 });
 
 test("ship-workflow commit is always authorized (no not-applicable for commit hash)", () => {
 	const content = readWorkflowSkill("ship-workflow");
-	assert.ok(/authorizes commit|chose Ship/i.test(content), "ship-workflow should state that /ship authorizes commit");
+	assert.ok(
+		/authorizes commit|chose Ship/i.test(content),
+		"ship-workflow should state that /ship authorizes commit",
+	);
 	// commit hash state should NOT have not-applicable
 	const commitLine = content.match(/commit hash:\s*pending.*$/m);
 	if (commitLine) {
-		assert.ok(!/not-applicable/.test(commitLine[0]), "commit hash state should not have not-applicable (commit is always authorized)");
+		assert.ok(
+			!/not-applicable/.test(commitLine[0]),
+			"commit hash state should not have not-applicable (commit is always authorized)",
+		);
 	}
 });
-
 
 // ─── Build workflow structural tests ──────────────────────────────────────────
 
@@ -430,7 +439,8 @@ test("review-workflow skips disposition if clean", () => {
 test("review-workflow does not apply changes during review (verified-fix = queued for /build)", () => {
 	const content = readWorkflowSkill("review-workflow");
 	assert.ok(
-		/verified-fix.*queued for.*build/i.test(content) || /verified-fix.*Do NOT apply/i.test(content),
+		/verified-fix.*queued for.*build/i.test(content) ||
+			/verified-fix.*Do NOT apply/i.test(content),
 		"verified-fix should mean queued for /build, not apply during review",
 	);
 	assert.ok(
@@ -442,11 +452,12 @@ test("review-workflow does not apply changes during review (verified-fix = queue
 test("review-workflow waits for needs-user-decision before completing", () => {
 	const content = readWorkflowSkill("review-workflow");
 	assert.ok(
-		/needs-user-decision.*REMAIN in disposition|needs-user-decision.*do not.*complete/i.test(content),
+		/needs-user-decision.*REMAIN in disposition|needs-user-decision.*do not.*complete/i.test(
+			content,
+		),
 		"review-workflow should wait for needs-user-decision before completing",
 	);
 });
-
 
 // ─── All specialist skills referenced by workflows exist at the canonical path ─
 
@@ -476,4 +487,195 @@ test("all specialist skills referenced by workflows exist at a known path", () =
 			`specialist skill "${specialist}" referenced by a workflow but not found at ~/.agents/skills/ or ~/.pi/agent/skills/`,
 		);
 	}
+});
+
+// ─── B1: Fresh-context-per-ticket invariants ──────────────────────────────
+
+test("planning-workflow complete (bounded) recommends fresh /build per ticket", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	const completeMatch = content.match(/Phase: complete \(bounded\)([\s\S]*?)(?=\n## |\nRules|$)/);
+	if (completeMatch) {
+		const complete = completeMatch[1];
+		assert.ok(
+			/fresh.*\/build/i.test(complete) || /separate build session/i.test(complete),
+			"planning complete (bounded) should recommend fresh /build per ticket",
+		);
+	}
+});
+
+test("build-workflow entry invariant: one invocation accepts one ticket", () => {
+	const content = readWorkflowSkill("build-workflow");
+	assert.ok(
+		/one.*ticket.*one.*invocation|one invocation.*one.*ticket/i.test(content) || /exactly one ticket/i.test(content),
+		"build-workflow should enforce one-ticket-per-invocation at entry",
+	);
+});
+
+test("build-workflow entry invariant: refuses multiple tickets", () => {
+	const content = readWorkflowSkill("build-workflow");
+	assert.ok(
+		/refuse.*multiple|break.*apart|do not.*multiple tickets/i.test(content),
+		"build-workflow should refuse or break apart multiple tickets at entry",
+	);
+});
+
+test("build-workflow detects inherited unrelated context (smart zone)", () => {
+	const content = readWorkflowSkill("build-workflow");
+	assert.ok(
+		/inherited.*context|smart zone|fresh session.*handoff/i.test(content),
+		"build-workflow should detect inherited unrelated context and recommend fresh session/handoff",
+	);
+});
+
+// ─── B4: Triage discoverability ─────────────────────────────────────────────
+
+test("triage prompt exists and pins triage directly", () => {
+	assert.ok(existsSync(join(PROMPTS_DIR, "triage.md")), "/triage prompt should exist");
+	const content = readFileSync(join(PROMPTS_DIR, "triage.md"), "utf-8");
+	assert.equal(skillPin(content), "triage", "/triage should pin the triage skill directly");
+});
+
+test("triage prompt says do NOT triage to-tickets output", () => {
+	const content = readFileSync(join(PROMPTS_DIR, "triage.md"), "utf-8");
+	assert.ok(
+		/do not.*triage.*to-tickets|to-tickets.*already.*agent-ready|do not.*triage.*produced/i.test(content),
+		"/triage prompt should say not to triage to-tickets output (Matt's rule)",
+	);
+});
+
+test("triage skill exists at the canonical path", () => {
+	assert.ok(
+		existsSync(join(LIVE_SKILLS_DIR, "triage", "SKILL.md")),
+		"triage skill should exist at ~/.agents/skills/triage/SKILL.md",
+	);
+});
+
+// ─── B2: Planning staged routing (style + domain underlay) ──────────────────
+
+test("planning-workflow state block has style field", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	assert.ok(/style:\s*brainstorming.*grilling/i.test(content), "planning state block should have style field");
+});
+
+test("planning-workflow state block has domain capture field", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	assert.ok(/domain capture:\s*on.*off/i.test(content), "planning state block should have domain capture field");
+});
+
+test("planning-workflow defaults to brainstorming style", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	assert.ok(/Default.*brainstorming|default.*style.*brainstorming/i.test(content), "planning should default to brainstorming");
+});
+
+test("planning-workflow grilling requires explicit user consent (never silent escalation)", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	assert.ok(
+		/explicitly asks.*grill|ask permission.*once|Never silently.*grilling/i.test(content),
+		"planning should require explicit user consent for grilling, never silent escalation",
+	);
+});
+
+test("planning-workflow has a setup phase for style + domain capture", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	const phases = parsePhases(content);
+	assert.ok(phases.includes("setup"), `planning should have a setup phase, got: ${phases.join(", ")}`);
+});
+
+test("planning-workflow domain-modeling underlay has triggers", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	assert.ok(/ambiguous.*domain terms|CONTEXT.*ADRs.*constrain|cross-module.*contracts/i.test(content), "planning should have domain-modeling triggers");
+});
+
+test("planning-workflow domain-modeling no ceremony rule", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	assert.ok(
+		/No ceremony.*complex|glossary.*actually resolved|ADR.*hard-to-reverse.*surprising.*genuine/i.test(content),
+		"planning should say no ceremony for domain-modeling (only when triggers genuinely apply)",
+	);
+});
+
+test("planning-workflow reads grilling + domain-modeling when triggered", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	const reads = parseSkillReads(content);
+	assert.ok(reads.includes("grilling"), `planning should read grilling, got: ${reads.join(", ")}`);
+	assert.ok(reads.includes("domain-modeling"), `planning should read domain-modeling, got: ${reads.join(", ")}`);
+});
+
+// ─── B3: Prototype detour (workflow-owned, consented interrupt) ───────────────
+
+test("planning-workflow has a prototype interrupt (not a phase, a transition)", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	assert.ok(/Prototype interrupt/i.test(content), "planning should have a Prototype interrupt section");
+	// It should be available from brainstorm or grill, not a standalone phase
+	assert.ok(/available from brainstorm or grill/i.test(content), "prototype interrupt should be available from the design phases");
+});
+
+test("planning-workflow prototype interrupt requires explicit user consent", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	assert.ok(
+		/ask permission.*once|explicit user consent/i.test(content),
+		"prototype interrupt should require explicit user consent (ask permission once)",
+	);
+});
+
+test("planning-workflow prototype declined: do not pretend resolved", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	assert.ok(
+		/decline.*record.*uncertainty|do not.*pretend.*resolved/i.test(content),
+		"prototype interrupt should say: if declined, record uncertainty, do not pretend it was resolved",
+	);
+});
+
+test("planning-workflow reads the prototype skill", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	const reads = parseSkillReads(content);
+	assert.ok(reads.includes("prototype"), `planning should read prototype, got: ${reads.join(", ")}`);
+});
+
+test("prototype skill exists at the canonical path", () => {
+	assert.ok(
+		existsSync(join(LIVE_SKILLS_DIR, "prototype", "SKILL.md")),
+		"prototype skill should exist at ~/.agents/skills/prototype/SKILL.md",
+	);
+});
+
+// ─── B5: Provenance + drift automation ────────────────────────────────────────
+
+test("code-review has provenance frontmatter (upstream repo + commit + local-patch)", () => {
+	const content = readFileSync(join(REPO_SKILLS_DIR, "code-review", "SKILL.md"), "utf-8");
+	assert.ok(/^upstream:/m.test(content), "code-review should have upstream: frontmatter");
+	assert.ok(/mattpocock\/skills|github\.com.*mattpocock/i.test(content), "code-review provenance should point to Matt Pocock repo");
+	assert.ok(/commit:\s*\w+/i.test(content), "code-review provenance should record the upstream commit");
+	assert.ok(/^local-patch:/m.test(content), "code-review should have local-patch frontmatter");
+});
+
+test("diagnosing-bugs has provenance frontmatter (upstream repo + commit + local-patch)", () => {
+	const content = readFileSync(join(REPO_SKILLS_DIR, "diagnosing-bugs", "SKILL.md"), "utf-8");
+	assert.ok(/^upstream:/m.test(content), "diagnosing-bugs should have upstream: frontmatter");
+	assert.ok(/mattpocock\/skills|github\.com.*mattpocock/i.test(content), "diagnosing-bugs provenance should point to Matt Pocock repo");
+	assert.ok(/commit:\s*\w+/i.test(content), "diagnosing-bugs provenance should record the upstream commit");
+	assert.ok(/^local-patch:/m.test(content), "diagnosing-bugs should have local-patch frontmatter");
+});
+
+test("check-drift.sh exists", () => {
+	const driftScript = join(REPO_ROOT, "scripts", "check-drift.sh");
+	assert.ok(existsSync(driftScript), "scripts/check-drift.sh should exist");
+});
+
+// ─── B6: Calibrate local review heuristics ────────────────────────────────────
+
+test("code-review heuristics are candidates requiring proof, not automatic severity", () => {
+	const content = readFileSync(join(REPO_SKILLS_DIR, "code-review", "SKILL.md"), "utf-8");
+	assert.ok(
+		/candidate.*requiring.*proof|candidate.*not.*automatic/i.test(content),
+		"code-review heuristics should be candidates requiring proof, not automatic severity",
+	);
+});
+
+test("code-review sequential awaits is a candidate, not an automatic finding", () => {
+	const content = readFileSync(join(REPO_SKILLS_DIR, "code-review", "SKILL.md"), "utf-8");
+	assert.ok(
+		/Sequential awaits.*candidate|Promise\.all.*actually safe|ordering.*rate-limit.*contention.*transaction/i.test(content),
+		"sequential awaits should be a candidate with justification caveats, not an automatic finding",
+	);
 });

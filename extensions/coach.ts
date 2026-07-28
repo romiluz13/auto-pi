@@ -185,6 +185,12 @@ const WORKFLOW_OPTIONS: WorkflowOption[] = [
 		description: "Verify → docs → commit → github. Pins ship-workflow.",
 	},
 	{
+		label: "/triage — Triage incoming issues/PRs (categorise, verify, brief)",
+		command: '/triage "$TASK"',
+		description:
+			"For incoming raw issues/PRs you didn't create. Pins triage directly.",
+	},
+	{
 		label: "Browse all commands (/palette)",
 		command: "/palette",
 		description: "Fuzzy-search every command, prompt, and skill.",

@@ -1,6 +1,13 @@
 ---
 name: code-review
 description: Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/PRD asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X".
+upstream:
+  repo: https://github.com/mattpocock/skills.git
+  path: skills/engineering/code-review/SKILL.md
+  commit: ed37663
+local-patch:
+  intent: "AI-agent failure-mode guards (friction scan, AI-generated anti-patterns, no-self-grading-downgrade) — added because Matt's upstream is written for human-driven coding agents, not AI agents."
+  owner: auto-pi
 ---
 
 Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
@@ -81,18 +88,18 @@ End with a one-line summary: total findings per axis, and the worst issue _withi
 
 ## Review depth checks
 
-**Friction scan** (architectural signals per-line review misses):
+**Friction scan** (architectural signals — investigate these as candidates requiring proof of impact, not automatic severity):
 
-- Understanding one concept requires reading >4 files across >2 directories → MEDIUM (fragmentation)
-- A module's public interface has more surface area than its implementation → MEDIUM (shallow module)
-- Two modules share >3 direct cross-imports with no interface boundary → HIGH (coupling risk)
+- Understanding one concept requires reading >4 files across >2 directories → candidate for MEDIUM (fragmentation) — verify the fragmentation actually harms before flagging
+- A module's public interface has more surface area than its implementation → candidate for MEDIUM (shallow module) — verify the shallowness matters before flagging
+- Two modules share >3 direct cross-imports with no interface boundary → candidate for HIGH (coupling risk) — verify the coupling causes a real problem before flagging
 
-**AI-generated anti-patterns** (common in LLM-written code):
+**AI-generated anti-patterns** (common in LLM-written code — investigate as candidates requiring proof, not automatic findings):
 
-- Defensive coding for impossible states (null checks on non-nullable values, internal boundaries)
-- Test mirrors implementation (tautological test — expected value recomputed via same logic)
-- State duplication (same state in 2+ places, manually synced)
-- Sequential awaits where `Promise.all` would do (latency multiplier)
+- Defensive coding for impossible states (null checks on non-nullable values, internal boundaries) — verify the state is genuinely impossible before flagging
+- Test mirrors implementation (tautological test — expected value recomputed via same logic) — verify the test is actually tautological before flagging
+- State duplication (same state in 2+ places, manually synced) — verify the duplication causes a real sync risk before flagging
+- Sequential awaits where `Promise.all` would do — **this is a candidate, not an automatic finding.** Sequential awaits may be justified by ordering requirements, rate limits, resource contention, transaction semantics, or fail-fast behavior. Verify `Promise.all` is actually safe (no ordering/rate-limit/contention/transaction/fail-fast constraint) before flagging as a latency multiplier.
 
 **No self-grading downgrade:** An implementer's stated rationale ("left it per YAGNI", "intentional, see plan") is self-grading, not external evidence. It must NOT downgrade a finding's severity. If the rationale points at the plan rather than the code, that's a PLAN_DEFECT (route to planner), not a reason to soften the code finding.
 
