@@ -11,9 +11,9 @@
 
 set -euo pipefail
 
-# Resolve repo root from script location (don't rely on cwd)
+# Resolve repo root from script location (or accept REPO_ROOT env var for testing)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="${REPO_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 UPSTREAM_REPO="${MATTPocOCK_REPO:-/Users/rom.iluz/Dev/mattpocock-skills}"
 
 # The local forks with known drift
