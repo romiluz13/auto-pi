@@ -1448,7 +1448,10 @@ upstream content v1
 	// So we need to test the actual drift script with the real skills, not the fixture
 	// For now, just verify the script runs without crashing
 	cleanup();
-	assert.ok(true, "drift fixture test setup works");
+	assert.ok(
+		existsSync(join(REPO_ROOT, "scripts", "check-drift.sh")),
+		"drift script should exist for fixture tests",
+	);
 });
 
 test("drift: local-only intentional patch (upstream unchanged)", () => {
@@ -1498,21 +1501,32 @@ test("drift: missing provenance exits 1", () => {
 
 // ─── Contract v3: triage contract, argFromState, expected routes, drift fixtures ─
 
-import { TRIAGE_CONTRACT, ASK_MATT_SOURCE, EXPECTED_ASK_MATT_ROUTES } from "../config/workflow-graph-contract.ts";
+import {
+	TRIAGE_CONTRACT,
+	ASK_MATT_SOURCE,
+	EXPECTED_ASK_MATT_ROUTES,
+} from "../config/workflow-graph-contract.ts";
 
 // Check: triage has a direct-pinned state-machine contract
 test("triage has a direct-pinned state-machine contract", () => {
 	assert.equal(TRIAGE_CONTRACT.kind, "direct-pinned-state-machine");
 	assert.equal(TRIAGE_CONTRACT.name, "triage");
 	assert.equal(TRIAGE_CONTRACT.promptPin, "triage");
-	assert.ok(TRIAGE_CONTRACT.outcomes.length >= 6, "triage contract should have at least 6 outcomes");
+	assert.ok(
+		TRIAGE_CONTRACT.outcomes.length >= 6,
+		"triage contract should have at least 6 outcomes",
+	);
 });
 
 // Check: triage prompt pin matches the contract
 test("triage prompt pin matches the direct-pinned contract", () => {
 	const triagePrompt = readFileSync(join(PROMPTS_DIR, "triage.md"), "utf-8");
 	const pin = skillPin(triagePrompt);
-	assert.equal(pin, TRIAGE_CONTRACT.promptPin, "/triage prompt pin should match the contract");
+	assert.equal(
+		pin,
+		TRIAGE_CONTRACT.promptPin,
+		"/triage prompt pin should match the contract",
+	);
 });
 
 // Check: ask-matt dispositions cover the exact expected route set
@@ -1535,10 +1549,22 @@ test("ASK_MATT_DISPOSITIONS covers the exact expected route set (no missing, no 
 
 // Check: ask-matt source metadata exists
 test("ask-matt source metadata exists (repoHeadChecked, skillBaseCommit, repo, path)", () => {
-	assert.ok(ASK_MATT_SOURCE.repoHeadChecked.length >= 7, "repoHeadChecked should be a commit hash");
-	assert.ok(ASK_MATT_SOURCE.skillBaseCommit.length >= 7, "skillBaseCommit should be a commit hash");
-	assert.ok(ASK_MATT_SOURCE.repo.includes("mattpocock"), "repo should point to Matt Pocock");
-	assert.ok(ASK_MATT_SOURCE.path.includes("ask-matt"), "path should point to the ask-matt skill");
+	assert.ok(
+		ASK_MATT_SOURCE.repoHeadChecked.length >= 7,
+		"repoHeadChecked should be a commit hash",
+	);
+	assert.ok(
+		ASK_MATT_SOURCE.skillBaseCommit.length >= 7,
+		"skillBaseCommit should be a commit hash",
+	);
+	assert.ok(
+		ASK_MATT_SOURCE.repo.includes("mattpocock"),
+		"repo should point to Matt Pocock",
+	);
+	assert.ok(
+		ASK_MATT_SOURCE.path.includes("ask-matt"),
+		"path should point to the ask-matt skill",
+	);
 });
 
 // Check: argFromState in outcome handoffs
@@ -1606,11 +1632,21 @@ test("drift: upstream-only change → stale fork → exit 1", () => {
 	// behavior by checking it handles the current state correctly (upstream unchanged).
 	// For a real upstream-only test, we'd need to modify the upstream repo.
 	// For now, verify the script runs and the logic is sound.
-	const result = runDriftCheck(REPO_ROOT, "/Users/rom.iluz/Dev/mattpocock-skills");
-	assert.equal(result.exitCode, 0, "current state: upstream unchanged, local intentional → exit 0");
+	const result = runDriftCheck(
+		REPO_ROOT,
+		"/Users/rom.iluz/Dev/mattpocock-skills",
+	);
+	assert.equal(
+		result.exitCode,
+		0,
+		"current state: upstream unchanged, local intentional → exit 0",
+	);
 	// The script has the logic to detect upstream-only changes (base vs upstream-HEAD comparison)
 	// We verified this manually — the three-way comparison catches it.
-	assert.ok(/three-way/i.test(result.output) || /intentionally drifted/i.test(result.output));
+	assert.ok(
+		/three-way/i.test(result.output) ||
+			/intentionally drifted/i.test(result.output),
+	);
 });
 
 // Drift fixture: both changed → manual review → exit 1
@@ -1620,7 +1656,10 @@ test("drift: both changed → conservative manual review → exit 1 (logic verif
 	// but the script's logic is: if both upstream and local changed since the base,
 	// it exits 1 with "both upstream and local changed — check for overlap".
 	// Verify the script runs and the logic is present in the script.
-	const scriptContent = readFileSync(join(REPO_ROOT, "scripts", "check-drift.sh"), "utf-8");
+	const scriptContent = readFileSync(
+		join(REPO_ROOT, "scripts", "check-drift.sh"),
+		"utf-8",
+	);
 	assert.ok(
 		/both.*changed|overlap/i.test(scriptContent),
 		"drift script should have both-changed/overlap detection logic",
@@ -1629,4 +1668,57 @@ test("drift: both changed → conservative manual review → exit 1 (logic verif
 		/manual.*review|merge review/i.test(scriptContent),
 		"drift script should describe both-changed as requiring manual review",
 	);
+});
+
+// ─── Contract v4: procedureScope, selected path validation ─────────────────
+
+// Check: diagnose phases have procedureScope (Phases 1-4, not Phase 5)
+test("diagnose phases have procedureScope (Phases 1-4, not Phase 5)", () => {
+	for (const wfName of ["build-workflow", "debug-workflow"]) {
+		const wf = WORKFLOWS_V2.find((w) => w.name === wfName);
+		const diagnose = wf?.phases.find((p) => p.name === "diagnose");
+		assert.ok(
+			diagnose?.procedureScope,
+			`${wfName}: diagnose phase should have procedureScope`,
+		);
+		assert.ok(
+			/Phases 1-4|not Phase 5/i.test(diagnose!.procedureScope!),
+			`${wfName}: diagnose procedureScope should say "Phases 1-4" and exclude Phase 5`,
+		);
+	}
+});
+
+// Check: every selected path is a runtime path (in ~/.agents/skills or ~/.pi/agent/skills)
+test("every reachability selected path is a runtime path (not a repo source path)", () => {
+	for (const entry of REACH_V2) {
+		assert.ok(
+			entry.selectedPath.includes(".agents/skills") ||
+				entry.selectedPath.includes(".pi/agent/skills"),
+			`${entry.skill}: selectedPath "${entry.selectedPath}" should be a runtime path (~/.agents/skills or ~/.pi/agent/skills), not a repo source path`,
+		);
+	}
+});
+
+// Check: domain artifacts in planning SKILL.md allows not-applicable
+test("planning SKILL.md domain artifacts allows not-applicable", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	assert.ok(
+		/domain artifacts:.*not-applicable/i.test(content),
+		"planning SKILL.md domain artifacts should allow not-applicable",
+	);
+});
+
+// Check: setup style does not include grill-me (it's a conditional specialist, not a style)
+test("planning setup style does not include grill-me (it's a conditional specialist)", () => {
+	const planning = WORKFLOWS_V2.find((w) => w.name === "planning-workflow");
+	const setup = planning?.phases.find((p) => p.name === "setup");
+	const styleConstraint = setup?.stateConstraints?.find(
+		(c) => c.field === "style",
+	);
+	if (styleConstraint?.requiredOnExit) {
+		assert.ok(
+			!styleConstraint.requiredOnExit.includes("grill-me"),
+			"setup style allowed values should NOT include grill-me (it's a conditional specialist, not a style)",
+		);
+	}
 });

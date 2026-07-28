@@ -25,7 +25,7 @@ phase: setup | brainstorm | spec | tickets | complete
 design: pending | approved
 style: brainstorming | grilling | not-applicable
 domain capture: off | on | not-applicable
-domain artifacts: none | none-needed | [<CONTEXT/ADR refs>]
+domain artifacts: none | none-needed | not-applicable | [<CONTEXT/ADR refs>]
 prototype: not-needed | proposed | declined | running | complete
 prototype question: not-applicable | <question>
 prototype conclusion: pending | not-applicable | <conclusion>
