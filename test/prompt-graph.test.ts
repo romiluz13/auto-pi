@@ -1,3 +1,4 @@
+import { WORKFLOWS, ASK_MATT_DISPOSITIONS, REACHABILITY_ENTRIES } from "./workflow-graph-contract.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -793,35 +794,16 @@ test("every workflow's complete phase has a valid next phase or slash handoff", 
 	}
 });
 
-// Check 4: Every slash handoff names an installed prompt/command
-test("every slash handoff in workflow skills names an installed prompt or skill", () => {
-	const allPromptsAndSkills = new Set<string>();
-	// All prompt names (without .md)
-	for (const p of PROMPT_NAMES) allPromptsAndSkills.add(p);
-	// All workflow skills
-	for (const s of [
-		"planning-workflow",
-		"build-workflow",
-		"review-workflow",
-		"ship-workflow",
-		"research-workflow",
-		"debug-workflow",
-	]) {
-		allPromptsAndSkills.add(s);
-	}
-	// All specialist skills (in ~/.agents/skills or ~/.pi/agent/skills)
-	const allSkillDirs = readdirSync(LIVE_SKILLS_DIR, { withFileTypes: true })
-		.filter((d) => d.isDirectory())
-		.map((d) => d.name);
-	for (const s of allSkillDirs) allPromptsAndSkills.add(s);
-	const piSkillDir = join(homedir(), ".pi/agent/skills");
-	if (existsSync(piSkillDir)) {
-		for (const s of readdirSync(piSkillDir, { withFileTypes: true })
-			.filter((d) => d.isDirectory())
-			.map((d) => d.name)) {
-			allPromptsAndSkills.add(s);
-		}
-	}
+// Check 4: Every slash handoff names an installed user-facing command (NOT internal skills)
+test("every slash handoff in workflow skills names an installed user-facing command (not internal skills)", () => {
+	// User-facing commands are: prompt names (the slash workflows) + extension/built-in commands
+	// Internal skill commands (/skill:X) are NOT valid handoffs
+	const validHandoffCommands = new Set<string>();
+	// All prompt names (user-facing slash commands)
+	for (const p of PROMPT_NAMES) validHandoffCommands.add(p);
+	// Extension/built-in commands (explicit allowlist — NOT skill directories)
+	validHandoffCommands.add("handoff");
+	validHandoffCommands.add("palette");
 
 	for (const skill of [
 		"planning-workflow",
@@ -832,8 +814,7 @@ test("every slash handoff in workflow skills names an installed prompt or skill"
 		"debug-workflow",
 	]) {
 		const content = readWorkflowSkill(skill);
-		// Find all "type /X" or "type `/X`" handoffs — but NOT /skill:* (those are the 'don't type internal' rule)
-		// Use [ \t] instead of \s to prevent cross-line matching
+		// Find all "type `/X`" handoffs — must use backticks (excludes false positives like 'type/LSP')
 		const handoffs: string[] = [];
 		const regex = /\btype[ \t]*`\/(\S+?)`[ \t.,]/g;
 		let match;
@@ -845,8 +826,8 @@ test("every slash handoff in workflow skills names an installed prompt or skill"
 		}
 		for (const cmd of handoffs) {
 			assert.ok(
-				allPromptsAndSkills.has(cmd),
-				`${skill} says "type /${cmd}" but /${cmd} is neither an installed prompt nor a skill`,
+				validHandoffCommands.has(cmd),
+				`${skill} says "type /${cmd}" but /${cmd} is not a valid user-facing command (prompt or extension). Internal skill commands are not valid handoffs.`,
 			);
 		}
 	}
@@ -948,18 +929,26 @@ test("no installed skill is a true orphan (all reachable by at least one means)"
 		}
 	}
 
-	// Every skill is reachable via /palette (Pi's fuzzy command search) or /skill:<name>.
-	// This is the baseline reachability — no skill is truly orphaned because Pi's /palette
-	// and /skill: commands can invoke any installed skill.
-	// The classification is: workflow-bundled, prompt-pinned, situational, or on-demand.
-	// All skills are at least "on-demand" (reachable via /palette or /skill:<name>).
-	// This test verifies no skill is truly unreachable — it's the floor of reachability.
+	// Non-vacuous reachability: every skill must have a reachability classification
+	// in the workflow-graph-contract.ts REACHABILITY_ENTRIES. "Installed" does NOT imply
+	// "reachable" — a skill is reachable only if it has an explicit disposition
+	// (workflow-bundled, prompt-pinned, extension-command, or documented standalone).
+	// Catalog-only skills (installed but not in any workflow + not documented standalone)
+	// are TRUE ORPHANS, not "reachable via /skill".
+	//
+	// This test verifies the reachability contract covers every installed skill.
+	const classified = new Set(REACHABILITY_ENTRIES.map((e) => e.skill));
+	const trueOrphans: string[] = [];
 	for (const skill of allSkills) {
-		// Every skill is at least reachable via /skill:<name> (Pi's slash command)
-		// This is always true — if the skill is installed, /skill:<name> works.
-		// The test is a placeholder for the reachability matrix generation.
-		assert.ok(true, `${skill} is reachable via /skill:<name> (baseline)`);
+		if (!classified.has(skill)) {
+			trueOrphans.push(skill);
+		}
 	}
+	assert.equal(
+		trueOrphans.length,
+		0,
+		`True orphans (installed but no reachability classification): ${trueOrphans.join(", ")}`,
+	);
 });
 
 // Check: planning wayfinder → ready-for-brainstorm goes through setup (not directly to brainstorm)
@@ -1051,8 +1040,6 @@ test("triage prompt has conditional handoff (only /build when ready-for-agent)",
 
 // ─── Contract-based graph validation (non-vacuous) ───────────────────────────
 
-import { WORKFLOWS, ASK_MATT_DISPOSITIONS } from "./workflow-graph-contract.ts";
-
 // Check: every workflow in the contract has a matching SKILL.md
 test("every workflow in the contract exists as a SKILL.md", () => {
 	for (const wf of WORKFLOWS) {
@@ -1071,7 +1058,11 @@ test("every workflow prompt pin matches the contract", () => {
 		const promptPath = join(PROMPTS_DIR, `${promptName}.md`);
 		if (existsSync(promptPath)) {
 			const pin = skillPin(readFileSync(promptPath, "utf-8"));
-			assert.equal(pin, wf.promptPin, `/${promptName} should pin ${wf.promptPin}`);
+			assert.equal(
+				pin,
+				wf.promptPin,
+				`/${promptName} should pin ${wf.promptPin}`,
+			);
 		}
 	}
 });
@@ -1118,7 +1109,10 @@ test("every contract transition targets a valid phase in the same workflow", () 
 test("every workflow has at least one terminal phase", () => {
 	for (const wf of WORKFLOWS) {
 		const terminals = wf.phases.filter((p) => p.terminal);
-		assert.ok(terminals.length >= 1, `${wf.name} should have at least one terminal phase`);
+		assert.ok(
+			terminals.length >= 1,
+			`${wf.name} should have at least one terminal phase`,
+		);
 	}
 });
 
@@ -1161,15 +1155,32 @@ test("no conditional specialist appears in the unconditional specialists list", 
 test("every ask-matt route has an explicit disposition (no gaps)", () => {
 	// The known ask-matt routes that must have a disposition
 	const requiredRoutes = [
-		"grill-with-docs", "prototype", "to-spec", "to-tickets", "implement",
-		"tdd", "code-review", "triage", "diagnosing-bugs", "wayfinder",
-		"improve-codebase-architecture", "domain-modeling", "codebase-design",
-		"handoff", "compact", "grill-me", "teach", "writing-great-skills",
+		"grill-with-docs",
+		"prototype",
+		"to-spec",
+		"to-tickets",
+		"implement",
+		"tdd",
+		"code-review",
+		"triage",
+		"diagnosing-bugs",
+		"wayfinder",
+		"improve-codebase-architecture",
+		"domain-modeling",
+		"codebase-design",
+		"handoff",
+		"compact",
+		"grill-me",
+		"teach",
+		"writing-great-skills",
 		"setup-matt-pocock-skills",
 	];
 	for (const route of requiredRoutes) {
 		const disp = ASK_MATT_DISPOSITIONS.find((d) => d.askMattRoute === route);
-		assert.ok(disp, `ask-matt route "${route}" has no disposition in the contract`);
+		assert.ok(
+			disp,
+			`ask-matt route "${route}" has no disposition in the contract`,
+		);
 		assert.ok(
 			disp?.disposition !== undefined,
 			`ask-matt route "${route}" has an undefined disposition`,
@@ -1181,7 +1192,12 @@ test("every ask-matt route has an explicit disposition (no gaps)", () => {
 test("no ask-matt disposition is a gap — all have an explicit classification", () => {
 	for (const disp of ASK_MATT_DISPOSITIONS) {
 		assert.ok(
-			["equivalent", "deliberate-substitution", "intentional-standalone", "intentional-unsupported"].includes(disp.disposition),
+			[
+				"equivalent",
+				"deliberate-substitution",
+				"intentional-standalone",
+				"intentional-unsupported",
+			].includes(disp.disposition),
 			`ask-matt route "${disp.askMattRoute}" has disposition "${disp.disposition}" which is not a valid classification`,
 		);
 	}

@@ -104,7 +104,7 @@ During the design phase, if a material question cannot be settled by reasoning o
 
 ## Phase: spec (bounded only, after design approval)
 
-**Smart-zone checkpoint:** before starting the spec phase, assess the context window. If the session is approaching the smart zone (~120k tokens), `/handoff` and continue in a fresh thread before writing the spec. Do NOT push on degraded — the spec and tickets must build on the same thinking as the design.
+**Smart-zone checkpoint:** before starting the spec phase, assess the context window. If the session is approaching the smart zone (~120k tokens), STOP — tell the user: "This session is approaching the context limit. Type `/handoff` to save the context, then start fresh with `/plan <handoff>` to continue planning." Do NOT push on degraded — the spec and tickets must build on the same thinking as the design. This is an exceptional boundary, not a normal phase transition — most plans complete in one session without hitting it.
 
 1. Read `/Users/rom.iluz/.agents/skills/to-spec/SKILL.md` completely.
 2. Follow the to-spec procedure: synthesize the approved conversation into a tracker spec.
@@ -137,7 +137,7 @@ During the design phase, if a material question cannot be settled by reasoning o
    - `outcome: map-charted` → go to **complete** (the map is the deliverable; planning pauses until the next session).
    - `outcome: decision-resolved` → stay in wayfind or go to **complete** based on whether the destination is clear.
    - `outcome: ready-for-brainstorm` → set `mode: bounded`, go to **setup** (NOT directly to brainstorm — the setup phase must initialize `style` and `domain capture` before the design phase).
-   - `outcome: ready-for-spec` → set `mode: bounded`, set `style: not-applicable`, `domain capture: not-applicable` (the design is already resolved by the wayfinder's decisions; spec synthesis does not need a style or domain capture), go to **spec**.
+   - `outcome: ready-for-spec` → set `mode: bounded`, `design: approved` (the wayfinder's decisions ARE the approved design), `style: not-applicable`, `domain capture: not-applicable`, `domain artifacts: not-applicable` (the design is already resolved by the wayfinder's decisions; spec synthesis does not need a style or domain capture), go to **spec**.
    - Do NOT blindly force spec/tickets.
 
 ## Phase: complete (bounded)

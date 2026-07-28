@@ -39,7 +39,7 @@ Emit the state block. Reread this workflow skill.
 
 1. Read `/Users/rom.iluz/.agents/skills/diagnosing-bugs/SKILL.md` completely.
 2. Follow the diagnosing-bugs procedure: build a feedback loop, find the root cause.
-3. **Diagnosis only — do NOT fix the source here.** The fix + regression test happen in `/build` (TDD).
+3. **Diagnosis only — do NOT fix the source here.** Follow the specialist's Phases 1–4 (establish the feedback loop, reproduce, form hypotheses, find the root cause). Do NOT execute the specialist's Phase 5 (Fix + regression test) — the fix + regression test happen in `/build` (TDD), not here.
 4. Set `root cause: <diagnosis>`.
 5. Emit the state block. Reread this workflow skill.
 6. Go to **complete**.

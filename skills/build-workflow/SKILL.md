@@ -51,7 +51,7 @@ verification: pending | <command + exit code + output>
 ## Phase: diagnose (on persistent RED only)
 
 1. Read `/Users/rom.iluz/.agents/skills/diagnosing-bugs/SKILL.md` completely.
-2. Follow the diagnosing-bugs procedure: build a feedback loop, find the root cause. **Diagnosis only — do NOT fix the source here.**
+2. Follow the diagnosing-bugs procedure: build a feedback loop, find the root cause. **Diagnosis only — do NOT fix the source here.** Follow the specialist's Phases 1–4 (establish the feedback loop, reproduce, form hypotheses, find the root cause). Do NOT execute the specialist's Phase 5 (Fix + regression test) — the fix + regression test happen in the tdd phase, not here.
 3. When you have the root cause → set `root cause: <diagnosis>`, emit the state block, reread this workflow, go to **tdd** (return to the build with the diagnosis in hand).
 
 ## Phase: complete
