@@ -85,7 +85,7 @@ The workflow skill orchestrates the phases. You answer questions and approve ins
 
 | Piece | What you get |
 | --- | --- |
-| **Coach** | Plain-English task → fixed workflow menu (7 workflows + raw + palette) |
+| **Coach** | Plain-English task → fixed workflow menu (8 workflows + raw + palette) |
 | **Prompts** | `/plan` `/build` `/debug` `/research` `/review` `/ship` `/setup-audit` (thin — entry + task only) |
 | **Extensions** | `coach` · `guardrails` · `trace` · `palette` · `handoff` · `session-status` |
 | **Packages** | 12 npm packages (memory, subagents, context sidecar, lens, rewind, web, etc.) |

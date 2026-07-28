@@ -21,10 +21,15 @@ All skill paths are absolute canonical: `/Users/rom.iluz/.agents/skills/<name>/S
 ```
 workflow: plan
 mode: bounded
-phase: brainstorm | spec | tickets | complete
+phase: setup | brainstorm | spec | tickets | complete
 design: pending | approved
-style: brainstorming | grilling
-domain capture: on | off
+style: brainstorming | grilling | not-applicable
+domain capture: off | on | not-applicable
+domain artifacts: none | none-needed | [<CONTEXT/ADR refs>]
+prototype: not-needed | proposed | declined | running | complete
+prototype question: not-applicable | <question>
+prototype conclusion: pending | not-applicable | <conclusion>
+unresolved design uncertainty: none | <text>
 spec: pending | not-applicable | <tracker reference>
 tickets: pending | not-applicable | [<references>]
 frontier: pending | not-applicable | <first unblocked ticket>
@@ -71,13 +76,12 @@ Emit the state block. Reread this workflow skill. Go to **brainstorm**.
 
 ## Phase: brainstorm (bounded only)
 
-1. Read `/Users/rom.iluz/.agents/skills/brainstorming/SKILL.md` completely.
-2. If `style: grilling` → read `/Users/rom.iluz/.agents/skills/grilling/SKILL.md` as well and run the grilling interview (relentless, one question at a time, with your recommended answer for each). If `style: brainstorming` → follow the brainstorming procedure (collaborative dialogue, questions one at a time, 2-3 approaches, present design, get approval).
-3. If `domain capture: on` → read `/Users/rom.iluz/.agents/skills/domain-modeling/SKILL.md` and use it as an underlay: resolve domain terms into a glossary (only when terminology is actually resolved), write ADRs (only when hard-to-reverse + surprising + genuine trade-off). The durable records (CONTEXT.md, ADRs) survive the planning session.
-4. **Ignore brainstorming's routing prose** ("invoke /skill:to-spec", "terminal state"). This workflow owns the routing — brainstorming owns only the procedure.
-5. When the user explicitly approves the design → set `design: approved`.
-6. Emit the state block. Reread this workflow skill.
-7. Go to **spec**.
+1. If `style: grilling` → read `/Users/rom.iluz/.agents/skills/grilling/SKILL.md` completely and run the grilling interview (relentless, one question at a time, with your recommended answer for each). If `style: brainstorming` → read `/Users/rom.iluz/.agents/skills/brainstorming/SKILL.md` completely and follow the brainstorming procedure (collaborative dialogue, questions one at a time, 2-3 approaches, present design, get approval). Do NOT preload both — read only the active style's skill.
+2. If `domain capture: on` → read `/Users/rom.iluz/.agents/skills/domain-modeling/SKILL.md` and use it as an underlay: resolve domain terms into a glossary (only when terminology is actually resolved), write ADRs (only when hard-to-reverse + surprising + genuine trade-off). The durable records (CONTEXT.md, ADRs) survive the planning session. Record the artifacts: set `domain artifacts: [<refs>]` or `none-needed` (with rationale) if no durable artifact was warranted.
+3. **Ignore specialist routing prose** ("invoke /skill:to-spec", "terminal state"). This workflow owns the routing — the specialist owns only the procedure.
+4. When the user explicitly approves the design → set `design: approved`.
+5. Emit the state block. Reread this workflow skill.
+6. Go to **spec**.
 
 **Do NOT advance before explicit design approval in the conversation.**
 
@@ -98,6 +102,8 @@ During the design phase, if a material question cannot be settled by reasoning o
 4. Handoff to a fresh session only if context pressure or isolation demands it. Do not mechanically handoff every small prototype.
 
 ## Phase: spec (bounded only, after design approval)
+
+**Smart-zone checkpoint:** before starting the spec phase, assess the context window. If the session is approaching the smart zone (~120k tokens), `/handoff` and continue in a fresh thread before writing the spec. Do NOT push on degraded — the spec and tickets must build on the same thinking as the design.
 
 1. Read `/Users/rom.iluz/.agents/skills/to-spec/SKILL.md` completely.
 2. Follow the to-spec procedure: synthesize the approved conversation into a tracker spec.
@@ -129,8 +135,8 @@ During the design phase, if a material question cannot be settled by reasoning o
 6. Route based on the actual outcome:
    - `outcome: map-charted` → go to **complete** (the map is the deliverable; planning pauses until the next session).
    - `outcome: decision-resolved` → stay in wayfind or go to **complete** based on whether the destination is clear.
-   - `outcome: ready-for-brainstorm` → set `mode: bounded`, go to **brainstorm**.
-   - `outcome: ready-for-spec` → set `mode: bounded`, go to **spec**.
+   - `outcome: ready-for-brainstorm` → set `mode: bounded`, go to **setup** (NOT directly to brainstorm — the setup phase must initialize `style` and `domain capture` before the design phase).
+   - `outcome: ready-for-spec` → set `mode: bounded`, set `style: not-applicable`, `domain capture: not-applicable` (the design is already resolved by the wayfinder's decisions; spec synthesis does not need a style or domain capture), go to **spec**.
    - Do NOT blindly force spec/tickets.
 
 ## Phase: complete (bounded)

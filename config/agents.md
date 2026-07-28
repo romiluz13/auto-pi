@@ -37,19 +37,20 @@ When given a task, follow this flow. Each step is a user-facing workflow — typ
 
 ```
 MAIN FLOW: idea → ship
-  /plan ==planning-workflow==> brainstorming → to-spec → to-tickets (bounded)
-                                  wayfinder (foggy)
-  /build ==build-workflow==> tdd → diagnosing-bugs on RED → tdd
+  /plan ==planning-workflow==> setup (style + domain capture) → brainstorming → to-spec → to-tickets (bounded)
+                                  wayfinder (foggy) → ready-for-brainstorm → setup
+  /build ==build-workflow==> tdd (full cadence) → diagnosing-bugs on RED → tdd
   /debug ==debug-workflow==> diagnosing-bugs | resolving-merge-conflicts
   /research ==research-workflow==> research | octocode-research | live-research
   /review ==review-workflow==> code-review → receiving-code-review
   /ship ==ship-workflow==> verification → diff-driven-docs → commit → github (conditional)
   /setup-audit ==setup-maintenance==> (direct pin — 1 specialist)
+  /triage ==triage==> (direct pin — incoming issues/PRs, on-ramp)
 
 The workflow skill reads each specialist in turn; the user types one slash command.
 
 VOCABULARY (on-demand, not always-on):
-  domain-modeling — domain language
+  domain-modeling — domain language (planning underlay when triggered)
   codebase-design — deep module vocabulary
 
 CROSSING SESSIONS:

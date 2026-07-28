@@ -32,18 +32,19 @@ verification: pending | <command + exit code + output>
 
 ## Phase: tdd
 
-**Entry invariant (check before starting):**
-- One invocation accepts exactly one ticket/slice-sized unit. If the user supplied multiple tickets, refuse — tell them to break them apart and run `/build` once per ticket.
-- Detect inherited unrelated context: if the conversation contains substantial unrelated work (other features, prior planning, unrelated debugging), recommend a fresh session or `/handoff` before starting. The ticket itself is the durable handoff — a full conversation handoff may be unnecessary if the ticket is self-contained.
+**Entry invariant (check before starting — STOP if violated):**
+- One invocation accepts exactly one ticket/slice-sized unit. If the user supplied multiple tickets, refuse — tell them to break them apart and run `/build` once per ticket. STOP.
+- Detect inherited unrelated context: if the conversation contains substantial unrelated work (other features, prior planning, unrelated debugging), STOP — do NOT edit or run TDD in contaminated context. Tell the user: "This session has unrelated context. Start fresh: type `/build <ticket>` in a new session, or `/handoff` first." The ticket itself is the durable handoff — a full conversation handoff may be unnecessary if the ticket is self-contained.
 - If the working context is clean (one ticket, no unrelated context), proceed.
 
 1. Read `/Users/rom.iluz/.agents/skills/tdd/SKILL.md` completely.
 2. Follow the tdd procedure: one red-green slice at a time (write the test first, see it fail, implement, see it pass).
 3. **Situational:** if the project is Python, read `/Users/rom.iluz/.agents/skills/uv/SKILL.md` for the environment runner.
-4. Fix type/LSP errors immediately when detected.
-5. **Persistent RED threshold:** if a failing test cannot be explained or the failure blocks progress after a genuine hypothesis/repro attempt (not arbitrary retries) → set `red: <failure description>`, emit the state block, reread this workflow, go to **diagnose**.
-6. After each green slice, update `slices completed` + `slices remaining`.
-7. When all acceptance criteria have evidence + the relevant test/lint/typecheck commands pass → set `verification: <command + exit code + output summary>`, emit the state block, reread this workflow, go to **complete**.
+4. **Cadence (Matt's implement invariant):** run typechecking regularly (after each slice or meaningful change), run targeted single-test files regularly (after each slice), and run the full test suite once at the end (before claiming complete). Do not skip the full suite — a passing slice is not completion.
+5. Fix type/LSP errors immediately when detected.
+6. **Persistent RED threshold:** if a failing test cannot be explained or the failure blocks progress after a genuine hypothesis/repro attempt (not arbitrary retries) → set `red: <failure description>`, emit the state block, reread this workflow, go to **diagnose**.
+7. After each green slice, update `slices completed` + `slices remaining`.
+8. When all acceptance criteria have evidence + the relevant test/lint/typecheck commands pass (including the full test suite) → set `verification: <command + exit code + output summary>`, emit the state block, reread this workflow, go to **complete**.
 
 **Do NOT complete after a single green slice if the ticket has multiple acceptance criteria.** Complete only when all in-scope criteria have evidence and the relevant test/lint/typecheck commands pass.
 
