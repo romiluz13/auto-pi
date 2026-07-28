@@ -1048,3 +1048,150 @@ test("triage prompt has conditional handoff (only /build when ready-for-agent)",
 		"triage should have other outcome states (needs-info, wontfix, ready-for-human)",
 	);
 });
+
+// ─── Contract-based graph validation (non-vacuous) ───────────────────────────
+
+import { WORKFLOWS, ASK_MATT_DISPOSITIONS } from "./workflow-graph-contract.ts";
+
+// Check: every workflow in the contract has a matching SKILL.md
+test("every workflow in the contract exists as a SKILL.md", () => {
+	for (const wf of WORKFLOWS) {
+		assert.ok(
+			existsSync(join(REPO_SKILLS_DIR, wf.name, "SKILL.md")),
+			`workflow ${wf.name} in the contract but no SKILL.md exists`,
+		);
+	}
+});
+
+// Check: every workflow's prompt pin matches the contract
+test("every workflow prompt pin matches the contract", () => {
+	for (const wf of WORKFLOWS) {
+		// Find the prompt that pins this workflow
+		const promptName = wf.name.replace(/-workflow$/, "");
+		const promptPath = join(PROMPTS_DIR, `${promptName}.md`);
+		if (existsSync(promptPath)) {
+			const pin = skillPin(readFileSync(promptPath, "utf-8"));
+			assert.equal(pin, wf.promptPin, `/${promptName} should pin ${wf.promptPin}`);
+		}
+	}
+});
+
+// Check: every phase in the contract exists in the SKILL.md
+test("every contract phase exists as a '## Phase:' header in the SKILL.md", () => {
+	for (const wf of WORKFLOWS) {
+		const content = readWorkflowSkill(wf.name);
+		const skillPhases = parsePhases(content);
+		for (const phase of wf.phases) {
+			if (phase.name === "setup" && !skillPhases.includes("setup")) {
+				// setup may be a section, not a phase — check for "## Phase: setup" or a setup section
+				assert.ok(
+					/Phase: setup|## .*setup/i.test(content),
+					`${wf.name}: contract phase "setup" should exist in the SKILL.md`,
+				);
+				continue;
+			}
+			assert.ok(
+				skillPhases.includes(phase.name),
+				`${wf.name}: contract phase "${phase.name}" not found in SKILL.md phases: ${skillPhases.join(", ")}`,
+			);
+		}
+	}
+});
+
+// Check: every transition target in the contract is a valid phase
+test("every contract transition targets a valid phase in the same workflow", () => {
+	for (const wf of WORKFLOWS) {
+		const phaseNames = wf.phases.map((p) => p.name);
+		for (const phase of wf.phases) {
+			if (!phase.next) continue;
+			for (const target of phase.next) {
+				assert.ok(
+					phaseNames.includes(target),
+					`${wf.name}: phase "${phase.name}" transitions to "${target}" but "${target}" is not a valid phase in this workflow`,
+				);
+			}
+		}
+	}
+});
+
+// Check: every terminal phase has a handoff or is terminal
+test("every workflow has at least one terminal phase", () => {
+	for (const wf of WORKFLOWS) {
+		const terminals = wf.phases.filter((p) => p.terminal);
+		assert.ok(terminals.length >= 1, `${wf.name} should have at least one terminal phase`);
+	}
+});
+
+// Check: every handoff command is a valid user-facing prompt or extension command
+test("every contract handoff is a valid user-facing command (prompt or extension)", () => {
+	const validCommands = new Set<string>();
+	// All prompt names (user-facing slash commands)
+	for (const p of PROMPT_NAMES) validCommands.add(p);
+	// Extension commands (handoff, palette, etc.)
+	validCommands.add("handoff");
+	validCommands.add("palette");
+
+	for (const wf of WORKFLOWS) {
+		for (const phase of wf.phases) {
+			if (!phase.handoff) continue;
+			assert.ok(
+				validCommands.has(phase.handoff.command),
+				`${wf.name}: handoff "/${phase.handoff.command}" is not a valid user-facing command`,
+			);
+		}
+	}
+});
+
+// Check: every conditional specialist is not in the unconditional specialists list
+test("no conditional specialist appears in the unconditional specialists list", () => {
+	for (const wf of WORKFLOWS) {
+		for (const phase of wf.phases) {
+			if (!phase.conditionalSpecialists) continue;
+			for (const cond of phase.conditionalSpecialists) {
+				assert.ok(
+					!phase.specialists.includes(cond.skill),
+					`${wf.name}: phase "${phase.name}" has "${cond.skill}" in both unconditional and conditional — should be conditional only`,
+				);
+			}
+		}
+	}
+});
+
+// Check: every ask-matt route has a non-vacuous disposition
+test("every ask-matt route has an explicit disposition (no gaps)", () => {
+	// The known ask-matt routes that must have a disposition
+	const requiredRoutes = [
+		"grill-with-docs", "prototype", "to-spec", "to-tickets", "implement",
+		"tdd", "code-review", "triage", "diagnosing-bugs", "wayfinder",
+		"improve-codebase-architecture", "domain-modeling", "codebase-design",
+		"handoff", "compact", "grill-me", "teach", "writing-great-skills",
+		"setup-matt-pocock-skills",
+	];
+	for (const route of requiredRoutes) {
+		const disp = ASK_MATT_DISPOSITIONS.find((d) => d.askMattRoute === route);
+		assert.ok(disp, `ask-matt route "${route}" has no disposition in the contract`);
+		assert.ok(
+			disp?.disposition !== undefined,
+			`ask-matt route "${route}" has an undefined disposition`,
+		);
+	}
+});
+
+// Check: no ask-matt disposition is "gap" (all are equivalent, substitution, standalone, or unsupported)
+test("no ask-matt disposition is a gap — all have an explicit classification", () => {
+	for (const disp of ASK_MATT_DISPOSITIONS) {
+		assert.ok(
+			["equivalent", "deliberate-substitution", "intentional-standalone", "intentional-unsupported"].includes(disp.disposition),
+			`ask-matt route "${disp.askMattRoute}" has disposition "${disp.disposition}" which is not a valid classification`,
+		);
+	}
+});
+
+// Check: planning has a grill-me branch (the genius's option b)
+test("planning-workflow has a grill-me branch for no-codebase grilling", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	assert.ok(
+		/grill-me/i.test(content),
+		"planning-workflow should reference grill-me (the no-codebase grilling branch)",
+	);
+});
