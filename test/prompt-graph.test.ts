@@ -1,4 +1,4 @@
-import { WORKFLOWS, ASK_MATT_DISPOSITIONS, REACHABILITY_ENTRIES } from "./workflow-graph-contract.ts";
+import { WORKFLOWS, ASK_MATT_DISPOSITIONS, REACHABILITY_ENTRIES } from "../config/workflow-graph-contract.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -1210,4 +1210,139 @@ test("planning-workflow has a grill-me branch for no-codebase grilling", () => {
 		/grill-me/i.test(content),
 		"planning-workflow should reference grill-me (the no-codebase grilling branch)",
 	);
+});
+
+// ─── Contract v2: conditional outcomes, state constraints, interrupts ───────
+
+import { WORKFLOWS as WORKFLOWS_V2, ASK_MATT_DISPOSITIONS as ASK_MATT_V2, REACHABILITY_ENTRIES as REACH_V2, TRIAGE_OUTCOMES } from "../config/workflow-graph-contract.ts";
+
+// Check: every terminal phase has conditional outcomes (not a single handoff)
+test("every terminal phase has conditional outcomes (not a single arbitrary handoff)", () => {
+	for (const wf of WORKFLOWS_V2) {
+		for (const phase of wf.phases) {
+			if (phase.terminal) {
+				assert.ok(
+					phase.outcomes && phase.outcomes.length >= 1,
+					`${wf.name}: terminal phase "${phase.name}" should have outcomes (conditional handoffs), not a single handoff`,
+				);
+			}
+		}
+	}
+});
+
+// Check: every outcome has evidence fields
+test("every outcome has evidence fields (the state fields it requires)", () => {
+	for (const wf of WORKFLOWS_V2) {
+		for (const phase of wf.phases) {
+			if (!phase.outcomes) continue;
+			for (const outcome of phase.outcomes) {
+				assert.ok(
+					outcome.evidenceFields.length >= 1,
+					`${wf.name}: phase "${phase.name}" outcome "${outcome.predicate}" should have at least 1 evidence field`,
+				);
+			}
+		}
+	}
+});
+
+// Check: every outcome handoff is a valid user-facing command
+test("every outcome handoff is a valid user-facing command (not internal skills)", () => {
+	const validCommands = new Set<string>();
+	for (const p of PROMPT_NAMES) validCommands.add(p);
+	validCommands.add("handoff");
+	validCommands.add("palette");
+
+	for (const wf of WORKFLOWS_V2) {
+		for (const phase of wf.phases) {
+			if (!phase.outcomes) continue;
+			for (const outcome of phase.outcomes) {
+				if (!outcome.handoff) continue;
+				assert.ok(
+					validCommands.has(outcome.handoff.command),
+					`${wf.name}: outcome handoff "/${outcome.handoff.command}" is not a valid user-facing command`,
+				);
+			}
+		}
+	}
+});
+
+// Check: the prototype interrupt is in the planning-workflow contract
+test("planning-workflow contract has a prototype interrupt", () => {
+	const planning = WORKFLOWS_V2.find((w) => w.name === "planning-workflow");
+	assert.ok(planning?.interrupts, "planning-workflow should have interrupts");
+	const prototypeInterrupt = planning?.interrupts?.find((i) => i.name === "prototype");
+	assert.ok(prototypeInterrupt, "planning-workflow should have a prototype interrupt");
+	assert.equal(prototypeInterrupt?.specialist, "prototype");
+	assert.ok(
+		prototypeInterrupt?.resumePhase === "brainstorm",
+		"prototype interrupt should resume to brainstorm",
+	);
+});
+
+// Check: grill-me and grilling predicates are mutually exclusive
+test("grill-me and grilling predicates are mutually exclusive", () => {
+	const planning = WORKFLOWS_V2.find((w) => w.name === "planning-workflow");
+	const brainstorm = planning?.phases.find((p) => p.name === "brainstorm");
+	const grilling = brainstorm?.conditionalSpecialists?.find((s) => s.skill === "grilling");
+	const grillMe = brainstorm?.conditionalSpecialists?.find((s) => s.skill === "grill-me");
+	assert.ok(grilling, "brainstorm should have a grilling conditional specialist");
+	assert.ok(grillMe, "brainstorm should have a grill-me conditional specialist");
+	// grilling: hasCodebase; grill-me: !hasCodebase — mutually exclusive
+	assert.ok(
+		/grilling && hasCodebase|hasCodebase/i.test(grilling!.predicate),
+		"grilling predicate should include hasCodebase",
+	);
+	assert.ok(
+		/grill-me.*!hasCodebase|!hasCodebase/i.test(grillMe!.predicate),
+		"grill-me predicate should include !hasCodebase (mutually exclusive with grilling)",
+	);
+});
+
+// Check: research is in ASK_MATT_DISPOSITIONS
+test("research is in ASK_MATT_DISPOSITIONS (was missing)", () => {
+	const research = ASK_MATT_V2.find((d) => d.askMattRoute === "research");
+	assert.ok(research, "research should be in ASK_MATT_DISPOSITIONS");
+	assert.equal(research?.disposition, "equivalent");
+});
+
+// Check: ask-matt dispositions have structured fields (trigger, invariants, artifacts, exit, autoPiRoute)
+test("every ask-matt disposition has structured harmony evidence (trigger/invariant/artifact/exit)", () => {
+	for (const disp of ASK_MATT_V2) {
+		assert.ok(disp.trigger.length > 0, `${disp.askMattRoute}: trigger should be non-empty`);
+		assert.ok(disp.invariants.length > 0, `${disp.askMattRoute}: invariants should be non-empty`);
+		assert.ok(disp.artifacts.length > 0, `${disp.askMattRoute}: artifacts should be non-empty`);
+		assert.ok(disp.exit.length > 0, `${disp.askMattRoute}: exit should be non-empty`);
+		assert.ok(disp.autoPiRoute.length > 0, `${disp.askMattRoute}: autoPiRoute should be non-empty`);
+	}
+});
+
+// Check: triage has explicit outcomes (the 6 outcome states)
+test("triage has explicit outcomes (6 outcome states with conditional handoffs)", () => {
+	assert.ok(TRIAGE_OUTCOMES.length >= 6, "triage should have at least 6 outcomes");
+	const readyForAgent = TRIAGE_OUTCOMES.find((o) => o.outcome === "ready-for-agent");
+	assert.ok(readyForAgent, "triage should have a ready-for-agent outcome");
+	assert.ok(readyForAgent?.handoff, "ready-for-agent should have a handoff");
+	assert.equal(readyForAgent?.handoff?.command, "build");
+});
+
+// Check: state constraints exist for the spec phase (requires design: approved)
+test("planning spec phase has state constraints (requires design: approved on entry)", () => {
+	const planning = WORKFLOWS_V2.find((w) => w.name === "planning-workflow");
+	const spec = planning?.phases.find((p) => p.name === "spec");
+	assert.ok(spec?.stateConstraints, "spec phase should have state constraints");
+	const designConstraint = spec?.stateConstraints?.find((c) => c.field === "design");
+	assert.ok(designConstraint, "spec should have a design state constraint");
+	assert.ok(
+		designConstraint?.requiredOnEntry?.includes("approved"),
+		"spec should require design: approved on entry",
+	);
+});
+
+// Check: build tdd phase has state constraints (requires one ticket)
+test("build tdd phase has state constraints (requires ticket on entry)", () => {
+	const build = WORKFLOWS_V2.find((w) => w.name === "build-workflow");
+	const tdd = build?.phases.find((p) => p.name === "tdd");
+	assert.ok(tdd?.stateConstraints, "tdd phase should have state constraints");
+	const ticketConstraint = tdd?.stateConstraints?.find((c) => c.field === "ticket");
+	assert.ok(ticketConstraint, "tdd should have a ticket state constraint");
 });

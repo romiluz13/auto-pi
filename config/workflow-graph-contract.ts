@@ -2,43 +2,81 @@
 // This is NOT a runtime engine — it is a validation contract used by tests
 // and as documentation of the intended graph. Tests validate that the
 // SKILL.md files match this contract (phases, transitions, specialists,
-// handoffs) rather than inferring the graph from prose.
+// handoffs, state constraints) rather than inferring the graph from prose.
+//
+// Location: config/ (not test/) — this is the source of truth + documentation,
+// not just a test fixture.
+
+// ─── Phase definitions ─────────────────────────────────────────────────────
+
+export interface ConditionalSpecialist {
+	skill: string;
+	predicate: string; // must be mutually exclusive with other conditional specialists in the same phase
+}
+
+export interface Outcome {
+	predicate: string; // the condition for this outcome
+	handoff?: { command: string; argPlaceholder?: string };
+	terminal: boolean;
+	evidenceFields: string[]; // state fields that must be set for this outcome
+}
+
+export interface StateConstraint {
+	field: string;
+	requiredOnEntry?: string[]; // allowed values when entering this phase
+	requiredOnExit?: string[]; // allowed values when exiting this phase
+}
+
+export interface Interrupt {
+	name: string;
+	availableFrom: string[]; // phases this interrupt can be triggered from
+	specialist: string; // the skill to read
+	transitions: { from: string; to: string }[]; // state transitions (e.g., proposed → declined)
+	resumePhase: string; // the phase to resume after the interrupt
+}
 
 export interface PhaseDef {
 	name: string;
-	specialists: string[]; // skills read in this phase (conditional reads marked with predicate in the predicate field)
-	conditionalSpecialists?: { skill: string; predicate: string }[];
+	specialists: string[]; // unconditional skills read in this phase
+	conditionalSpecialists?: ConditionalSpecialist[];
 	next?: string[]; // allowed next phases (by name)
 	terminal?: boolean;
-	handoff?: { command: string; argPlaceholder?: string }; // user-facing slash handoff
+	outcomes?: Outcome[]; // conditional terminal outcomes (replaces single handoff)
+	stateConstraints?: StateConstraint[]; // required state field values on entry/exit
 }
 
 export interface WorkflowDef {
 	name: string;
-	promptPin: string; // the skill: frontmatter in the prompt
+	promptPin: string;
 	phases: PhaseDef[];
 	stateFields: string[];
+	interrupts?: Interrupt[];
 }
+
+// ─── The 6 workflows + triage ──────────────────────────────────────────────
 
 export const WORKFLOWS: WorkflowDef[] = [
 	{
 		name: "planning-workflow",
 		promptPin: "planning-workflow",
 		stateFields: [
-			"workflow",
-			"mode",
-			"phase",
-			"design",
-			"style",
-			"domain capture",
-			"domain artifacts",
-			"prototype",
-			"prototype question",
-			"prototype conclusion",
-			"unresolved design uncertainty",
-			"spec",
-			"tickets",
-			"frontier",
+			"workflow", "mode", "phase", "design", "style", "domain capture",
+			"domain artifacts", "prototype", "prototype question",
+			"prototype conclusion", "unresolved design uncertainty",
+			"spec", "tickets", "frontier",
+		],
+		interrupts: [
+			{
+				name: "prototype",
+				availableFrom: ["brainstorm"],
+				specialist: "prototype",
+				transitions: [
+					{ from: "proposed", to: "declined" },
+					{ from: "proposed", to: "running" },
+					{ from: "running", to: "complete" },
+				],
+				resumePhase: "brainstorm",
+			},
 		],
 		phases: [
 			{
@@ -50,27 +88,43 @@ export const WORKFLOWS: WorkflowDef[] = [
 				name: "setup",
 				specialists: [],
 				next: ["brainstorm"],
+				stateConstraints: [
+					{ field: "style", requiredOnExit: ["brainstorming", "grilling", "grill-me", "not-applicable"] },
+					{ field: "domain capture", requiredOnExit: ["off", "on", "not-applicable"] },
+				],
 			},
 			{
 				name: "brainstorm",
 				specialists: [],
 				conditionalSpecialists: [
-					{ skill: "brainstorming", predicate: "style: brainstorming" },
-					{ skill: "grilling", predicate: "style: grilling" },
-					{ skill: "grill-me", predicate: "style: grilling + no codebase" },
-					{ skill: "domain-modeling", predicate: "domain capture: on" },
+					{ skill: "brainstorming", predicate: "style=brainstorming" },
+					{ skill: "grilling", predicate: "style=grilling && hasCodebase" },
+					{ skill: "grill-me", predicate: "style=grilling && !hasCodebase" },
+					{ skill: "domain-modeling", predicate: "domain capture=on" },
 				],
 				next: ["spec"],
+				stateConstraints: [
+					{ field: "design", requiredOnExit: ["approved"] },
+				],
 			},
 			{
 				name: "spec",
 				specialists: ["to-spec"],
 				next: ["tickets"],
+				stateConstraints: [
+					{ field: "design", requiredOnEntry: ["approved"] },
+					{ field: "spec", requiredOnExit: ["<tracker reference>"] },
+				],
 			},
 			{
 				name: "tickets",
 				specialists: ["to-tickets"],
 				next: ["complete"],
+				stateConstraints: [
+					{ field: "spec", requiredOnEntry: ["<tracker reference>"] },
+					{ field: "tickets", requiredOnExit: ["[<references>]"] },
+					{ field: "frontier", requiredOnExit: ["<first unblocked ticket>"] },
+				],
 			},
 			{
 				name: "wayfind",
@@ -81,7 +135,26 @@ export const WORKFLOWS: WorkflowDef[] = [
 				name: "complete",
 				specialists: [],
 				terminal: true,
-				handoff: { command: "build", argPlaceholder: "<frontier>" },
+				outcomes: [
+					{
+						predicate: "mode=bounded",
+						handoff: { command: "build", argPlaceholder: "<frontier>" },
+						terminal: true,
+						evidenceFields: ["spec", "tickets", "frontier"],
+					},
+					{
+						predicate: "mode=foggy && outcome=map-charted",
+						handoff: { command: "plan", argPlaceholder: "<map>" },
+						terminal: true,
+						evidenceFields: ["map", "wayfind frontier", "outcome"],
+					},
+					{
+						predicate: "mode=foggy && outcome=decision-resolved",
+						handoff: { command: "plan", argPlaceholder: "<map>" },
+						terminal: true,
+						evidenceFields: ["map", "wayfind frontier", "outcome"],
+					},
+				],
 			},
 		],
 	},
@@ -89,15 +162,8 @@ export const WORKFLOWS: WorkflowDef[] = [
 		name: "build-workflow",
 		promptPin: "build-workflow",
 		stateFields: [
-			"workflow",
-			"phase",
-			"ticket",
-			"acceptance criteria",
-			"slices completed",
-			"slices remaining",
-			"red",
-			"root cause",
-			"verification",
+			"workflow", "phase", "ticket", "acceptance criteria",
+			"slices completed", "slices remaining", "red", "root cause", "verification",
 		],
 		phases: [
 			{
@@ -107,17 +173,28 @@ export const WORKFLOWS: WorkflowDef[] = [
 					{ skill: "uv", predicate: "project is Python" },
 				],
 				next: ["diagnose", "complete"],
+				stateConstraints: [
+					{ field: "ticket", requiredOnEntry: ["<one ticket>"] },
+				],
 			},
 			{
 				name: "diagnose",
 				specialists: ["diagnosing-bugs"],
 				next: ["tdd"],
+				// Procedure scope: Phases 1-4 only (not Phase 5 — fix happens in tdd)
 			},
 			{
 				name: "complete",
 				specialists: [],
 				terminal: true,
-				handoff: { command: "review" },
+				outcomes: [
+					{
+						predicate: "all acceptance criteria met",
+						handoff: { command: "review" },
+						terminal: true,
+						evidenceFields: ["verification"],
+					},
+				],
 			},
 		],
 	},
@@ -140,7 +217,20 @@ export const WORKFLOWS: WorkflowDef[] = [
 				name: "complete",
 				specialists: [],
 				terminal: true,
-				handoff: { command: "build" }, // or ship — conditional on findings
+				outcomes: [
+					{
+						predicate: "findings exist",
+						handoff: { command: "build" },
+						terminal: true,
+						evidenceFields: ["findings", "dispositions"],
+					},
+					{
+						predicate: "findings=none",
+						handoff: { command: "ship" },
+						terminal: true,
+						evidenceFields: ["findings"],
+					},
+				],
 			},
 		],
 	},
@@ -148,19 +238,17 @@ export const WORKFLOWS: WorkflowDef[] = [
 		name: "ship-workflow",
 		promptPin: "ship-workflow",
 		stateFields: [
-			"workflow",
-			"phase",
-			"verification",
-			"doc disposition",
-			"commit hash",
-			"pr url",
-			"ci",
+			"workflow", "phase", "verification", "doc disposition",
+			"commit hash", "pr url", "ci",
 		],
 		phases: [
 			{
 				name: "verify",
 				specialists: ["verification-before-completion"],
 				next: ["docs"],
+				stateConstraints: [
+					{ field: "verification", requiredOnExit: ["<command + exit code + output>"] },
+				],
 			},
 			{
 				name: "docs",
@@ -171,6 +259,9 @@ export const WORKFLOWS: WorkflowDef[] = [
 				name: "commit",
 				specialists: ["commit"],
 				next: ["github"],
+				stateConstraints: [
+					{ field: "commit hash", requiredOnExit: ["<hash>"] },
+				],
 			},
 			{
 				name: "github",
@@ -184,6 +275,18 @@ export const WORKFLOWS: WorkflowDef[] = [
 				name: "complete",
 				specialists: [],
 				terminal: true,
+				outcomes: [
+					{
+						predicate: "pr url != not-applicable",
+						terminal: true,
+						evidenceFields: ["commit hash", "pr url", "ci"],
+					},
+					{
+						predicate: "pr url=not-applicable",
+						terminal: true,
+						evidenceFields: ["commit hash", "pr url"],
+					},
+				],
 			},
 		],
 	},
@@ -201,9 +304,9 @@ export const WORKFLOWS: WorkflowDef[] = [
 				name: "investigate",
 				specialists: [],
 				conditionalSpecialists: [
-					{ skill: "research", predicate: "research type: general" },
-					{ skill: "octocode-research", predicate: "research type: code" },
-					{ skill: "live-research", predicate: "research type: deep-brief" },
+					{ skill: "research", predicate: "research type=general" },
+					{ skill: "octocode-research", predicate: "research type=code" },
+					{ skill: "live-research", predicate: "research type=deep-brief" },
 				],
 				next: ["complete"],
 			},
@@ -211,20 +314,32 @@ export const WORKFLOWS: WorkflowDef[] = [
 				name: "complete",
 				specialists: [],
 				terminal: true,
-				handoff: { command: "plan" }, // or build, or stop — conditional
+				outcomes: [
+					{
+						predicate: "findings suggest planning",
+						handoff: { command: "plan" },
+						terminal: true,
+						evidenceFields: ["findings", "sources"],
+					},
+					{
+						predicate: "findings suggest building",
+						handoff: { command: "build" },
+						terminal: true,
+						evidenceFields: ["findings", "sources"],
+					},
+					{
+						predicate: "research complete, no next action",
+						terminal: true,
+						evidenceFields: ["findings", "sources"],
+					},
+				],
 			},
 		],
 	},
 	{
 		name: "debug-workflow",
 		promptPin: "debug-workflow",
-		stateFields: [
-			"workflow",
-			"phase",
-			"issue type",
-			"root cause",
-			"conflict resolved",
-		],
+		stateFields: ["workflow", "phase", "issue type", "root cause", "conflict resolved"],
 		phases: [
 			{
 				name: "classify",
@@ -235,6 +350,7 @@ export const WORKFLOWS: WorkflowDef[] = [
 				name: "diagnose",
 				specialists: ["diagnosing-bugs"],
 				next: ["complete"],
+				// Procedure scope: Phases 1-4 only (not Phase 5 — fix happens in /build)
 			},
 			{
 				name: "resolve-conflict",
@@ -245,13 +361,42 @@ export const WORKFLOWS: WorkflowDef[] = [
 				name: "complete",
 				specialists: [],
 				terminal: true,
-				handoff: { command: "build", argPlaceholder: "<fix>" },
+				outcomes: [
+					{
+						predicate: "issue type=bug",
+						handoff: { command: "build", argPlaceholder: "<fix>" },
+						terminal: true,
+						evidenceFields: ["root cause"],
+					},
+					{
+						predicate: "issue type=merge-conflict",
+						terminal: true,
+						evidenceFields: ["conflict resolved"],
+					},
+				],
 			},
 		],
 	},
 ];
 
-// ─── Reachability classification (two axes, non-overlapping) ───────────────
+// ─── Triage (direct-pinned state machine, not a workflow skill) ─────────────
+
+export interface TriageOutcome {
+	outcome: string;
+	handoff?: { command: string; argPlaceholder?: string };
+	terminal: boolean;
+}
+
+export const TRIAGE_OUTCOMES: TriageOutcome[] = [
+	{ outcome: "ready-for-agent", handoff: { command: "build", argPlaceholder: "<issue ref>" }, terminal: true },
+	{ outcome: "needs-info", terminal: true },
+	{ outcome: "ready-for-human", terminal: true },
+	{ outcome: "wontfix", terminal: true },
+	{ outcome: "needs-triage", terminal: false },
+	{ outcome: "list-query", terminal: true },
+];
+
+// ─── Reachability (two axes, non-overlapping) ───────────────────────────────
 
 export interface ReachabilityEntry {
 	skill: string;
@@ -273,123 +418,7 @@ export interface ReachabilityEntry {
 	rationale: string;
 }
 
-// The ask-matt route dispositions (non-vacuous — each route has an explicit disposition)
-export interface AskMattDisposition {
-	askMattRoute: string;
-	disposition:
-		| "equivalent"
-		| "deliberate-substitution"
-		| "intentional-standalone"
-		| "intentional-unsupported";
-	rationale: string;
-}
-
-export const ASK_MATT_DISPOSITIONS: AskMattDisposition[] = [
-	{
-		askMattRoute: "grill-with-docs",
-		disposition: "deliberate-substitution",
-		rationale:
-			"Decomposed into grilling (style) + domain-modeling (durable capture). Loading it would re-couple the dimensions we separated.",
-	},
-	{
-		askMattRoute: "prototype",
-		disposition: "equivalent",
-		rationale:
-			"Planning-workflow prototype interrupt (workflow-owned, consented).",
-	},
-	{
-		askMattRoute: "to-spec",
-		disposition: "equivalent",
-		rationale: "Planning-workflow spec phase.",
-	},
-	{
-		askMattRoute: "to-tickets",
-		disposition: "equivalent",
-		rationale: "Planning-workflow tickets phase.",
-	},
-	{
-		askMattRoute: "implement",
-		disposition: "deliberate-substitution",
-		rationale:
-			"Decomposed into build-workflow (tdd) + review-workflow (code-review) + ship-workflow (commit). Invariants preserved.",
-	},
-	{
-		askMattRoute: "tdd",
-		disposition: "equivalent",
-		rationale: "Build-workflow tdd phase.",
-	},
-	{
-		askMattRoute: "code-review",
-		disposition: "equivalent",
-		rationale: "Review-workflow review phase (+ Security axis).",
-	},
-	{
-		askMattRoute: "triage",
-		disposition: "equivalent",
-		rationale: "/triage prompt (direct pin) + 8th Coach option.",
-	},
-	{
-		askMattRoute: "diagnosing-bugs",
-		disposition: "deliberate-substitution",
-		rationale:
-			"Debug-workflow (diagnose only) + build-workflow (fix with TDD). Split for independent observability.",
-	},
-	{
-		askMattRoute: "wayfinder",
-		disposition: "equivalent",
-		rationale: "Planning-workflow wayfind phase.",
-	},
-	{
-		askMattRoute: "improve-codebase-architecture",
-		disposition: "intentional-standalone",
-		rationale:
-			"Codebase health (upkeep, not feature work). Reachable via /palette + AGENTS.md. Generates ideas → /plan.",
-	},
-	{
-		askMattRoute: "domain-modeling",
-		disposition: "equivalent",
-		rationale: "Planning-workflow domain-modeling underlay (trigger-based).",
-	},
-	{
-		askMattRoute: "codebase-design",
-		disposition: "intentional-standalone",
-		rationale: "Vocabulary (on-demand). Reachable via /palette + AGENTS.md.",
-	},
-	{
-		askMattRoute: "handoff",
-		disposition: "equivalent",
-		rationale: "handoff.ts extension + referenced in build/planning workflows.",
-	},
-	{
-		askMattRoute: "compact",
-		disposition: "equivalent",
-		rationale: "Pi built-in /compact. Documented in AGENTS.md.",
-	},
-	{
-		askMattRoute: "grill-me",
-		disposition: "equivalent",
-		rationale:
-			"Planning-workflow no-codebase branch (when style: grilling + no codebase).",
-	},
-	{
-		askMattRoute: "teach",
-		disposition: "intentional-standalone",
-		rationale: "Learning tool (not SDLC). Reachable via /palette.",
-	},
-	{
-		askMattRoute: "writing-great-skills",
-		disposition: "intentional-standalone",
-		rationale: "Reference (not SDLC). Reachable via /palette.",
-	},
-	{
-		askMattRoute: "setup-matt-pocock-skills",
-		disposition: "intentional-standalone",
-		rationale: "One-time setup (not SDLC). Reachable via /palette.",
-	},
-];
-
-// ─── Reachability entries (every installed skill with an explicit disposition) ──
-
+// The entries are in the second part of this file (after the ask-matt dispositions).
 export const REACHABILITY_ENTRIES: ReachabilityEntry[] = [
   { skill: "planning-workflow", invocationSurface: "workflow-prompt-pin", productRole: "orchestrator", discoveryRoute: "Coach menu + prompt pin", rationale: "auto-pi workflow orchestrator" },
   { skill: "build-workflow", invocationSurface: "workflow-prompt-pin", productRole: "orchestrator", discoveryRoute: "Coach menu + prompt pin", rationale: "auto-pi workflow orchestrator" },
@@ -401,25 +430,24 @@ export const REACHABILITY_ENTRIES: ReachabilityEntry[] = [
   { skill: "triage", invocationSurface: "workflow-prompt-pin", productRole: "standalone-utility", discoveryRoute: "Coach menu + direct prompt pin", rationale: "direct-pinned self-contained state machine" },
   { skill: "brainstorming", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
   { skill: "grilling", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
-  { skill: "grill-me", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
   { skill: "to-spec", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
   { skill: "to-tickets", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
   { skill: "wayfinder", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
   { skill: "tdd", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
   { skill: "diagnosing-bugs", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
-  { skill: "uv", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
   { skill: "code-review", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
   { skill: "receiving-code-review", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
   { skill: "verification-before-completion", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
   { skill: "diff-driven-docs", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
   { skill: "commit", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
   { skill: "github", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
-  { skill: "research", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
-  { skill: "octocode-research", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
-  { skill: "live-research", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
-  { skill: "resolving-merge-conflicts", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
-  { skill: "prototype", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
-  { skill: "domain-modeling", invocationSurface: "workflow-phase-read", productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary" },
+  { skill: "uv", invocationSurface: "workflow-phase-read", productRole: "conditional-specialist", discoveryRoute: "workflow phase read (conditional)", rationale: "conditional specialist — read only when predicate matches" },
+  { skill: "prototype", invocationSurface: "workflow-phase-read", productRole: "conditional-specialist", discoveryRoute: "workflow phase read (conditional)", rationale: "conditional specialist — read only when predicate matches" },
+  { skill: "domain-modeling", invocationSurface: "workflow-phase-read", productRole: "conditional-specialist", discoveryRoute: "workflow phase read (conditional)", rationale: "conditional specialist — read only when predicate matches" },
+  { skill: "grill-me", invocationSurface: "workflow-phase-read", productRole: "conditional-specialist", discoveryRoute: "workflow phase read (conditional)", rationale: "conditional specialist — read only when predicate matches" },
+  { skill: "octocode-research", invocationSurface: "workflow-phase-read", productRole: "conditional-specialist", discoveryRoute: "workflow phase read (conditional)", rationale: "conditional specialist — read only when predicate matches" },
+  { skill: "live-research", invocationSurface: "workflow-phase-read", productRole: "conditional-specialist", discoveryRoute: "workflow phase read (conditional)", rationale: "conditional specialist — read only when predicate matches" },
+  { skill: "resolving-merge-conflicts", invocationSurface: "workflow-phase-read", productRole: "conditional-specialist", discoveryRoute: "workflow phase read (conditional)", rationale: "conditional specialist — read only when predicate matches" },
   { skill: "handoff", invocationSurface: "extension-command", productRole: "standalone-utility", discoveryRoute: "/handoff extension command", rationale: "extension-backed cross-session transfer" },
   { skill: "grill-with-docs", invocationSurface: "catalog-only", productRole: "superseded", discoveryRoute: "/palette only (expert/manual use)", rationale: "superseded by grilling + domain-modeling decomposition" },
   { skill: "improve-codebase-architecture", invocationSurface: "catalog-only", productRole: "standalone-utility", discoveryRoute: "/palette + /skill:improve-codebase-architecture", rationale: "intentionally standalone (upkeep/vocabulary/learning, not SDLC)" },
@@ -427,7 +455,6 @@ export const REACHABILITY_ENTRIES: ReachabilityEntry[] = [
   { skill: "teach", invocationSurface: "catalog-only", productRole: "standalone-utility", discoveryRoute: "/palette + /skill:teach", rationale: "intentionally standalone (upkeep/vocabulary/learning, not SDLC)" },
   { skill: "writing-great-skills", invocationSurface: "catalog-only", productRole: "standalone-utility", discoveryRoute: "/palette + /skill:writing-great-skills", rationale: "intentionally standalone (upkeep/vocabulary/learning, not SDLC)" },
   { skill: "setup-matt-pocock-skills", invocationSurface: "catalog-only", productRole: "standalone-utility", discoveryRoute: "/palette + /skill:setup-matt-pocock-skills", rationale: "intentionally standalone (upkeep/vocabulary/learning, not SDLC)" },
-  { skill: "compact", invocationSurface: "catalog-only", productRole: "standalone-utility", discoveryRoute: "/palette + /skill:compact", rationale: "intentionally standalone (upkeep/vocabulary/learning, not SDLC)" },
   { skill: "agent-browser", invocationSurface: "catalog-only", productRole: "community-on-demand", discoveryRoute: "/palette + /skill:agent-browser", rationale: "community skill, available on-demand" },
   { skill: "agents-sdk", invocationSurface: "catalog-only", productRole: "community-on-demand", discoveryRoute: "/palette + /skill:agents-sdk", rationale: "community skill, available on-demand" },
   { skill: "ask-matt", invocationSurface: "catalog-only", productRole: "community-on-demand", discoveryRoute: "/palette + /skill:ask-matt", rationale: "community skill, available on-demand" },
@@ -468,6 +495,7 @@ export const REACHABILITY_ENTRIES: ReachabilityEntry[] = [
   { skill: "port-api-blueprint-creation", invocationSurface: "catalog-only", productRole: "community-on-demand", discoveryRoute: "/palette + /skill:port-api-blueprint-creation", rationale: "community skill, available on-demand" },
   { skill: "qa", invocationSurface: "catalog-only", productRole: "community-on-demand", discoveryRoute: "/palette + /skill:qa", rationale: "community skill, available on-demand" },
   { skill: "request-refactor-plan", invocationSurface: "catalog-only", productRole: "community-on-demand", discoveryRoute: "/palette + /skill:request-refactor-plan", rationale: "community skill, available on-demand" },
+  { skill: "research", invocationSurface: "catalog-only", productRole: "community-on-demand", discoveryRoute: "/palette + /skill:research", rationale: "community skill, available on-demand" },
   { skill: "sandbox-sdk", invocationSurface: "catalog-only", productRole: "community-on-demand", discoveryRoute: "/palette + /skill:sandbox-sdk", rationale: "community skill, available on-demand" },
   { skill: "scaffold-exercises", invocationSurface: "catalog-only", productRole: "community-on-demand", discoveryRoute: "/palette + /skill:scaffold-exercises", rationale: "community skill, available on-demand" },
   { skill: "session-handoff", invocationSurface: "catalog-only", productRole: "community-on-demand", discoveryRoute: "/palette + /skill:session-handoff", rationale: "community skill, available on-demand" },
@@ -489,3 +517,40 @@ export const REACHABILITY_ENTRIES: ReachabilityEntry[] = [
   { skill: "writing-fragments", invocationSurface: "catalog-only", productRole: "community-on-demand", discoveryRoute: "/palette + /skill:writing-fragments", rationale: "community skill, available on-demand" },
   { skill: "writing-shape", invocationSurface: "catalog-only", productRole: "community-on-demand", discoveryRoute: "/palette + /skill:writing-shape", rationale: "community skill, available on-demand" },
 ];
+
+// ─── Ask-matt dispositions (structured harmony evidence) ───────────────────
+
+export interface AskMattDisposition {
+	askMattRoute: string;
+	disposition: "equivalent" | "deliberate-substitution" | "intentional-standalone" | "intentional-unsupported";
+	trigger: string;
+	invariants: string;
+	artifacts: string;
+	exit: string;
+	autoPiRoute: string;
+	rationale: string;
+}
+
+export const ASK_MATT_DISPOSITIONS: AskMattDisposition[] = [
+	{ askMattRoute: "grill-with-docs", disposition: "deliberate-substitution", trigger: "bounded work needing durable domain record", invariants: "collaborative approval + durable domain capture", artifacts: "approved design + CONTEXT.md/ADR", exit: "spec phase", autoPiRoute: "planning-workflow setup + brainstorm (grilling + domain-modeling)", rationale: "Decomposed — loading grill-with-docs would re-couple the dimensions we separated." },
+	{ askMattRoute: "prototype", disposition: "equivalent", trigger: "design question needs runnable answer", invariants: "throwaway, one command, no persistence", artifacts: "answer captured", exit: "resume design phase", autoPiRoute: "planning-workflow prototype interrupt", rationale: "Workflow-owned, consented interrupt." },
+	{ askMattRoute: "to-spec", disposition: "equivalent", trigger: "bounded, design approved", invariants: "seam confirmation", artifacts: "spec reference", exit: "tickets phase", autoPiRoute: "planning-workflow spec phase", rationale: "Direct equivalent." },
+	{ askMattRoute: "to-tickets", disposition: "equivalent", trigger: "spec published", invariants: "ticket-breakdown approval", artifacts: "ticket refs + frontier", exit: "complete → /build", autoPiRoute: "planning-workflow tickets phase", rationale: "Direct equivalent." },
+	{ askMattRoute: "implement", disposition: "deliberate-substitution", trigger: "a ticket", invariants: "tdd red-green, fresh context per ticket, review before commit", artifacts: "verification evidence, commit hash", exit: "review → ship", autoPiRoute: "build-workflow + review-workflow + ship-workflow", rationale: "Decomposed for independent observability. Invariants preserved." },
+	{ askMattRoute: "tdd", disposition: "equivalent", trigger: "a slice", invariants: "red-green one slice at a time", artifacts: "passing test", exit: "diagnose or complete", autoPiRoute: "build-workflow tdd phase", rationale: "Direct equivalent." },
+	{ askMattRoute: "code-review", disposition: "equivalent", trigger: "uncommitted diff", invariants: "standards + spec (+ security)", artifacts: "findings with file:line", exit: "disposition or complete", autoPiRoute: "review-workflow review phase", rationale: "Direct equivalent + Security axis." },
+	{ askMattRoute: "triage", disposition: "equivalent", trigger: "incoming raw issues/PRs", invariants: "triage roles, not to-tickets output", artifacts: "agent-ready briefs", exit: "/build when ready-for-agent", autoPiRoute: "/triage prompt (direct pin) + 8th Coach option", rationale: "Direct equivalent." },
+	{ askMattRoute: "diagnosing-bugs", disposition: "deliberate-substitution", trigger: "bug", invariants: "feedback loop, root cause (Phases 1-4 only)", artifacts: "root cause diagnosis", exit: "/build (fix with TDD)", autoPiRoute: "debug-workflow (diagnose) + build-workflow (fix)", rationale: "Split — diagnosis only, fix in /build via TDD." },
+	{ askMattRoute: "wayfinder", disposition: "equivalent", trigger: "foggy", invariants: "decisions, not deliverables", artifacts: "map reference + outcome", exit: "resume or route", autoPiRoute: "planning-workflow wayfind phase", rationale: "Direct equivalent." },
+	{ askMattRoute: "improve-codebase-architecture", disposition: "intentional-standalone", trigger: "spare moment for codebase health", invariants: "surfaces deepening opportunities", artifacts: "ideas", exit: "/plan", autoPiRoute: "/palette + AGENTS.md", rationale: "Upkeep, not feature work." },
+	{ askMattRoute: "domain-modeling", disposition: "equivalent", trigger: "domain terms/ADRs need capture", invariants: "glossary when resolved, ADR when hard-to-reverse", artifacts: "CONTEXT.md/ADR", exit: "resume planning", autoPiRoute: "planning-workflow domain-modeling underlay", rationale: "Trigger-based underlay." },
+	{ askMattRoute: "codebase-design", disposition: "intentional-standalone", trigger: "module shape design", invariants: "deep-module vocabulary", artifacts: "design", exit: "—", autoPiRoute: "/palette + AGENTS.md", rationale: "Vocabulary, on-demand." },
+	{ askMattRoute: "handoff", disposition: "equivalent", trigger: "session full / branch off", invariants: "preserve context", artifacts: "HANDOFF.md", exit: "fresh session", autoPiRoute: "handoff.ts extension", rationale: "Direct equivalent." },
+	{ askMattRoute: "compact", disposition: "equivalent", trigger: "intentional break between phases", invariants: "stay in same conversation", artifacts: "summarized context", exit: "continue", autoPiRoute: "Pi built-in /compact", rationale: "Direct equivalent (built-in)." },
+	{ askMattRoute: "grill-me", disposition: "equivalent", trigger: "no codebase + grilling requested", invariants: "stateless, saves nothing locally", artifacts: "sharpened plan", exit: "resume planning", autoPiRoute: "planning-workflow no-codebase grilling branch", rationale: "Direct equivalent (no-codebase branch)." },
+	{ askMattRoute: "research", disposition: "equivalent", trigger: "need cited findings from primary sources", invariants: "high-trust primary sources", artifacts: "cited markdown file", exit: "/plan or /build", autoPiRoute: "research-workflow", rationale: "Direct equivalent." },
+	{ askMattRoute: "teach", disposition: "intentional-standalone", trigger: "learn a concept", invariants: "multi-session workspace", artifacts: "learned concept", exit: "—", autoPiRoute: "/palette", rationale: "Learning tool, not SDLC." },
+	{ askMattRoute: "writing-great-skills", disposition: "intentional-standalone", trigger: "write/edit skills", invariants: "skill vocabulary", artifacts: "skill file", exit: "—", autoPiRoute: "/palette", rationale: "Reference, not SDLC." },
+	{ askMattRoute: "setup-matt-pocock-skills", disposition: "intentional-standalone", trigger: "first engineering flow", invariants: "configure issue tracker", artifacts: "tracker config", exit: "—", autoPiRoute: "/palette", rationale: "One-time setup." },
+];
+
