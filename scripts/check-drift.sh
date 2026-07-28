@@ -100,7 +100,7 @@ done
 
 echo ""
 if [ "$exit_code" -eq 0 ]; then
-	echo "✓ All local forks have provenance. Drift is intentional and tracked. No upstream changes overlap with local patches."
+	echo "✓ All local forks have provenance. Drift is intentional and tracked. No upstream skill-file changes require manual review."
 else
 	echo "✗ Drift issues detected — see above."
 fi

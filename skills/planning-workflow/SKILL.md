@@ -30,6 +30,7 @@ prototype: not-needed | proposed | declined | running | complete
 prototype question: not-applicable | <question>
 prototype conclusion: pending | not-applicable | <conclusion>
 unresolved design uncertainty: none | <text>
+resume phase: not-applicable | brainstorm
 spec: pending | not-applicable | <tracker reference>
 tickets: pending | not-applicable | [<references>]
 frontier: pending | not-applicable | <first unblocked ticket>

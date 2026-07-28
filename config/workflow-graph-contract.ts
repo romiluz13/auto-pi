@@ -14,11 +14,17 @@ export interface ConditionalSpecialist {
 	predicate: string; // must be mutually exclusive with other conditional specialists in the same phase
 }
 
+export interface Handoff {
+	command: string;
+	argPlaceholder?: string;
+	argFromState?: string; // the state field the argument value comes from (e.g., "frontier" → /build <frontier>)
+}
+
 export interface Outcome {
-	predicate: string; // the condition for this outcome
-	handoff?: { command: string; argPlaceholder?: string };
+	predicate: string;
+	handoff?: Handoff;
 	terminal: boolean;
-	evidenceFields: string[]; // state fields that must be set for this outcome
+	evidenceFields: string[];
 }
 
 export interface StateConstraint {
@@ -71,9 +77,11 @@ export const WORKFLOWS: WorkflowDef[] = [
 			"prototype question",
 			"prototype conclusion",
 			"unresolved design uncertainty",
+			"resume phase",
 			"spec",
 			"tickets",
 			"frontier",
+			"map", "wayfind frontier", "outcome",
 		],
 		interrupts: [
 			{
@@ -157,19 +165,19 @@ export const WORKFLOWS: WorkflowDef[] = [
 				outcomes: [
 					{
 						predicate: "mode=bounded",
-						handoff: { command: "build", argPlaceholder: "<frontier>" },
+						handoff: { command: "build", argPlaceholder: "<frontier>", argFromState: "frontier" },
 						terminal: true,
 						evidenceFields: ["spec", "tickets", "frontier"],
 					},
 					{
 						predicate: "mode=foggy && outcome=map-charted",
-						handoff: { command: "plan", argPlaceholder: "<map>" },
+						handoff: { command: "plan", argPlaceholder: "<map>", argFromState: "map" },
 						terminal: true,
 						evidenceFields: ["map", "wayfind frontier", "outcome"],
 					},
 					{
 						predicate: "mode=foggy && outcome=decision-resolved",
-						handoff: { command: "plan", argPlaceholder: "<map>" },
+						handoff: { command: "plan", argPlaceholder: "<map>", argFromState: "map" },
 						terminal: true,
 						evidenceFields: ["map", "wayfind frontier", "outcome"],
 					},
@@ -404,7 +412,7 @@ export const WORKFLOWS: WorkflowDef[] = [
 				outcomes: [
 					{
 						predicate: "issue type=bug",
-						handoff: { command: "build", argPlaceholder: "<fix>" },
+						handoff: { command: "build", argPlaceholder: "<fix>", argFromState: "root cause" },
 						terminal: true,
 						evidenceFields: ["root cause"],
 					},
@@ -421,16 +429,24 @@ export const WORKFLOWS: WorkflowDef[] = [
 
 // ─── Triage (direct-pinned state machine, not a workflow skill) ─────────────
 
+export interface DirectPinnedStateMachine {
+	kind: "direct-pinned-state-machine";
+	name: string;
+	prompt: string;
+	promptPin: string;
+	outcomes: TriageOutcome[];
+}
+
 export interface TriageOutcome {
 	outcome: string;
-	handoff?: { command: string; argPlaceholder?: string };
+	handoff?: Handoff;
 	terminal: boolean;
 }
 
 export const TRIAGE_OUTCOMES: TriageOutcome[] = [
 	{
 		outcome: "ready-for-agent",
-		handoff: { command: "build", argPlaceholder: "<issue ref>" },
+		handoff: { command: "build", argPlaceholder: "<issue ref>", argFromState: "issue ref" },
 		terminal: true,
 	},
 	{ outcome: "needs-info", terminal: true },
@@ -439,6 +455,14 @@ export const TRIAGE_OUTCOMES: TriageOutcome[] = [
 	{ outcome: "needs-triage", terminal: false },
 	{ outcome: "list-query", terminal: true },
 ];
+
+export const TRIAGE_CONTRACT: DirectPinnedStateMachine = {
+	kind: "direct-pinned-state-machine",
+	name: "triage",
+	prompt: "triage",
+	promptPin: "triage",
+	outcomes: TRIAGE_OUTCOMES,
+};
 
 // ─── Reachability (two axes, non-overlapping) ───────────────────────────────
 
@@ -470,7 +494,7 @@ export interface ReachabilityEntry {
 export const REACHABILITY_ENTRIES: ReachabilityEntry[] = [
 { skill: "agent-browser", invocationSurfaces: ["catalog-only"], productRole: "community-on-demand", discoveryRoute: "/palette + /skill:agent-browser", rationale: "community skill, available on-demand", physicalPaths: ["/Users/rom.iluz/.agents/skills/agent-browser/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/agent-browser/SKILL.md", shadowedPaths: [] },
   { skill: "agents-sdk", invocationSurfaces: ["catalog-only"], productRole: "community-on-demand", discoveryRoute: "/palette + /skill:agents-sdk", rationale: "community skill, available on-demand", physicalPaths: ["/Users/rom.iluz/.agents/skills/agents-sdk/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/agents-sdk/SKILL.md", shadowedPaths: [] },
-  { skill: "ask-matt", invocationSurfaces: ["catalog-only"], productRole: "community-on-demand", discoveryRoute: "/palette + /skill:ask-matt", rationale: "community skill, available on-demand", physicalPaths: ["/Users/rom.iluz/.agents/skills/ask-matt/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/ask-matt/SKILL.md", shadowedPaths: [] },
+  { skill: "ask-matt", invocationSurfaces: ["catalog-only"], productRole: "superseded", discoveryRoute: "/palette + /skill:ask-matt (reference router, not runtime)", rationale: "superseded by Coach (auto-pi uses Coach as the sole normal router)", physicalPaths: ["/Users/rom.iluz/.agents/skills/ask-matt/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/ask-matt/SKILL.md", shadowedPaths: [] },
   { skill: "batch-grill-me", invocationSurfaces: ["catalog-only"], productRole: "community-on-demand", discoveryRoute: "/palette + /skill:batch-grill-me", rationale: "community skill, available on-demand", physicalPaths: ["/Users/rom.iluz/.agents/skills/batch-grill-me/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/batch-grill-me/SKILL.md", shadowedPaths: [] },
   { skill: "bearings", invocationSurfaces: ["catalog-only"], productRole: "community-on-demand", discoveryRoute: "/palette + /skill:bearings", rationale: "community skill, available on-demand", physicalPaths: ["skills/bearings/SKILL.md", "/Users/rom.iluz/.agents/skills/bearings/SKILL.md"], selectedPath: "skills/bearings/SKILL.md", shadowedPaths: ["/Users/rom.iluz/.agents/skills/bearings/SKILL.md"] },
   { skill: "brainstorming", invocationSurfaces: ["workflow-phase-read"], productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary", physicalPaths: ["skills/brainstorming/SKILL.md", "/Users/rom.iluz/.agents/skills/brainstorming/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/brainstorming/SKILL.md", shadowedPaths: ["skills/brainstorming/SKILL.md"] },
@@ -510,7 +534,7 @@ export const REACHABILITY_ENTRIES: ReachabilityEntry[] = [
   { skill: "herdr", invocationSurfaces: ["catalog-only"], productRole: "community-on-demand", discoveryRoute: "/palette + /skill:herdr", rationale: "community skill, available on-demand", physicalPaths: ["/Users/rom.iluz/.agents/skills/herdr/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/herdr/SKILL.md", shadowedPaths: [] },
   { skill: "hyperadar-stack-gotchas", invocationSurfaces: ["catalog-only"], productRole: "community-on-demand", discoveryRoute: "/palette + /skill:hyperadar-stack-gotchas", rationale: "community skill, available on-demand", physicalPaths: ["/Users/rom.iluz/.pi/agent/skills/hyperadar-stack-gotchas/SKILL.md"], selectedPath: "/Users/rom.iluz/.pi/agent/skills/hyperadar-stack-gotchas/SKILL.md", shadowedPaths: [] },
   { skill: "impeccable", invocationSurfaces: ["catalog-only"], productRole: "community-on-demand", discoveryRoute: "/palette + /skill:impeccable", rationale: "community skill, available on-demand", physicalPaths: ["/Users/rom.iluz/.agents/skills/impeccable/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/impeccable/SKILL.md", shadowedPaths: [] },
-  { skill: "implement", invocationSurfaces: ["catalog-only"], productRole: "community-on-demand", discoveryRoute: "/palette + /skill:implement", rationale: "community skill, available on-demand", physicalPaths: ["/Users/rom.iluz/.agents/skills/implement/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/implement/SKILL.md", shadowedPaths: [] },
+  { skill: "implement", invocationSurfaces: ["catalog-only"], productRole: "superseded", discoveryRoute: "/palette + /skill:implement (expert/manual use)", rationale: "superseded by build-workflow + review-workflow + ship-workflow (decomposed for independent observability)", physicalPaths: ["/Users/rom.iluz/.agents/skills/implement/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/implement/SKILL.md", shadowedPaths: [] },
   { skill: "improve-codebase-architecture", invocationSurfaces: ["catalog-only"], productRole: "standalone-utility", discoveryRoute: "/palette + /skill:improve-codebase-architecture", rationale: "intentionally standalone (upkeep/vocabulary/learning, not SDLC)", physicalPaths: ["/Users/rom.iluz/.agents/skills/improve-codebase-architecture/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/improve-codebase-architecture/SKILL.md", shadowedPaths: [] },
   { skill: "live-heuristic-evaluation", invocationSurfaces: ["catalog-only"], productRole: "community-on-demand", discoveryRoute: "/palette + /skill:live-heuristic-evaluation", rationale: "community skill, available on-demand", physicalPaths: ["/Users/rom.iluz/.agents/skills/live-heuristic-evaluation/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/live-heuristic-evaluation/SKILL.md", shadowedPaths: [] },
   { skill: "live-research", invocationSurfaces: ["workflow-phase-read"], productRole: "conditional-specialist", discoveryRoute: "workflow phase read (conditional)", rationale: "conditional specialist — read only when predicate matches", physicalPaths: ["/Users/rom.iluz/.pi/agent/skills/live-research/SKILL.md"], selectedPath: "/Users/rom.iluz/.pi/agent/skills/live-research/SKILL.md", shadowedPaths: [] },
@@ -540,7 +564,7 @@ export const REACHABILITY_ENTRIES: ReachabilityEntry[] = [
   { skill: "rag-pipeline", invocationSurfaces: ["catalog-only"], productRole: "community-on-demand", discoveryRoute: "/palette + /skill:rag-pipeline", rationale: "community skill, available on-demand", physicalPaths: ["/Users/rom.iluz/.pi/agent/skills/rag-pipeline/SKILL.md"], selectedPath: "/Users/rom.iluz/.pi/agent/skills/rag-pipeline/SKILL.md", shadowedPaths: [] },
   { skill: "receiving-code-review", invocationSurfaces: ["workflow-phase-read"], productRole: "normal-path-specialist", discoveryRoute: "workflow phase read", rationale: "read by a workflow at a phase boundary", physicalPaths: ["skills/receiving-code-review/SKILL.md", "/Users/rom.iluz/.agents/skills/receiving-code-review/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/receiving-code-review/SKILL.md", shadowedPaths: ["skills/receiving-code-review/SKILL.md"] },
   { skill: "request-refactor-plan", invocationSurfaces: ["catalog-only"], productRole: "community-on-demand", discoveryRoute: "/palette + /skill:request-refactor-plan", rationale: "community skill, available on-demand", physicalPaths: ["/Users/rom.iluz/.agents/skills/request-refactor-plan/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/request-refactor-plan/SKILL.md", shadowedPaths: [] },
-  { skill: "research", invocationSurfaces: ["catalog-only"], productRole: "community-on-demand", discoveryRoute: "/palette + /skill:research", rationale: "community skill, available on-demand", physicalPaths: ["/Users/rom.iluz/.agents/skills/research/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/research/SKILL.md", shadowedPaths: [] },
+  { skill: "research", invocationSurfaces: ["workflow-phase-read"], productRole: "normal-path-specialist", discoveryRoute: "workflow phase read (research-workflow)", rationale: "read by research-workflow at the investigate phase (general research type)", physicalPaths: ["/Users/rom.iluz/.agents/skills/research/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/research/SKILL.md", shadowedPaths: [] },
   { skill: "research-workflow", invocationSurfaces: ["workflow-prompt-pin"], productRole: "orchestrator", discoveryRoute: "Coach menu + prompt pin", rationale: "auto-pi workflow orchestrator", physicalPaths: ["skills/research-workflow/SKILL.md", "/Users/rom.iluz/.agents/skills/research-workflow/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/research-workflow/SKILL.md", shadowedPaths: ["skills/research-workflow/SKILL.md"] },
   { skill: "resolving-merge-conflicts", invocationSurfaces: ["workflow-phase-read"], productRole: "conditional-specialist", discoveryRoute: "workflow phase read (conditional)", rationale: "conditional specialist — read only when predicate matches", physicalPaths: ["/Users/rom.iluz/.agents/skills/resolving-merge-conflicts/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/resolving-merge-conflicts/SKILL.md", shadowedPaths: [] },
   { skill: "review-workflow", invocationSurfaces: ["workflow-prompt-pin"], productRole: "orchestrator", discoveryRoute: "Coach menu + prompt pin", rationale: "auto-pi workflow orchestrator", physicalPaths: ["skills/review-workflow/SKILL.md", "/Users/rom.iluz/.agents/skills/review-workflow/SKILL.md"], selectedPath: "/Users/rom.iluz/.agents/skills/review-workflow/SKILL.md", shadowedPaths: ["skills/review-workflow/SKILL.md"] },
@@ -824,4 +848,23 @@ export const ASK_MATT_DISPOSITIONS: AskMattDisposition[] = [
 		autoPiRoute: "/palette",
 		rationale: "One-time setup.",
 	},
+];
+
+
+// ─── Ask-matt source metadata ──────────────────────────────────────────────
+export const ASK_MATT_SOURCE = {
+	repoHeadChecked: "2ab9580",
+	skillBaseCommit: "ed37663",
+	repo: "https://github.com/mattpocock/skills.git",
+	path: "skills/engineering/ask-matt/SKILL.md",
+};
+
+// The exact set of ask-matt routes expected from the upstream skill content
+// at commit ed37663. If upstream adds a route, this set must be updated.
+export const EXPECTED_ASK_MATT_ROUTES = [
+	"grill-with-docs", "prototype", "to-spec", "to-tickets", "implement",
+	"tdd", "code-review", "triage", "diagnosing-bugs", "wayfinder",
+	"improve-codebase-architecture", "domain-modeling", "codebase-design",
+	"handoff", "compact", "grill-me", "research", "teach",
+	"writing-great-skills", "setup-matt-pocock-skills",
 ];
