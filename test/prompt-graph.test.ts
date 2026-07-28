@@ -1105,6 +1105,9 @@ import {
 	ASK_MATT_DISPOSITIONS as ASK_MATT_V2,
 	REACHABILITY_ENTRIES as REACH_V2,
 	TRIAGE_OUTCOMES,
+	TRIAGE_CONTRACT,
+	ASK_MATT_SOURCE,
+	EXPECTED_ASK_MATT_ROUTES,
 } from "../config/workflow-graph-contract.ts";
 
 // Check: every terminal phase has conditional outcomes (not a single handoff)
@@ -1286,13 +1289,13 @@ test("local forks (code-review, diagnosing-bugs) are the selected paths, not sha
 		assert.ok(entry, `${skill} should be in REACHABILITY_ENTRIES`);
 		// The selected path should be in ~/.agents/skills (the live path where the repo fork wins)
 		assert.ok(
-			entry!.selectedPath.includes(".agents/skills") ||
-				entry!.selectedPath.includes("skills/"),
+			entry!.selectedRuntimePath.includes(".agents/skills") ||
+				entry!.selectedRuntimePath.includes("skills/"),
 			`${skill}: selectedPath should be the local fork (not the community copy)`,
 		);
 		// Physical paths should include both repo + live
 		assert.ok(
-			entry!.physicalPaths.length >= 1,
+			entry!.runtimePhysicalPaths.length >= 1,
 			`${skill}: should have at least 1 physical path`,
 		);
 	}
@@ -1302,10 +1305,10 @@ test("local forks (code-review, diagnosing-bugs) are the selected paths, not sha
 test("every reachability entry has valid physical paths that exist on disk", () => {
 	for (const entry of REACH_V2) {
 		assert.ok(
-			entry.physicalPaths.length >= 1,
+			entry.runtimePhysicalPaths.length >= 1,
 			`${entry.skill}: should have at least 1 physical path`,
 		);
-		for (const p of entry.physicalPaths) {
+		for (const p of entry.runtimePhysicalPaths) {
 			assert.ok(
 				existsSync(p),
 				`${entry.skill}: physical path "${p}" does not exist on disk`,
@@ -1436,13 +1439,25 @@ function createDriftFixtureBase(): {
 	const localDir = join(baseDir, "local");
 	const upstreamRepo = join(baseDir, "upstream");
 	mkdirSync(join(localDir, "skills", "test-fork"), { recursive: true });
-	mkdirSync(join(upstreamRepo, "skills", "engineering", "test-fork"), { recursive: true });
+	mkdirSync(join(upstreamRepo, "skills", "engineering", "test-fork"), {
+		recursive: true,
+	});
 
 	// Initialize upstream git repo with initial content
-	execSync(`cd "${upstreamRepo}" && git init -q && git config user.email "t@t.com" && git config user.name "t"`, { stdio: "pipe" });
-	writeFileSync(join(upstreamRepo, "skills", "engineering", "test-fork", "SKILL.md"), "---\nname: test-fork\ndescription: A test skill.\n---\nupstream content v1\n");
-	execSync(`cd "${upstreamRepo}" && git add -A && git commit -q -m "v1"`, { stdio: "pipe" });
-	const baseCommit = execSync(`cd "${upstreamRepo}" && git rev-parse HEAD`, { encoding: "utf-8" }).trim();
+	execSync(
+		`cd "${upstreamRepo}" && git init -q && git config user.email "t@t.com" && git config user.name "t"`,
+		{ stdio: "pipe" },
+	);
+	writeFileSync(
+		join(upstreamRepo, "skills", "engineering", "test-fork", "SKILL.md"),
+		"---\nname: test-fork\ndescription: A test skill.\n---\nupstream content v1\n",
+	);
+	execSync(`cd "${upstreamRepo}" && git add -A && git commit -q -m "v1"`, {
+		stdio: "pipe",
+	});
+	const baseCommit = execSync(`cd "${upstreamRepo}" && git rev-parse HEAD`, {
+		encoding: "utf-8",
+	}).trim();
 
 	return {
 		localDir,
@@ -1474,7 +1489,10 @@ ${content}`,
 	);
 }
 
-function runDriftFixture(localDir: string, upstreamRepo: string): { exitCode: number; output: string } {
+function runDriftFixture(
+	localDir: string,
+	upstreamRepo: string,
+): { exitCode: number; output: string } {
 	const env = {
 		...process.env,
 		REPO_ROOT: localDir,
@@ -1482,76 +1500,154 @@ function runDriftFixture(localDir: string, upstreamRepo: string): { exitCode: nu
 		LOCAL_FORK_NAMES: "test-fork",
 	};
 	try {
-		const stdout = execSync(`bash "${join(REPO_ROOT, "scripts", "check-drift.sh")}"`, {
-			encoding: "utf-8",
-			stdio: "pipe",
-			env,
-			maxBuffer: 1024 * 1024,
-		});
+		const stdout = execSync(
+			`bash "${join(REPO_ROOT, "scripts", "check-drift.sh")}"`,
+			{
+				encoding: "utf-8",
+				stdio: "pipe",
+				env,
+				maxBuffer: 1024 * 1024,
+			},
+		);
 		return { exitCode: 0, output: stdout };
 	} catch (e: any) {
-		const stdout = e.stdout ? (typeof e.stdout === "string" ? e.stdout : e.stdout.toString("utf-8")) : "";
-		const stderr = e.stderr ? (typeof e.stderr === "string" ? e.stderr : e.stderr.toString("utf-8")) : "";
+		const stdout = e.stdout
+			? typeof e.stdout === "string"
+				? e.stdout
+				: e.stdout.toString("utf-8")
+			: "";
+		const stderr = e.stderr
+			? typeof e.stderr === "string"
+				? e.stderr
+				: e.stderr.toString("utf-8")
+			: "";
 		return { exitCode: e.status ?? 1, output: stdout + stderr };
 	}
 }
 
 test("drift fixture 1: no changes (local = base = upstream-HEAD) → exit 0", () => {
-	const { localDir, upstreamRepo, baseCommit, cleanup } = createDriftFixtureBase();
+	const { localDir, upstreamRepo, baseCommit, cleanup } =
+		createDriftFixtureBase();
 	writeLocalForkWithProvenance(localDir, baseCommit, "upstream content v1\n");
 	const result = runDriftFixture(localDir, upstreamRepo);
-	assert.equal(result.exitCode, 0, `no-changes: should exit 0, got ${result.exitCode}: ${result.output}`);
+	assert.equal(
+		result.exitCode,
+		0,
+		`no-changes: should exit 0, got ${result.exitCode}: ${result.output}`,
+	);
 	cleanup();
 });
 
 test("drift fixture 2: local-only intentional patch (upstream unchanged) → exit 0", () => {
-	const { localDir, upstreamRepo, baseCommit, cleanup } = createDriftFixtureBase();
-	writeLocalForkWithProvenance(localDir, baseCommit, "upstream content v1\nlocal patch line\n");
+	const { localDir, upstreamRepo, baseCommit, cleanup } =
+		createDriftFixtureBase();
+	writeLocalForkWithProvenance(
+		localDir,
+		baseCommit,
+		"upstream content v1\nlocal patch line\n",
+	);
 	const result = runDriftFixture(localDir, upstreamRepo);
-	assert.equal(result.exitCode, 0, `local-only: should exit 0, got ${result.exitCode}: ${result.output}`);
-	assert.ok(/intentionally drifted/.test(result.output), "should report 'intentionally drifted'");
+	assert.equal(
+		result.exitCode,
+		0,
+		`local-only: should exit 0, got ${result.exitCode}: ${result.output}`,
+	);
+	assert.ok(
+		/intentionally drifted/.test(result.output),
+		"should report 'intentionally drifted'",
+	);
 	cleanup();
 });
 
 test("drift fixture 3: upstream-only change → stale fork → exit 1", () => {
-	const { localDir, upstreamRepo, baseCommit, cleanup } = createDriftFixtureBase();
+	const { localDir, upstreamRepo, baseCommit, cleanup } =
+		createDriftFixtureBase();
 	writeLocalForkWithProvenance(localDir, baseCommit, "upstream content v1\n");
 	// Change upstream after the base
-	writeFileSync(join(upstreamRepo, "skills", "engineering", "test-fork", "SKILL.md"), "---\nname: test-fork\ndescription: A test skill.\n---\nupstream content v2\n");
-	execSync(`cd "${upstreamRepo}" && git add -A && git commit -q -m "v2"`, { stdio: "pipe" });
+	writeFileSync(
+		join(upstreamRepo, "skills", "engineering", "test-fork", "SKILL.md"),
+		"---\nname: test-fork\ndescription: A test skill.\n---\nupstream content v2\n",
+	);
+	execSync(`cd "${upstreamRepo}" && git add -A && git commit -q -m "v2"`, {
+		stdio: "pipe",
+	});
 	const result = runDriftFixture(localDir, upstreamRepo);
-	assert.equal(result.exitCode, 1, `upstream-only: should exit 1 (stale), got ${result.exitCode}: ${result.output}`);
-	assert.ok(/stale|upstream changed/i.test(result.output), `should report stale/upstream changed: ${result.output}`);
+	assert.equal(
+		result.exitCode,
+		1,
+		`upstream-only: should exit 1 (stale), got ${result.exitCode}: ${result.output}`,
+	);
+	assert.ok(
+		/stale|upstream changed/i.test(result.output),
+		`should report stale/upstream changed: ${result.output}`,
+	);
 	cleanup();
 });
 
 test("drift fixture 4: both changed → manual review → exit 1", () => {
-	const { localDir, upstreamRepo, baseCommit, cleanup } = createDriftFixtureBase();
-	writeLocalForkWithProvenance(localDir, baseCommit, "upstream content v1\nlocal patch\n");
+	const { localDir, upstreamRepo, baseCommit, cleanup } =
+		createDriftFixtureBase();
+	writeLocalForkWithProvenance(
+		localDir,
+		baseCommit,
+		"upstream content v1\nlocal patch\n",
+	);
 	// Change upstream after the base too
-	writeFileSync(join(upstreamRepo, "skills", "engineering", "test-fork", "SKILL.md"), "---\nname: test-fork\ndescription: A test skill.\n---\nupstream content v2\n");
-	execSync(`cd "${upstreamRepo}" && git add -A && git commit -q -m "v2"`, { stdio: "pipe" });
+	writeFileSync(
+		join(upstreamRepo, "skills", "engineering", "test-fork", "SKILL.md"),
+		"---\nname: test-fork\ndescription: A test skill.\n---\nupstream content v2\n",
+	);
+	execSync(`cd "${upstreamRepo}" && git add -A && git commit -q -m "v2"`, {
+		stdio: "pipe",
+	});
 	const result = runDriftFixture(localDir, upstreamRepo);
-	assert.equal(result.exitCode, 1, `both-changed: should exit 1 (manual review), got ${result.exitCode}: ${result.output}`);
-	assert.ok(/both.*changed|manual.*review/i.test(result.output), "should report both-changed/manual review");
+	assert.equal(
+		result.exitCode,
+		1,
+		`both-changed: should exit 1 (manual review), got ${result.exitCode}: ${result.output}`,
+	);
+	assert.ok(
+		/both.*changed|manual.*review/i.test(result.output),
+		"should report both-changed/manual review",
+	);
 	cleanup();
 });
 
 test("drift fixture 5: missing provenance → exit 1", () => {
 	const { localDir, upstreamRepo, cleanup } = createDriftFixtureBase();
 	// Write local file without provenance frontmatter
-	writeFileSync(join(localDir, "skills", "test-fork", "SKILL.md"), "no provenance here\n");
+	writeFileSync(
+		join(localDir, "skills", "test-fork", "SKILL.md"),
+		"no provenance here\n",
+	);
 	const result = runDriftFixture(localDir, upstreamRepo);
-	assert.equal(result.exitCode, 1, `missing-provenance: should exit 1, got ${result.exitCode}: ${result.output}`);
-	assert.ok(/NO provenance|provenance frontmatter/i.test(result.output), "should report missing provenance");
+	assert.equal(
+		result.exitCode,
+		1,
+		`missing-provenance: should exit 1, got ${result.exitCode}: ${result.output}`,
+	);
+	assert.ok(
+		/NO provenance|provenance frontmatter/i.test(result.output),
+		"should report missing provenance",
+	);
 	cleanup();
 });
 
 // Integration smoke test: the real auto-pi drift check passes
 test("drift integration: real auto-pi forks pass the drift check", () => {
-	const result = runDriftCheck(REPO_ROOT, "/Users/rom.iluz/Dev/mattpocock-skills");
-	assert.equal(result.exitCode, 0, `real drift check should exit 0, got ${result.exitCode}: ${result.output}`);
-	assert.ok(/intentionally drifted/.test(result.output), "real drift check should report 'intentionally drifted'");
+	const result = runDriftCheck(
+		REPO_ROOT,
+		"/Users/rom.iluz/Dev/mattpocock-skills",
+	);
+	assert.equal(
+		result.exitCode,
+		0,
+		`real drift check should exit 0, got ${result.exitCode}: ${result.output}`,
+	);
+	assert.ok(
+		/intentionally drifted/.test(result.output),
+		"real drift check should report 'intentionally drifted'",
+	);
 });
 // ─── Contract v4: procedureScope, selected path validation ─────────────────
 
@@ -1575,9 +1671,9 @@ test("diagnose phases have procedureScope (Phases 1-4, not Phase 5)", () => {
 test("every reachability selected path is a runtime path (not a repo source path)", () => {
 	for (const entry of REACH_V2) {
 		assert.ok(
-			entry.selectedPath.includes(".agents/skills") ||
-				entry.selectedPath.includes(".pi/agent/skills"),
-			`${entry.skill}: selectedPath "${entry.selectedPath}" should be a runtime path (~/.agents/skills or ~/.pi/agent/skills), not a repo source path`,
+			entry.selectedRuntimePath.includes(".agents/skills") ||
+				entry.selectedRuntimePath.includes(".pi/agent/skills"),
+			`${entry.skill}: selectedPath "${entry.selectedRuntimePath}" should be a runtime path (~/.agents/skills or ~/.pi/agent/skills), not a repo source path`,
 		);
 	}
 });
@@ -1604,4 +1700,123 @@ test("planning setup style does not include grill-me (it's a conditional special
 			"setup style allowed values should NOT include grill-me (it's a conditional specialist, not a style)",
 		);
 	}
+});
+
+// ─── Contract v5: stateDomains, SHA-256, triage evidence, shadow validation ──
+
+// Check: selected runtime path is never in shadowedRuntimePaths
+test("no reachability entry has its selected path in shadowedRuntimePaths", () => {
+	for (const entry of REACH_V2) {
+		assert.ok(
+			!entry.shadowedRuntimePaths.includes(entry.selectedRuntimePath),
+			`${entry.skill}: selectedRuntimePath "${entry.selectedRuntimePath}" should NOT be in shadowedRuntimePaths`,
+		);
+	}
+});
+
+// Check: selected runtime path is in runtimePhysicalPaths
+test("every reachability entry's selected path is in its runtimePhysicalPaths", () => {
+	for (const entry of REACH_V2) {
+		assert.ok(
+			entry.runtimePhysicalPaths.includes(entry.selectedRuntimePath),
+			`${entry.skill}: selectedRuntimePath should be in runtimePhysicalPaths`,
+		);
+	}
+});
+
+// Check: selected + shadowed partition runtime paths
+test("selected + shadowed partition the runtimePhysicalPaths", () => {
+	for (const entry of REACH_V2) {
+		const all = [entry.selectedRuntimePath, ...entry.shadowedRuntimePaths];
+		assert.equal(
+			all.length,
+			entry.runtimePhysicalPaths.length,
+			`${entry.skill}: selected + shadowed should cover all runtimePhysicalPaths`,
+		);
+	}
+});
+
+// Check: ask-matt is classified as superseded
+test("ask-matt is classified as superseded", () => {
+	const entry = REACH_V2.find((e) => e.skill === "ask-matt");
+	assert.equal(entry?.productRole, "superseded");
+});
+
+// Check: implement is classified as superseded
+test("implement is classified as superseded", () => {
+	const entry = REACH_V2.find((e) => e.skill === "implement");
+	assert.equal(entry?.productRole, "superseded");
+});
+
+// Check: grill-with-docs is classified as superseded
+test("grill-with-docs is classified as superseded", () => {
+	const entry = REACH_V2.find((e) => e.skill === "grill-with-docs");
+	assert.equal(entry?.productRole, "superseded");
+});
+
+// Check: claude-handoff is classified as superseded
+test("claude-handoff is classified as superseded", () => {
+	const entry = REACH_V2.find((e) => e.skill === "claude-handoff");
+	assert.equal(entry?.productRole, "superseded");
+});
+
+// Check: session-handoff is classified as standalone-utility
+test("session-handoff is classified as standalone-utility", () => {
+	const entry = REACH_V2.find((e) => e.skill === "session-handoff");
+	assert.equal(entry?.productRole, "standalone-utility");
+});
+
+// Check: planning has stateDomains
+test("planning workflow has stateDomains", () => {
+	const planning = WORKFLOWS_V2.find((w) => w.name === "planning-workflow");
+	assert.ok(planning?.stateDomains, "planning should have stateDomains");
+	assert.ok(planning?.stateDomains?.["mode"], "planning should have mode domain");
+	assert.ok(planning?.stateDomains?.["prototype"], "planning should have prototype domain");
+});
+
+// Check: state constraint values are valid members of state domains
+test("planning state constraint values are valid members of state domains", () => {
+	const planning = WORKFLOWS_V2.find((w) => w.name === "planning-workflow");
+	const domains = planning?.stateDomains;
+	if (!domains) return;
+	for (const phase of planning!.phases) {
+		if (!phase.stateConstraints) continue;
+		for (const constraint of phase.stateConstraints) {
+			const domain = domains[constraint.field];
+			if (!domain) continue;
+			if (constraint.requiredOnExit) {
+				for (const val of constraint.requiredOnExit) {
+					assert.ok(
+						domain.includes(val) || val.includes("<") || val === "approved",
+						`planning: constraint value "${val}" for field "${constraint.field}" not in domain ${JSON.stringify(domain)}`,
+					);
+				}
+			}
+		}
+	}
+});
+
+// Check: ASK_MATT_SOURCE has SHA-256
+test("ASK_MATT_SOURCE has a SHA-256 hash", () => {
+	assert.ok(ASK_MATT_SOURCE.sha256, "ASK_MATT_SOURCE should have a sha256 field");
+	assert.ok(ASK_MATT_SOURCE.sha256.length >= 16, "sha256 should be at least 16 chars");
+});
+
+// Check: triage outcomes have evidence fields
+test("triage outcomes have evidence fields", () => {
+	const readyForAgent = TRIAGE_OUTCOMES.find((o) => o.outcome === "ready-for-agent");
+	assert.ok(readyForAgent?.evidenceFields, "ready-for-agent should have evidence fields");
+	assert.ok(
+		readyForAgent!.evidenceFields!.includes("issue ref"),
+		"ready-for-agent should require issue ref evidence",
+	);
+});
+
+// Check: prototype state mutations are explicit in the SKILL.md
+test("planning SKILL.md has explicit prototype state mutations", () => {
+	const content = readWorkflowSkill("planning-workflow");
+	assert.ok(/prototype: proposed/i.test(content), "should set prototype: proposed when asking permission");
+	assert.ok(/prototype: declined/i.test(content), "should set prototype: declined when user declines");
+	assert.ok(/prototype: running/i.test(content), "should set prototype: running when user approves");
+	assert.ok(/prototype: complete/i.test(content), "should set prototype: complete when prototype is done");
 });
