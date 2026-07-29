@@ -1857,13 +1857,21 @@ import { createHash } from "node:crypto";
 // Check: ASK_MATT_SOURCE.sha256 is a full 64-char hex digest matching the actual file
 test("ASK_MATT_SOURCE.sha256 is a full 64-char hex digest matching the actual upstream file", () => {
 	const sha256 = ASK_MATT_SOURCE.sha256;
-	assert.ok(/^[a-f0-9]{64}$/.test(sha256), `sha256 should be a 64-char hex digest, got: ${sha256}`);
+	assert.ok(
+		/^[a-f0-9]{64}$/.test(sha256),
+		`sha256 should be a 64-char hex digest, got: ${sha256}`,
+	);
 	// Compute the actual SHA-256 of the upstream ask-matt file
-	const upstreamPath = "/Users/rom.iluz/Dev/mattpocock-skills/skills/engineering/ask-matt/SKILL.md";
+	const upstreamPath =
+		"/Users/rom.iluz/Dev/mattpocock-skills/skills/engineering/ask-matt/SKILL.md";
 	if (existsSync(upstreamPath)) {
 		const fileContent = readFileSync(upstreamPath);
 		const computed = createHash("sha256").update(fileContent).digest("hex");
-		assert.equal(sha256, computed, `ASK_MATT_SOURCE.sha256 should match the actual file hash`);
+		assert.equal(
+			sha256,
+			computed,
+			`ASK_MATT_SOURCE.sha256 should match the actual file hash`,
+		);
 	}
 });
 
