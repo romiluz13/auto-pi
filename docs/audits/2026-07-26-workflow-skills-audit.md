@@ -1,3 +1,5 @@
+> **SUPERSEDED by v0.4 — see [docs/audits/2026-08-01-auto-pi-v0.4-audit.md](2026-08-01-auto-pi-v0.4-audit.md)**
+
 # Workflow Skills Audit (v0.3)
 
 **Date:** 2026-07-26
@@ -9,7 +11,7 @@
 One thin **workflow skill** per user-facing workflow. Each prompt pins its workflow skill mechanically. The workflow skill is an orchestrator/map — it reads each specialist skill in turn, rereading itself between phases. The user types ONE slash command (`/plan`); the workflow handles everything. The user never types internal skill commands.
 
 | Layer | Owns |
-|-------|------|
+| ------- | ------ |
 | **Workflow skill** | Phase ordering, branching, completion evidence, the reread protocol, state block |
 | **Specialist skill** | How to perform one phase (brainstorming, to-spec, tdd, etc.) |
 | **Prompt** | Workflow entry + task input only |
@@ -65,7 +67,7 @@ One thin **workflow skill** per user-facing workflow. Each prompt pins its workf
 ## Skill-library classification
 
 | Type | Count | Role |
-|------|-------|------|
+| ------ | ------- | ------ |
 | **Workflow orchestrator** | 6 (new, auto-pi's) | planning, build, review, ship, research, debug |
 | **Core phase specialist** | 18 | brainstorming, to-spec, to-tickets, wayfinder, tdd, diagnosing-bugs, uv, code-review, receiving-code-review, verification-before-completion, diff-driven-docs, commit, github, research, octocode-research, live-research, resolving-merge-conflicts, setup-maintenance |
 | **Operational utility (repo)** | 8 | bearings, codebase-hygiene, decision-hold-lifecycle, grilling, memory-compounding, session-handoff, setup-matt-pocock-skills, verification-before-completion (also a specialist) |
@@ -78,7 +80,7 @@ One thin **workflow skill** per user-facing workflow. Each prompt pins its workf
 The genius's review said: "blanket exclusion does not answer whether the library is leveraged optimally." Here's the candidate analysis for skills that COULD improve the normal path:
 
 | Skill | Could enhance | Decision |
-|-------|--------------|----------|
+| ------- | -------------- | ---------- |
 | `ask-matt` | A router over the skills — could be a Coach alternative | **Excluded.** Coach is auto-pi's entry menu; ask-matt is Matt Pocock's router. Adding it would create two competing entry points. |
 | `implement` | A build specialist (Matt's version of tdd) | **Excluded.** `tdd` is already the build specialist. `implement` is Matt's thinner wrapper; `tdd` is the procedure. |
 | `codebase-design` | Deep module vocabulary for planning | **Excluded from workflow.** It's on-demand vocabulary, not a phase procedure. The planning-workflow doesn't need it on every plan — only when designing module interfaces. Available via `/skill:codebase-design` when needed. |
@@ -95,6 +97,7 @@ The genius's review said: "blanket exclusion does not answer whether the library
 ## State protocol (all 6 workflows)
 
 Every workflow skill follows the same state protocol:
+
 1. **At entry:** initialize the state block and print it.
 2. **Before every user wait:** emit the current state block.
 3. **On every continuation:** read the latest state block. If missing/ambiguous, STOP — reconstruct from conversation artifacts. Never guess.

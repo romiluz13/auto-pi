@@ -1,9 +1,9 @@
 # auto-pi
 
-**A workflow OS for [Pi](https://pi.dev).**  
-Type a task → pick a workflow → one pinned workflow skill orchestrates the phases by reading specialists in turn.
+**A workflow OS for [Pi](https://pi.dev).**
+Type a task → pick a workflow → one pinned orchestration layer drives ask-matt's routing through the SDLC.
 
-Not another coding agent. A dress on Pi's minimal harness: Coach, slash workflows, mechanical `skill:` pins, and workflow skills that orchestrate.
+Not another coding agent. A dress on Pi's minimal harness: Coach, slash workflows, mechanical `skill:` pins, ask-matt as the routing brain, and a thin orchestration layer that adds the mechanics Matt's skills don't have.
 
 [![Pi](https://img.shields.io/badge/Pi-v0.80+-blue.svg)](https://pi.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -15,7 +15,7 @@ Not another coding agent. A dress on Pi's minimal harness: Coach, slash workflow
 | Is | Is not |
 | --- | --- |
 | An installable Pi config: extensions + prompts + skills + shared `AGENTS.md` | A sealed product competing with Claude Code / Codex / ChatGPT |
-| Seven workflows that **pin** a workflow skill via Pi `skill:` frontmatter | A promise that every cascading skill is force-injected |
+| Three layers: Coach → ask-matt → orchestration-layer | Six parallel workflow orchestrators duplicating upstream routing |
 | Model-agnostic — point Pi at whatever you pay for | Vendor lock-in |
 
 ---
@@ -47,35 +47,35 @@ Coach shows a fixed menu. You pick. Examples:
 
 | You pick | What happens |
 | --- | --- |
-| `/plan` | **Pins** `planning-workflow` — classifies bounded vs foggy, then orchestrates brainstorming → to-spec → to-tickets by reading each specialist in turn |
-| `/build` | **Pins** `build-workflow` — tdd (red → green), with diagnosing-bugs on persistent RED |
-| `/debug` | **Pins** `debug-workflow` — routes to diagnosing-bugs (bugs) or resolving-merge-conflicts (merge/rebase) |
-| `/research` | **Pins** `research-workflow` — routes among research, octocode-research, live-research |
-| `/review` | **Pins** `review-workflow` — code-review (standards + spec + security) → receiving-code-review |
-| `/ship` | **Pins** `ship-workflow` — verification → docs → commit → github (conditional) |
+| `/plan` | **Pins** `orchestration-layer` → reads `ask-matt` → routes to brainstorming → to-spec → to-tickets (bounded) or wayfinder (foggy) |
+| `/build` | **Pins** `orchestration-layer` → reads `ask-matt` → routes to tdd (red → green), with diagnosing-bugs on persistent RED |
+| `/debug` | **Pins** `orchestration-layer` → reads `ask-matt` → routes to diagnosing-bugs (bugs) or resolving-merge-conflicts (merge/rebase) |
+| `/research` | **Pins** `orchestration-layer` → reads `ask-matt` → routes among research, octocode-research, live-research |
+| `/review` | **Pins** `orchestration-layer` → code-review (standards + spec + security) → receiving-code-review (disposition) |
+| `/ship` | **Pins** `orchestration-layer` → verification → diff-driven-docs → commit → github (conditional) |
 | `Just do it` or `!…` | Raw agent — AGENTS.md only, no workflow pin |
 
-The workflow skill orchestrates the phases. You answer questions and approve inside the workflow. You never type internal skill commands — the workflow handles the routing.
+The orchestration layer reads ask-matt for routing, reads each specialist in turn, and tracks state + evidence. You answer questions and approve inside the workflow. You never type internal skill commands.
 
 ---
 
 ## How it works
 
-**Pinned (HARD)** — Pi injects the workflow skill body when the slash command declares `skill:`:
+**Three layers:**
 
-| Command | Pinned workflow skill | Specialists it reads |
-| --- | --- | --- |
-| `/plan` | `planning-workflow` | brainstorming → to-spec → to-tickets (bounded); wayfinder (foggy) |
-| `/build` | `build-workflow` | tdd; diagnosing-bugs on RED; uv for Python |
-| `/debug` | `debug-workflow` | diagnosing-bugs; resolving-merge-conflicts |
-| `/research` | `research-workflow` | research / octocode-research / live-research |
-| `/review` | `review-workflow` | code-review → receiving-code-review |
-| `/ship` | `ship-workflow` | verification-before-completion → diff-driven-docs → commit → github |
-| `/setup-audit` | `setup-maintenance` | (direct pin — 1 specialist, no wrapper) |
+| Layer | Role | Owner |
+| ------- | ------ | ------- |
+| **Coach** | Deterministic 9-option menu. Human-controlled entry. Intercepts input, hands to the matching prompt. | auto-pi (`extensions/coach.ts`) |
+| **ask-matt** | The routing brain. Decides which specialist to read next based on where the work is in the SDLC. Pinned external skill with provenance + drift automation. | Matt Pocock (external, pinned) |
+| **orchestration-layer** | The mechanics. State blocks, evidence gates, reread-after-phase, compaction recovery, human-controlled stops, and the unique auto-pi phases (ship, review disposition, verification, security). | auto-pi (one thin skill) |
 
-**Orchestration** — the workflow skill reads each specialist `SKILL.md` at its phase boundary, follows only that specialist's procedure, then rereads the workflow skill to route to the next phase. The workflow owns the routing; the specialist owns the procedure.
+**Pinned (HARD)** — Pi injects the orchestration layer when the slash command declares `skill: orchestration-layer`. The layer's first instruction reads `ask-matt` (the routing brain). ask-matt routes to the specialist for the current SDLC phase. The layer adds state + evidence + the human-controlled stop.
 
-**State block** — each workflow tracks a compact state block (phase, evidence, artifacts) across turns. Before every user wait, the workflow emits the state. On continuation, it reads the latest state. If the state is lost (compaction), the workflow reconstructs from conversation artifacts.
+**Why not six orchestrators?** v0.3 had six parallel workflow orchestrators that each independently routed through the SDLC — duplicating routing that `ask-matt` already provides. v0.4 collapses them: ask-matt owns the routing (one source of truth), the orchestration layer owns the mechanics (one thin wrapper). No duplication.
+
+**Orchestration** — the layer reads ask-matt for routing, reads each specialist `SKILL.md` at its phase boundary, follows only that specialist's procedure, then rereads itself + ask-matt to route to the next phase. The layer owns the mechanics; ask-matt owns the routing; the specialist owns the procedure.
+
+**State block** — the layer tracks a compact state block (phase, evidence, artifacts) across turns. Before every user wait, the layer emits the state. On continuation, it reads the latest state. If the state is lost (compaction), the layer reconstructs from conversation artifacts.
 
 **Observable** — `/trace-skills` shows available vs activated skills.
 
@@ -86,11 +86,13 @@ The workflow skill orchestrates the phases. You answer questions and approve ins
 | Piece | What you get |
 | --- | --- |
 | **Coach** | Plain-English task → fixed workflow menu (8 workflows + raw + palette) |
-| **Prompts** | `/plan` `/build` `/debug` `/research` `/review` `/ship` `/triage` `/setup-audit` (thin — entry + task only) |
+| **Prompts** | `/plan` `/build` `/debug` `/research` `/review` `/ship` `/triage` `/setup-audit` (thin — entry + task only, each pins `orchestration-layer`) |
 | **Extensions** | `coach` · `guardrails` · `trace` · `palette` · `handoff` · `session-status` |
 | **Packages** | 12 npm packages (memory, subagents, context sidecar, lens, rewind, web, etc.) |
-| **Skills** | 6 workflow skills + 14 hand-tuned in-repo + community packs provisioned by install. Catalog: 88 skills total. **Only pinned workflow skills are mechanically injected; specialists are read on demand by the workflow.** |
-| **Rules** | `config/agents.md` (~183 lines) — installer wires the same file for Pi, Claude Code, and Codex |
+| **Routing brain** | `ask-matt` (Matt Pocock's, pinned with provenance + SHA-256 drift check) |
+| **Orchestration layer** | `orchestration-layer` (auto-pi's thin wrapper — state, evidence, reread, compaction, human-controlled stops, unique phases) |
+| **Specialists** | 14 hand-tuned in-repo skills (brainstorming, code-review, diagnosing-bugs, etc.) + community packs provisioned by install. Catalog: 88+ skills total. **Only the pinned layer is mechanically injected; ask-matt + specialists are read on demand.** |
+| **Rules** | `config/agents.md` — installer wires the same file for Pi, Claude Code, and Codex |
 
 ### Extensions (honest)
 
@@ -111,28 +113,32 @@ The workflow skill orchestrates the phases. You answer questions and approve ins
 
 ## Philosophy
 
-Pi ships a minimal harness on purpose. AutoPi fills the empty layer: **procedure reliability**.
+Pi ships a minimal harness on purpose. auto-pi fills the empty layer: **orchestration reliability around Matt Pocock's routing brain.**
 
 - Rent models (Claude API, ChatGPT Codex subscription, GLM, local — whatever Pi can reach).
-- Own the workflow: which workflow skill is pinned, what specialists it reads, what counts as "shipped."
-- Prefer one honest workflow pin over fifty silent catalog entries.
-- The workflow orchestrates; the human answers and approves.
+- Own the orchestration: state blocks, evidence gates, compaction recovery, human-controlled stops, and the phases Matt's skills don't have (ship, review disposition, verification, security).
+- Leverage upstream: ask-matt routes; we don't duplicate its graph.
+- One honest pin (`orchestration-layer`) over six parallel orchestrators.
+- The layer orchestrates; the human answers and approves.
 
 ---
 
 ## Structure
 
 ```
-config/agents.md        shared rules (~183 lines)
-config/settings.json    packages, compaction, memory, subagents
-config/models.json      provider / model definitions
-extensions/             coach, guardrails, trace, palette, handoff, session-status
-prompts/                slash workflows (7 — thin entry adapters)
-skills/                 6 workflow skills + 14 hand-tuned skills
-scripts/install.sh      one-command setup
-scripts/sync-live.sh    sync repo → live runtime
-scripts/update.sh       refresh
-docs/audits/            design / harmony trail
+config/agents.md            shared rules (3-layer architecture)
+config/settings.json        packages, compaction, memory, subagents
+config/models.json          provider / model definitions
+config/pinned-deps.json     ask-matt provenance (commit + SHA-256)
+config/workflow-graph-contract.ts  v0.4 graph contract + reachability
+extensions/                 coach, guardrails, trace, palette, handoff, session-status
+prompts/                    slash workflows (8 — thin, each pins orchestration-layer)
+skills/                     orchestration-layer + security-review + 14 hand-tuned skills
+scripts/install.sh          one-command setup
+scripts/sync-live.sh        sync repo → live runtime
+scripts/check-drift.sh      drift check (local forks + pinned deps)
+docs/specs/                 v0.4 spec
+docs/audits/                design / harmony / v0.4 audit trail
 ```
 
 ---

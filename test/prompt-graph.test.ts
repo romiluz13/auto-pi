@@ -341,7 +341,6 @@ test("every reachability entry has valid physical paths that exist on disk", () 
 
 // ─── Drift fixture tests (5 scenarios) ────────────────────────────────────────
 
-
 function runDriftCheck(
 	localDir: string,
 	upstreamRepo: string,
@@ -380,8 +379,6 @@ function runDriftCheck(
 		return { exitCode: e.status || 1, output: e.stdout || e.stderr || "" };
 	}
 }
-
-
 
 // ─── Drift fixture tests (5 real behavioral scenarios) ────────────────────────
 
@@ -717,7 +714,6 @@ test("triage outcomes have evidence fields", () => {
 // Check: prototype state mutations are explicit in the SKILL.md
 
 // ─── Contract v6: full SHA-256 + prototype state reset ───────────────────────
-
 
 // Check: ASK_MATT_SOURCE.sha256 is a full 64-char hex digest matching the actual file
 test("ASK_MATT_SOURCE.sha256 is a full 64-char hex digest matching the actual upstream file", () => {
@@ -1641,9 +1637,19 @@ test("v0.4 T8: config/agents.md describes the 3-layer architecture", () => {
 // Check: ASK_MATT_ROUTES covers the full SDLC
 test("v0.4 T9: ASK_MATT_ROUTES has the main flow (grill, spec, tickets, implement, tdd, code-review)", () => {
 	const routes = ASK_MATT_ROUTES.map((r) => r.route);
-	const mainFlow = ["grill-with-docs", "to-spec", "to-tickets", "implement", "tdd", "code-review"];
+	const mainFlow = [
+		"grill-with-docs",
+		"to-spec",
+		"to-tickets",
+		"implement",
+		"tdd",
+		"code-review",
+	];
 	for (const r of mainFlow) {
-		assert.ok(routes.includes(r), `ASK_MATT_ROUTES should include main-flow route "${r}"`);
+		assert.ok(
+			routes.includes(r),
+			`ASK_MATT_ROUTES should include main-flow route "${r}"`,
+		);
 	}
 });
 
@@ -1652,7 +1658,10 @@ test("v0.4 T9: ASK_MATT_ROUTES has on-ramps (triage, diagnosing-bugs, wayfinder)
 	const routes = ASK_MATT_ROUTES.map((r) => r.route);
 	const onRamps = ["triage", "diagnosing-bugs", "wayfinder"];
 	for (const r of onRamps) {
-		assert.ok(routes.includes(r), `ASK_MATT_ROUTES should include on-ramp "${r}"`);
+		assert.ok(
+			routes.includes(r),
+			`ASK_MATT_ROUTES should include on-ramp "${r}"`,
+		);
 	}
 });
 
@@ -1661,7 +1670,10 @@ test("v0.4 T9: ASK_MATT_ROUTES has standalone skills (grill-me, prototype, resea
 	const routes = ASK_MATT_ROUTES.map((r) => r.route);
 	const standalone = ["grill-me", "prototype", "research", "handoff"];
 	for (const r of standalone) {
-		assert.ok(routes.includes(r), `ASK_MATT_ROUTES should include standalone "${r}"`);
+		assert.ok(
+			routes.includes(r),
+			`ASK_MATT_ROUTES should include standalone "${r}"`,
+		);
 	}
 });
 
@@ -1669,16 +1681,28 @@ test("v0.4 T9: ASK_MATT_ROUTES has standalone skills (grill-me, prototype, resea
 test("v0.4 T9: EXPECTED_ASK_MATT_ROUTES is derived from ASK_MATT_ROUTES", () => {
 	assert.equal(EXPECTED_ASK_MATT_ROUTES.length, ASK_MATT_ROUTES.length);
 	for (const r of ASK_MATT_ROUTES) {
-		assert.ok(EXPECTED_ASK_MATT_ROUTES.includes(r.route), `EXPECTED_ASK_MATT_ROUTES should include "${r.route}"`);
+		assert.ok(
+			EXPECTED_ASK_MATT_ROUTES.includes(r.route),
+			`EXPECTED_ASK_MATT_ROUTES should include "${r.route}"`,
+		);
 	}
 });
 
 // Check: ORCHESTRATION_LAYER_PHASES has the 5 unique auto-pi phases
 test("v0.4 T9: ORCHESTRATION_LAYER_PHASES has ship, review-disposition, verification, security, diagnose", () => {
 	const phases = ORCHESTRATION_LAYER_PHASES.map((p) => p.name);
-	const expected = ["ship", "review-disposition", "verification", "security", "diagnose"];
+	const expected = [
+		"ship",
+		"review-disposition",
+		"verification",
+		"security",
+		"diagnose",
+	];
 	for (const p of expected) {
-		assert.ok(phases.includes(p), `ORCHESTRATION_LAYER_PHASES should include "${p}"`);
+		assert.ok(
+			phases.includes(p),
+			`ORCHESTRATION_LAYER_PHASES should include "${p}"`,
+		);
 	}
 });
 
@@ -1693,21 +1717,27 @@ test("v0.4 T9: ship phase reads the 3 core specialists", () => {
 
 // Check: review-disposition phase reads receiving-code-review
 test("v0.4 T9: review-disposition phase reads receiving-code-review", () => {
-	const review = ORCHESTRATION_LAYER_PHASES.find((p) => p.name === "review-disposition");
+	const review = ORCHESTRATION_LAYER_PHASES.find(
+		(p) => p.name === "review-disposition",
+	);
 	assert.ok(review);
 	assert.ok(review!.specialists.includes("receiving-code-review"));
 });
 
 // Check: security phase reads security-review
 test("v0.4 T9: security phase reads security-review", () => {
-	const security = ORCHESTRATION_LAYER_PHASES.find((p) => p.name === "security");
+	const security = ORCHESTRATION_LAYER_PHASES.find(
+		(p) => p.name === "security",
+	);
 	assert.ok(security);
 	assert.ok(security!.specialists.includes("security-review"));
 });
 
 // Check: diagnose phase has procedureScope limiting to Phases 1-4
 test("v0.4 T9: diagnose phase has procedureScope limiting to Phases 1-4", () => {
-	const diagnose = ORCHESTRATION_LAYER_PHASES.find((p) => p.name === "diagnose");
+	const diagnose = ORCHESTRATION_LAYER_PHASES.find(
+		(p) => p.name === "diagnose",
+	);
 	assert.ok(diagnose);
 	assert.ok(diagnose!.procedureScope);
 	assert.match(diagnose!.procedureScope!, /Phases 1-4/i);
@@ -1716,14 +1746,27 @@ test("v0.4 T9: diagnose phase has procedureScope limiting to Phases 1-4", () => 
 // Check: every community specialist in the reachability catalog exists on disk
 test("v0.4 T9: community specialists referenced by ask-matt routes exist at runtime paths", () => {
 	const communitySpecialists = [
-		"tdd", "to-spec", "to-tickets", "wayfinder", "prototype",
-		"domain-modeling", "codebase-design", "improve-codebase-architecture",
-		"commit", "github", "research", "resolving-merge-conflicts",
-		"grill-me", "triage",
+		"tdd",
+		"to-spec",
+		"to-tickets",
+		"wayfinder",
+		"prototype",
+		"domain-modeling",
+		"codebase-design",
+		"improve-codebase-architecture",
+		"commit",
+		"github",
+		"research",
+		"resolving-merge-conflicts",
+		"grill-me",
+		"triage",
 	];
 	for (const name of communitySpecialists) {
 		const entry = REACHABILITY_ENTRIES.find((e) => e.skill === name);
-		assert.ok(entry, `community specialist "${name}" should be in REACHABILITY_ENTRIES`);
+		assert.ok(
+			entry,
+			`community specialist "${name}" should be in REACHABILITY_ENTRIES`,
+		);
 	}
 });
 
@@ -1736,7 +1779,9 @@ test("v0.4 T9: ask-matt is classified as superseded in the reachability catalog"
 
 // Check: orchestration-layer is classified as workflow-orchestrator
 test("v0.4 T9: orchestration-layer is classified as workflow-orchestrator", () => {
-	const entry = REACHABILITY_ENTRIES.find((e) => e.skill === "orchestration-layer");
+	const entry = REACHABILITY_ENTRIES.find(
+		(e) => e.skill === "orchestration-layer",
+	);
 	assert.ok(entry);
 	assert.equal(entry!.productRole, "workflow-orchestrator");
 });
@@ -1744,12 +1789,19 @@ test("v0.4 T9: orchestration-layer is classified as workflow-orchestrator", () =
 // Check: the 6 old orchestrators are NOT in the reachability catalog
 test("v0.4 T9: the 6 collapsed orchestrators are NOT in the reachability catalog", () => {
 	const collapsed = [
-		"planning-workflow", "build-workflow", "review-workflow",
-		"ship-workflow", "research-workflow", "debug-workflow",
+		"planning-workflow",
+		"build-workflow",
+		"review-workflow",
+		"ship-workflow",
+		"research-workflow",
+		"debug-workflow",
 	];
 	for (const name of collapsed) {
 		const entry = REACHABILITY_ENTRIES.find((e) => e.skill === name);
-		assert.ok(!entry, `collapsed orchestrator "${name}" should NOT be in REACHABILITY_ENTRIES`);
+		assert.ok(
+			!entry,
+			`collapsed orchestrator "${name}" should NOT be in REACHABILITY_ENTRIES`,
+		);
 	}
 });
 
@@ -1758,7 +1810,71 @@ test("v0.4 T9: contract ASK_MATT_SOURCE has sha256 matching pinned-deps.json", (
 	const pinnedDepsPath = join(REPO_ROOT, "config", "pinned-deps.json");
 	if (existsSync(pinnedDepsPath)) {
 		const pinnedDeps = JSON.parse(readFileSync(pinnedDepsPath, "utf-8"));
-		assert.equal(ASK_MATT_SOURCE.sha256, pinnedDeps["ask-matt"].sha256,
-			"ASK_MATT_SOURCE.sha256 should match pinned-deps.json");
+		assert.equal(
+			ASK_MATT_SOURCE.sha256,
+			pinnedDeps["ask-matt"].sha256,
+			"ASK_MATT_SOURCE.sha256 should match pinned-deps.json",
+		);
 	}
+});
+
+// ─── v0.4 T10: documentation consistency guards ──────────────────────────────
+
+test("v0.4 T10: config/agents.md describes the 3-layer architecture", () => {
+	const content = readFileSync(join(REPO_ROOT, "config", "agents.md"), "utf-8");
+	assert.ok(/Coach/i.test(content), "AGENTS.md should mention Coach");
+	assert.ok(/ask-matt/i.test(content), "AGENTS.md should mention ask-matt");
+	assert.ok(
+		/orchestration-layer/i.test(content),
+		"AGENTS.md should mention orchestration-layer",
+	);
+});
+
+test("v0.4 T10: no stale orchestrator references in key files", () => {
+	const staleNames = [
+		"planning-workflow",
+		"build-workflow",
+		"review-workflow",
+		"ship-workflow",
+		"research-workflow",
+		"debug-workflow",
+	];
+	const filesToCheck = [
+		join(REPO_ROOT, "config", "agents.md"),
+		join(REPO_ROOT, "README.md"),
+		join(REPO_ROOT, "extensions", "coach.ts"),
+	];
+	for (const promptFile of readdirSync(join(REPO_ROOT, "prompts"))) {
+		filesToCheck.push(join(REPO_ROOT, "prompts", promptFile));
+	}
+	for (const file of filesToCheck) {
+		if (!existsSync(file)) continue;
+		const content = readFileSync(file, "utf-8");
+		for (const name of staleNames) {
+			assert.ok(
+				!content.includes(name),
+				`${file} should not reference stale orchestrator "${name}"`,
+			);
+		}
+	}
+});
+
+test("v0.4 T10: v0.4 audit document exists", () => {
+	assert.ok(
+		existsSync(
+			join(REPO_ROOT, "docs", "audits", "2026-08-01-auto-pi-v0.4-audit.md"),
+		),
+		"docs/audits/2026-08-01-auto-pi-v0.4-audit.md should exist",
+	);
+});
+
+test("v0.4 T10: v0.3 audit is marked superseded", () => {
+	const content = readFileSync(
+		join(REPO_ROOT, "docs", "audits", "2026-07-26-workflow-skills-audit.md"),
+		"utf-8",
+	);
+	assert.ok(
+		/SUPERSEDED/i.test(content),
+		"v0.3 audit should be marked SUPERSEDED",
+	);
 });
