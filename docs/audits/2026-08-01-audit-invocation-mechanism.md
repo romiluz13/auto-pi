@@ -11,7 +11,7 @@
 ### 1a. System prompt injection (always-on)
 
 | Component | File | Bytes | Injected where |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | AGENTS.md | `config/agents.md` (symlink → `~/.ai/AGENTS.md`) | 12,817 | System prompt contextFile — EVERY turn |
 | Guardrails HARD RULES block | `extensions/guardrails.ts` | ~3,700 (truncated to 3,500 chars + header) | System prompt — session_start + after auto-compaction |
 | Skill catalog (descriptions) | All `SKILL.md` frontmatter `description` fields | ~32,890 (119 skills × ~276 bytes avg) | System prompt — every turn (main agent) |
@@ -27,6 +27,7 @@
 **The pin is DETERMINISTIC and MECHANICAL.** When a user types `/plan`:
 
 1. Pi loads `prompts/plan.md` (synced to `~/.pi/agent/prompts/plan.md`):
+
    ```yaml
    ---
    skill: planning-workflow
@@ -53,6 +54,7 @@
 **CRITICAL:** The skill is injected as a **CONVERSATION MESSAGE**, not into the system prompt. The message has `customType: "skill-loaded"`, `display: true`, and `content: "<skill name=\"planning-workflow\">\n...\n</skill>"`.
 
 **Evidence:** `pi-prompt-template-model/index.ts:228-240`:
+
 ```typescript
 return {
     kind: "ready",
@@ -70,11 +72,13 @@ return {
 **This is MODEL-DEPENDENT (probabilistic), not deterministic.**
 
 The workflow skills contain instructions like:
+
 - `planning-workflow/SKILL.md:80`: "read `/Users/rom.iluz/.agents/skills/brainstorming/SKILL.md` completely"
 - `planning-workflow/SKILL.md:167`: "Reread this workflow skill after each phase + after compaction"
 - `build-workflow/SKILL.md:54`: "Follow the diagnosing-bugs procedure"
 
 These are natural-language instructions to the model. The model must:
+
 1. Remember the instruction exists (it's in the pinned skill message, which may be far back in context)
 2. Choose to call the `read` tool with the correct path
 3. Actually follow the procedure after reading it
@@ -86,6 +90,7 @@ These are natural-language instructions to the model. The model must:
 **Coach is deterministic for workflow selection, probabilistic only for optional skill hints.**
 
 `extensions/coach.ts:139-200` — Coach hooks the `input` event:
+
 1. Intercepts every user input (unless prefixed with `!` for raw mode or `/` for commands)
 2. Shows a **fixed 9-option menu** (`WORKFLOW_OPTIONS` array, `coach.ts:148-200`)
 3. User picks one → Coach transforms input into the matching slash command (e.g. `/build "$TASK"`)
@@ -113,7 +118,7 @@ This is always injected as a contextFile in the system prompt. Additionally, `gu
 ### 2b. Total system-prompt size estimate (main agent, 119 skills in catalog)
 
 | Component | Bytes | Tokens (~4 chars/tok) |
-|---|---|---|
+| --- | --- | --- |
 | AGENTS.md (contextFile) | 12,817 | 3,204 |
 | Guardrails HARD RULES block | 3,700 | 925 |
 | Skill catalog (119 descriptions) | 32,890 | 8,223 |
@@ -130,7 +135,7 @@ Plus the pinned workflow skill as a conversation message (not system prompt):
 ### 2c. Context window consumption
 
 | Model | Context window | System prompt % | First-turn total % |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | FW-GLM-5.2 (default) | 1,048,576 | 1.73% | 2.03% |
 | FW-GLM-5.1 | 202,752 | 8.95% | 10.49% |
 | 128K ctx model | 131,072 | 13.85% | 16.20% |
@@ -156,12 +161,13 @@ The compaction threshold is set at `compactAfterTokensRatio: 0.4` (`settings.jso
 ### 3a. Three grades of skill activation (from `trace.ts:243-246`)
 
 | Grade | Mechanism | Deterministic? | Count (all trace files) |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | A | `skill:` frontmatter pin (PTM mechanical injection) | YES — file read via `readFileSync` | 73 |
 | B | `/skill:name` command (PTM mechanical injection) | YES — same mechanism | (included in 73) |
 | C | Model reads `SKILL.md` via `read` tool | NO — model must choose to call `read` | 318 |
 
 **Total skill loads across all trace files: 391**
+
 - **Deterministic (Grade A/B): 73 = 18.7%**
 - **Probabilistic (Grade C): 318 = 81.3%**
 
@@ -195,7 +201,7 @@ The **initial workflow skill load is deterministic** (Grade A — the pin fires 
 ### 4a. What survives compaction
 
 | Component | Survives compaction? | Mechanism |
-|---|---|---|
+| --- | --- | --- |
 | AGENTS.md (contextFile) | **YES** | Pi re-injects contextFiles into every system prompt |
 | Guardrails HARD RULES block | **YES** | `guardrails.ts:176-179` — `session_compact` handler sets `fullInjectNext = true` for auto-compaction, triggering full re-injection on next `before_agent_start` |
 | Skill catalog (descriptions) | **YES** | Part of system prompt, always re-injected |
@@ -209,6 +215,7 @@ The **initial workflow skill load is deterministic** (Grade A — the pin fires 
 ### 4b. The compaction recovery gap
 
 After compaction, the system prompt is fully restored (AGENTS.md, guardrails, catalog, tools). But the **entire workflow context is gone**:
+
 - The pinned skill message (with the full workflow procedure) is compacted
 - The state block (tracking which phase we're in) is compacted
 - Any specialist skills that were read are compacted
@@ -221,11 +228,13 @@ And in each workflow skill (e.g. `planning-workflow/SKILL.md:167`):
 > "Reread this workflow skill after each phase + after compaction (if you detect the context was lost, reread `/Users/rom.iluz/.agents/skills/planning-workflow/SKILL.md`)."
 
 **But this instruction is in the workflow skill, which was compacted away.** After compaction, the model sees:
+
 1. The system prompt (AGENTS.md mentions compaction as a risk, but doesn't say which workflow was active)
 2. The compaction summary (may or may not mention the active workflow)
 3. No skill content, no state block
 
 The model must:
+
 1. Recognize it was in a workflow
 2. Know which workflow it was
 3. Know the path to re-read the workflow skill
@@ -237,6 +246,7 @@ The model must:
 ### 4c. Manual vs auto-compaction
 
 `guardrails.ts:177-179` distinguishes:
+
 - **Auto-compaction** (context overflow): triggers full guardrails re-injection
 - **Manual `/compact`**: user-initiated, only gets a 1-line reminder next turn
 
@@ -249,6 +259,7 @@ The workflow skill recovery instruction applies to both, but manual compaction g
 ### HIGH RISK: Post-compaction workflow recovery (probabilistic multi-step chain)
 
 After compaction, the entire workflow context is gone. Recovery depends on the model:
+
 1. Recognizing it was in a workflow
 2. Knowing which workflow and its file path
 3. Choosing to re-read the skill
@@ -261,6 +272,7 @@ After compaction, the entire workflow context is gone. Recovery depends on the m
 ### MEDIUM RISK: Specialist skill reads (81.3% of all loads are model-dependent)
 
 The workflow instructs the model to read specialist skills, but there's no enforcement. If the model skips a read:
+
 - It improvises the specialist's procedure
 - It may produce lower-quality output
 - There's no error or warning — the failure is silent
@@ -284,6 +296,7 @@ Coach's LLM skillHints can fail (timeout, API error), but the menu still shows. 
 ### STRUCTURAL RISK: No skill-injector.ts exists
 
 The task asked about `extensions/skill-injector.ts` — this file does not exist. Skill injection is handled by the `pi-prompt-template-model` npm package (`~/.pi/agent/npm/node_modules/pi-prompt-template-model/`), not a project-local extension. This means:
+
 - The injection mechanism is in a third-party package, not in the repo
 - The repo cannot modify the injection behavior
 - Any changes to skill loading require changes to the PTM package
@@ -303,7 +316,7 @@ The task asked about `extensions/skill-injector.ts` — this file does not exist
 ## Appendix: File measurements
 
 | File | Bytes |
-|---|---|
+| --- | --- |
 | `config/agents.md` | 12,817 |
 | `config/workflow-graph-contract.ts` | 72,241 (NOT injected — test/validation only) |
 | `config/settings.json` | 2,179 |
@@ -332,7 +345,7 @@ The task asked about `extensions/skill-injector.ts` — this file does not exist
 ### Trace data summary (all trace files, 421 turns)
 
 | Metric | Value |
-|---|---|
+| --- | --- |
 | Total turns logged | 421 |
 | Skill activations (model read, Grade C) | 318 |
 | Skill injections (PTM mechanical, Grade A/B) | 73 |

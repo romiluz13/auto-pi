@@ -44,11 +44,13 @@ The reread protocol is real and mechanically followable: the agent reads the wor
 **File:** `skills/build-workflow/SKILL.md`
 
 **Defect 1 — Phase 6 gap (MINOR, potentially MAJOR in practice):**
+
 - Line 54: `"Follow the specialist's Phases 1–4 (establish the feedback loop, reproduce, form hypotheses, find the root cause). Do NOT execute the specialist's Phase 5 (Fix + regression test) — the fix + regression test happen in the tdd phase, not here."`
 - The instruction explicitly addresses Phases 1–4 (follow) and Phase 5 (prohibit) but says **nothing about Phase 6** (Cleanup + post-mortem). Phase 6 of `diagnosing-bugs` includes removing `[DEBUG-...]` instrumentation, deleting throwaway prototypes, and re-running the original repro. An agent following the workflow literally would skip Phase 6 entirely. When it returns to tdd, the tdd skill has no knowledge of `[DEBUG-...]` tags, so debug instrumentation could be left in the codebase.
 - **Fix:** Add "Phase 6 (Cleanup + post-mortem) happens in the tdd phase after the fix is applied — ensure [DEBUG-...] instrumentation is removed and the original repro no longer reproduces."
 
 **Defect 2 — Phase 4 parenthetical imprecision (MINOR):**
+
 - Line 54: The parenthetical `"(establish the feedback loop, reproduce, form hypotheses, find the root cause)"` maps to Phases 1–4, but Phase 4 is named "Instrument", not "find the root cause". Finding the root cause is the *outcome* of instrumentation. Imprecise but not functionally wrong.
 
 ---
@@ -92,11 +94,13 @@ The reread protocol is real and mechanically followable: the agent reads the wor
 **File:** `skills/debug-workflow/SKILL.md`
 
 **Defect 1 — Phase 6 gap (MINOR, same as build-workflow):**
+
 - Line 42: `"Follow the specialist's Phases 1–4... Do NOT execute the specialist's Phase 5 (Fix + regression test) — the fix + regression test happen in /build (TDD), not here."`
 - Same issue as build-workflow: Phase 6 (Cleanup + post-mortem) is unaddressed. The debug-workflow goes to `complete` and tells the user to type `/build`. Phase 6 cleanup (removing debug instrumentation, deleting throwaway prototypes) would need to happen during `/build`, but neither the debug-workflow nor the build-workflow carries this forward.
 - **Fix:** Add "Phase 6 cleanup (remove [DEBUG-...] tags, delete throwaway prototypes) happens during /build after the fix."
 
 **Defect 2 — Phase 4 parenthetical imprecision (MINOR):**
+
 - Line 42: Same as build-workflow — "find the root cause" describes the outcome of Phase 4 (Instrument), not the phase name.
 
 ---
@@ -119,6 +123,7 @@ The reread protocol is real and mechanically followable: the agent reads the wor
 **File:** `skills/bearings/SKILL.md`
 
 **Defect 1 — No missing-file handling (MINOR):**
+
 - Lines 15, 21: `"Read ~/.pi/agent/session-status.jsonl"` and `"Also read ~/.pi/agent/decisions.json for open decisions."`
 - On a fresh setup, these files may not exist. The skill doesn't say to handle missing files gracefully. The "Every section ALWAYS renders, even when empty" rule implies the agent should handle empty/missing data, but it's not explicit.
 - **Fix:** Add "If a file doesn't exist, treat it as empty."
@@ -152,6 +157,7 @@ The reread protocol is real and mechanically followable: the agent reads the wor
 **File:** `skills/memory-compounding/SKILL.md`
 
 **Defect 1 — Markdown vs SQLite ambiguity (MINOR):**
+
 - Line 21: `"For each entry in ~/.pi/agent/pi-hermes-memory/MEMORY.md, USER.md, failures.md, and the SQLite memories table (via memory_search), apply exactly one outcome"`
 - The skill doesn't clarify the relationship between the markdown files and the SQLite table. Are they the same data in different formats? Different stores? If both exist, does the agent review the same entry twice? The skill should clarify which is authoritative or how they relate.
 - All referenced files exist: `MEMORY.md`, `USER.md`, `failures.md` verified at `~/.pi/agent/pi-hermes-memory/`.
@@ -188,6 +194,7 @@ The reread protocol is real and mechanically followable: the agent reads the wor
 **File:** `skills/grilling/SKILL.md`
 
 **Defect 1 — Ambiguous exit condition (MINOR):**
+
 - Line 6: `"Interview me relentlessly about every aspect of this until we reach a shared understanding."`
 - Line 12: `"Do not act on it until I confirm we have reached a shared understanding."`
 - "Shared understanding" is undefined — when is it achieved? There's no checklist, no criteria, no state field. The planning-workflow compensates with `design: pending | approved`, so the workflow knows when to advance. But the grilling skill itself has no exit condition.
@@ -212,6 +219,7 @@ The reread protocol is real and mechanically followable: the agent reads the wor
 **File:** `skills/code-review/SKILL.md`
 
 **Defect 1 — Impossible instruction (MINOR):**
+
 - Line 20: `"The issue tracker should have been provided to you — run /setup-matt-pocock-skills if docs/agents/issue-tracker.md is missing."`
 - The agent cannot run slash commands (per AGENTS.md: "The skill pin only fires when a HUMAN types the slash command. The agent cannot run slash commands."). Additionally, `setup-matt-pocock-skills` has `disable-model-invocation: true`, so the agent can't auto-invoke it either. The instruction should say "tell the user to run `/setup-matt-pocock-skills`".
 - **Fix:** Change "run `/setup-matt-pocock-skills`" to "tell the user to run `/setup-matt-pocock-skills`".
@@ -225,6 +233,7 @@ Otherwise excellent: two-axis review with smell baseline, friction scan, AI-gene
 **File:** `skills/diagnosing-bugs/SKILL.md`
 
 **Defect 1 — Ambiguous slash-command reference (MINOR):**
+
 - Line 150: `"hand off to the /improve-codebase-architecture skill with the specifics."`
 - "Hand off to" is ambiguous — the agent can't invoke slash commands. Should say "tell the user to run `/improve-codebase-architecture`". The skill `/improve-codebase-architecture` exists at `~/.agents/skills/improve-codebase-architecture`, so the reference isn't broken, just the invocation mode is wrong.
 
@@ -260,6 +269,7 @@ Otherwise excellent: 6-phase structure with tight completion criteria, hypothesi
 **File:** `skills/verification-before-completion/SKILL.md`
 
 **Defect 1 — Stale count (MINOR):**
+
 - Line 116: `"From 24 failure memories:"` — this is a hardcoded count that will go stale as memories are added or removed. Not functionally important (the count is context, not a procedure step), but factually imprecise.
 - **Fix:** Change to "From failure memories:" or make the count dynamic.
 
@@ -272,6 +282,7 @@ Otherwise excellent: Iron Law, Gate Function, Phantom-Green Failure defense, evi
 ### Pattern 1: Specialist skills tell the agent to "run" slash commands (3 instances)
 
 Three specialist skills use language that implies the agent can run slash commands:
+
 - `code-review:20` — "run `/setup-matt-pocock-skills`"
 - `diagnosing-bugs:150` — "hand off to the `/improve-codebase-architecture` skill"
 - `codebase-hygiene:8,58` — "route the change through `/build`"
@@ -289,6 +300,7 @@ Both workflows that route to `diagnosing-bugs` say "Follow Phases 1–4, do NOT 
 ### Pattern 3: Compaction resilience is well-designed across all 6 workflows
 
 All 6 workflow orchestrators have:
+
 - State blocks printed into the conversation (survives compaction as text)
 - "On every continuation: read the latest state block from the conversation. If missing or ambiguous, STOP — reconstruct from conversation artifacts."
 - "Compaction is a residual risk" rule with reconstruction from artifacts
@@ -305,7 +317,7 @@ The non-workflow skills that need persistence (bearings, decision-hold-lifecycle
 ## Summary Verdicts
 
 | Skill | Verdict | Key Issue |
-|-------|---------|-----------|
+| ------- | --------- | ----------- |
 | planning-workflow | CLEAN | — |
 | build-workflow | MINOR | Phase 6 gap; Phase 4 parenthetical imprecision |
 | review-workflow | CLEAN | — |

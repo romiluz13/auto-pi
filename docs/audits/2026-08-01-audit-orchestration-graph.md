@@ -23,7 +23,7 @@ The auto-pi orchestration graph has three layers:
 ### Coach Menu (`extensions/coach.ts`, WORKFLOW_OPTIONS, lines ~153-197)
 
 | # | Label | Command | Prompt Pin |
-|---|-------|---------|------------|
+| --- | ------- | --------- | ------------ |
 | 1 | Just do it | `null` (passthrough) | — |
 | 2 | /build | `/build "$TASK"` | `prompts/build.md` → `skill: build-workflow` |
 | 3 | /debug | `/debug "$TASK"` | `prompts/debug.md` → `skill: debug-workflow` |
@@ -49,7 +49,7 @@ Mentions skills by name in the "Skill flow graph" section but does NOT mechanica
 ## Complete Skill Table (20 Auto-Pi Repo Skills)
 
 | # | Skill | How Invoked | Invoked By (file:line) | Deterministic? | Verdict |
-|---|-------|-------------|------------------------|----------------|---------|
+| --- | ------- | ------------- | ------------------------ | ---------------- | --------- |
 | 1 | **bearings** | `/palette`, `/skill:bearings` | `extensions/session-status.ts:131` registers `/bearings` ext cmd, but handler reads STATUS_FILE directly — does NOT read SKILL.md | DETERMINISTIC (ext cmd) but ext cmd bypasses skill content | **CATALOG-ONLY** for skill; ext cmd is independent |
 | 2 | **brainstorming** | Workflow phase read | `skills/planning-workflow/SKILL.md` (conditional: `style=brainstorming`) | PROBABILISTIC — model decides to read | **PROBABILISTIC** |
 | 3 | **build-workflow** | Prompt pin + Coach menu | `prompts/build.md` `skill: build-workflow` + `extensions/coach.ts:162` (option 2) | DETERMINISTIC — mechanical frontmatter pin | **DETERMINISTIC** |
@@ -76,7 +76,7 @@ Mentions skills by name in the "Skill flow graph" section but does NOT mechanica
 ## Verdict Summary
 
 | Verdict | Count | Skills |
-|---------|-------|--------|
+| --------- | ------- | -------- |
 | **DETERMINISTIC** (prompt pin) | 7 | build-workflow, debug-workflow, planning-workflow, research-workflow, review-workflow, ship-workflow, setup-maintenance |
 | **PROBABILISTIC** (workflow phase read) | 7 | brainstorming, grilling, code-review, receiving-code-review, diagnosing-bugs, diff-driven-docs, verification-before-completion |
 | **PROBABILISTIC** (AGENTS.md or skill-to-skill mention) | 2 | codebase-hygiene, setup-matt-pocock-skills |
@@ -124,6 +124,7 @@ This is a known design tradeoff documented in the contract: "This is NOT a runti
 **Severity: None (positive finding)**
 
 All 14 external skills referenced by the 6 workflow SKILL.md files exist at their declared runtime paths:
+
 - `~/.agents/skills/`: grill-me, domain-modeling, prototype, to-spec, to-tickets, wayfinder, tdd, uv, commit, github, research, octocode-research, resolving-merge-conflicts
 - `~/.pi/agent/skills/`: live-research
 
@@ -208,7 +209,7 @@ AGENTS.md mention only (advisory, no pin):
 ## Contract vs. Reality Cross-Check
 
 | Contract Claim | Reality | Match? |
-|----------------|---------|--------|
+| ---------------- | --------- | -------- |
 | 20 skills with `sourcePaths` in `skills/` | 20 directories in `skills/` | ✅ Exact match |
 | setup-maintenance `discoveryRoute: "Coach menu + direct prompt pin"` | NOT in Coach menu | ❌ Contract overstates |
 | bearings `invocationSurfaces: ["catalog-only"]` | Also has `/bearings` ext cmd (bypasses skill) | ⚠️ Contract omits ext cmd |

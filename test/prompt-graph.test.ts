@@ -1498,6 +1498,7 @@ function runDriftFixture(
 		REPO_ROOT: localDir,
 		MATTPocOCK_REPO: upstreamRepo,
 		LOCAL_FORK_NAMES: "test-fork",
+		PINNED_DEP_NAMES: "",
 	};
 	try {
 		const stdout = execSync(
@@ -1897,4 +1898,170 @@ test("planning SKILL.md resets conclusion + resume phase on prototype decline", 
 		/prototype conclusion: not-applicable/i.test(content),
 		"prototype decline should set 'prototype conclusion: not-applicable'",
 	);
+});
+
+// ─── Pinned-dependency drift fixtures (ask-matt) — v0.4 T1 ────────────────────
+
+function createPinnedDepFixture(
+	installedContent: string,
+	manifestSha256: string,
+): {
+	installedDir: string;
+	manifestPath: string;
+	cleanup: () => void;
+} {
+	const baseDir = mkdtempSync(join(tmpdir(), "pinned-dep-"));
+	const installedDir = join(baseDir, "installed");
+	const manifestDir = join(baseDir, "config");
+	mkdirSync(join(installedDir, "ask-matt"), { recursive: true });
+	mkdirSync(manifestDir, { recursive: true });
+
+	writeFileSync(
+		join(installedDir, "ask-matt", "SKILL.md"),
+		installedContent,
+	);
+
+	const manifest = {
+		"ask-matt": {
+			installedPath: join(installedDir, "ask-matt", "SKILL.md"),
+			upstreamRepo: "/dev/null",
+			upstreamPath: "skills/engineering/ask-matt/SKILL.md",
+			baseCommit: "ed37663",
+			repoHeadChecked: "2ab9580",
+			sha256: manifestSha256,
+		},
+	};
+	const manifestPath = join(manifestDir, "pinned-deps.json");
+	writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+
+	return {
+		installedDir,
+		manifestPath,
+		cleanup: () => rmSync(baseDir, { recursive: true, force: true }),
+	};
+}
+
+function runPinnedDepCheck(
+	manifestPath: string,
+	installedDir: string,
+): { exitCode: number; output: string } {
+	const env = {
+		...process.env,
+		PINNED_DEPS_JSON: manifestPath,
+		PINNED_DEP_NAMES: "ask-matt",
+		INSTALLED_SKILLS_DIR: installedDir,
+		LOCAL_FORK_NAMES: "",
+	};
+	try {
+		const stdout = execSync(
+			`bash "${join(REPO_ROOT, "scripts", "check-drift.sh")}"`,
+			{
+				encoding: "utf-8",
+				stdio: "pipe",
+				env,
+				maxBuffer: 1024 * 1024,
+			},
+		);
+		return { exitCode: 0, output: stdout };
+	} catch (e: any) {
+		const stdout = e.stdout
+			? typeof e.stdout === "string"
+				? e.stdout
+				: e.stdout.toString("utf-8")
+			: "";
+		const stderr = e.stderr
+			? typeof e.stderr === "string"
+				? e.stderr
+				: e.stderr.toString("utf-8")
+			: "";
+		return { exitCode: e.status ?? 1, output: stdout + stderr };
+	}
+}
+
+function sha256OfFile(content: string): string {
+	return createHash("sha256").update(content).digest("hex");
+}
+
+test("pinned dep fixture 1: installed SHA matches recorded SHA → exit 0", () => {
+	const content = "---\nname: ask-matt\n---\n# Ask Matt\nrouting content\n";
+	const sha = sha256OfFile(content);
+	const { manifestPath, installedDir, cleanup } = createPinnedDepFixture(
+		content,
+		sha,
+	);
+	const result = runPinnedDepCheck(manifestPath, installedDir);
+	assert.equal(
+		result.exitCode,
+		0,
+		`pinned-dep match: should exit 0, got ${result.exitCode}: ${result.output}`,
+	);
+	cleanup();
+});
+
+test("pinned dep fixture 2: installed SHA differs (installed changed) → exit 1", () => {
+	const installedContent =
+		"---\nname: ask-matt\n---\n# Ask Matt\nCHANGED content\n";
+	const recordedSha = sha256OfFile(
+		"---\nname: ask-matt\n---\n# Ask Matt\nORIGINAL content\n",
+	);
+	const { manifestPath, installedDir, cleanup } = createPinnedDepFixture(
+		installedContent,
+		recordedSha,
+	);
+	const result = runPinnedDepCheck(manifestPath, installedDir);
+	assert.equal(
+		result.exitCode,
+		1,
+		`pinned-dep mismatch: should exit 1, got ${result.exitCode}: ${result.output}`,
+	);
+	cleanup();
+});
+
+test("pinned dep fixture 3: missing provenance manifest → exit 1", () => {
+	const content = "---\nname: ask-matt\n---\n# Ask Matt\nrouting content\n";
+	const sha = sha256OfFile(content);
+	const { manifestPath, installedDir, cleanup } = createPinnedDepFixture(
+		content,
+		sha,
+	);
+	// Point to a nonexistent manifest
+	const result = runPinnedDepCheck(
+		join(manifestPath, "nonexistent"),
+		installedDir,
+	);
+	assert.equal(
+		result.exitCode,
+		1,
+		`pinned-dep missing manifest: should exit 1, got ${result.exitCode}: ${result.output}`,
+	);
+	cleanup();
+});
+
+// Check: the real ask-matt provenance manifest exists + SHA matches the actual installed file
+test("real ask-matt provenance manifest exists + SHA matches the installed file", () => {
+	const manifestPath = join(REPO_ROOT, "config", "pinned-deps.json");
+	assert.ok(
+		existsSync(manifestPath),
+		"config/pinned-deps.json should exist",
+	);
+	const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+	assert.ok(manifest["ask-matt"], "manifest should have an ask-matt entry");
+	const entry = manifest["ask-matt"];
+	assert.ok(entry.sha256, "ask-matt entry should have a sha256");
+	assert.match(entry.sha256, /^[a-f0-9]{64}$/, "sha256 should be 64 hex chars");
+	// Verify against the actual installed file if it exists
+	const installedPath = entry.installedPath.replace(
+		/^~\/\.agents/,
+		join(homedir(), ".agents"),
+	);
+	if (existsSync(installedPath)) {
+		const computed = createHash("sha256")
+			.update(readFileSync(installedPath))
+			.digest("hex");
+		assert.equal(
+			entry.sha256,
+			computed,
+			"ask-matt sha256 in manifest should match the actual installed file",
+		);
+	}
 });

@@ -15,7 +15,7 @@ The 20 repo skills divide into two layers: **6 workflow orchestrators** (plannin
 ## Conflict Matrix
 
 | Skill A | Skill B | Relationship | Verdict |
-|---------|---------|-------------|---------|
+| --------- | --------- | ------------- | --------- |
 | `review-workflow` | `receiving-code-review` | Orchestrator → specialist | **CONFLICT** — "Do NOT apply" vs "IMPLEMENT" |
 | `build-workflow` | `diagnosing-bugs` | Orchestrator → specialist | **CONFLICT** — workflow skips Phase 5; specialist defines it as required |
 | `debug-workflow` | `diagnosing-bugs` | Orchestrator → specialist | **CONFLICT** — same as above |
@@ -47,12 +47,14 @@ The 20 repo skills divide into two layers: **6 workflow orchestrators** (plannin
 **Evidence:**
 
 `build-workflow/SKILL.md:53-54`:
+
 ```
 1. Read `/Users/rom.iluz/.agents/skills/diagnosing-bugs/SKILL.md` completely.
 2. Follow the diagnosing-bugs procedure: build a feedback loop, find the root cause. **Diagnosis only — do NOT fix the source here.** Follow the specialist's Phases 1–4 ... Do NOT execute the specialist's Phase 5 (Fix + regression test) — the fix + regression test happen in the tdd phase, not here.
 ```
 
 `debug-workflow/SKILL.md:40-42`:
+
 ```
 1. Read `/Users/rom.iluz/.agents/skills/diagnosing-bugs/SKILL.md` completely.
 2. Follow the diagnosing-bugs procedure: build a feedback loop, find the root cause.
@@ -72,6 +74,7 @@ The only difference: build-workflow returns to tdd with the diagnosis; debug-wor
 **Evidence:**
 
 `build-workflow/SKILL.md:59-62` (complete phase):
+
 ```
 The build is complete when:
 - All acceptance criteria have evidence (each slice's test passes).
@@ -96,16 +99,19 @@ The verification evidence format ("exact command, exit code, first + last 5 line
 **Evidence:**
 
 `receiving-code-review/SKILL.md:24` (The Response Pattern, step 6):
+
 ```
 6. IMPLEMENT: One item at a time, test each
 ```
 
 `receiving-code-review/SKILL.md:66`:
+
 ```
 - **Trusted** - implement after understanding
 ```
 
 `receiving-code-review/SKILL.md:110-113` (Implementation Order):
+
 ```
 2. Then implement in this order:
    - Blocking issues (breaks, security)
@@ -115,16 +121,19 @@ The verification evidence format ("exact command, exit code, first + last 5 line
 ```
 
 `review-workflow/SKILL.md:44`:
+
 ```
 - `verified-fix` — the finding is correct; verified and queued for `/build`. Do NOT apply changes during review — the fix happens in `/build` (TDD).
 ```
 
 `review-workflow/SKILL.md:49`:
+
 ```
 5. Do NOT use ambiguous "apply" — be explicit about the disposition. Do NOT apply changes during review — review is review-only; fixes happen in `/build`.
 ```
 
 **The conflict:** When `review-workflow` loads `receiving-code-review` in the disposition phase, the agent receives two contradictory instructions:
+
 - The specialist says: implement the fixes, test each one.
 - The orchestrator says: do NOT apply any changes, queue for `/build`.
 
@@ -143,6 +152,7 @@ The workflow's "Rules" section says "The workflow owns the routing... Do not fol
 **Evidence:**
 
 `diagnosing-bugs/SKILL.md:120`:
+
 ```
 ## Phase 5 — Fix + regression test
 ```
@@ -150,11 +160,13 @@ The workflow's "Rules" section says "The workflow owns the routing... Do not fol
 `diagnosing-bugs/SKILL.md:122-134`: Full fix procedure — write regression test, watch it fail, apply fix, watch it pass, re-run feedback loop.
 
 `build-workflow/SKILL.md:54`:
+
 ```
 Do NOT execute the specialist's Phase 5 (Fix + regression test) — the fix + regression test happen in the tdd phase, not here.
 ```
 
 `debug-workflow/SKILL.md:42`:
+
 ```
 Do NOT execute the specialist's Phase 5 (Fix + regression test) — the fix + regression test happen in `/build` (TDD), not here.
 ```
@@ -178,11 +190,13 @@ Do NOT execute the specialist's Phase 5 (Fix + regression test) — the fix + re
 `code-review/SKILL.md` defines exactly 2 axes: Standards and Spec (lines 5-7, 83-85). No security axis, no security methodology. (grep for "security" in code-review returns zero matches.)
 
 `review-workflow/SKILL.md:32`:
+
 ```
 3. **auto-pi policy:** add a third reviewer — **Security** (injection, auth, secrets, unsafe operations). Give each reviewer fresh context — only the diff, not the builder's reasoning (anti-anchored).
 ```
 
 `review-workflow/SKILL.md:68`:
+
 ```
 - **Security is always a third reviewer** (auto-pi policy).
 ```
@@ -202,6 +216,7 @@ If `code-review` is used standalone (without `review-workflow`), no security rev
 **Evidence:**
 
 `review-workflow/SKILL.md:43-48` defines 4 disposition categories:
+
 ```
 - `verified-fix` — the finding is correct; verified and queued for `/build`.
 - `verified-defer` — the finding is correct but should be a separate ticket.
@@ -224,11 +239,13 @@ When `review-workflow` loads `receiving-code-review`, the agent must cross-refer
 **Evidence:**
 
 `review-workflow/SKILL.md:62`:
+
 ```
 Report by severity: CRITICAL (blocks), HIGH (should fix), LOW (nice to have).
 ```
 
 `code-review/SKILL.md:85`:
+
 ```
 Present the two reports under `## Standards` and `## Spec` headings, verbatim or lightly cleaned.
 ```
@@ -268,6 +285,7 @@ It's used by `planning-workflow` as an alternative to `brainstorming` (line 60-6
 **Evidence:**
 
 `diagnosing-bugs/SKILL.md:136`:
+
 ```
 ## Phase 6 — Cleanup + post-mortem
 ```
@@ -407,7 +425,7 @@ There's no `handoff-workflow` that orchestrates the handoff with state protocol,
 ## Summary of Findings by Severity
 
 | Severity | Count | Items |
-|----------|-------|-------|
+| ---------- | ------- | ------- |
 | HIGH | 1 | C-1 (receiving-code-review IMPLEMENT vs review-workflow Do-NOT-apply) |
 | MEDIUM | 6 | D-1, D-2, C-2, O-1, O-2, G-1, G-5 |
 | LOW | 5 | O-3, G-2, G-3, G-4, G-6, G-7 |

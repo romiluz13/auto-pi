@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
-# check-drift.sh — three-way drift check for local forks (code-review, diagnosing-bugs)
+# check-drift.sh — drift check for local forks (code-review, diagnosing-bugs)
+#                + pinned external dependencies (ask-matt)
 #
-# Compares: base (upstream at the recorded provenance commit) vs upstream-HEAD vs local.
-# Reports: upstream-changed/local-unchanged, local-changed/upstream-unchanged, or overlapping changes.
-# Exit 0 = no drift OR drift is intentional (provenance present, no overlap with upstream changes).
-# Exit 1 = drift without provenance, or upstream changed in/near local patch regions (stale fork).
+# LOCAL FORKS: three-way compare base (upstream at recorded commit) vs upstream-HEAD vs local.
+#   Exit 0 = no drift OR drift is intentional (provenance present, no overlap with upstream changes).
+#   Exit 1 = drift without provenance, or upstream changed in/near local patch regions (stale fork).
+#
+# PINNED DEPS: verify the installed file's SHA-256 matches the recorded SHA in the manifest.
+#   Exit 0 = installed SHA matches the pinned SHA.
+#   Exit 1 = installed SHA differs (the running version is not what we pinned), or manifest missing.
 #
 # Usage: bash scripts/check-drift.sh
+# Env vars (for testing): REPO_ROOT, MATTPocOCK_REPO, LOCAL_FORK_NAMES,
+#   PINNED_DEPS_JSON (path to pinned-deps.json), PINNED_DEP_NAMES (override list),
+#   INSTALLED_SKILLS_DIR (override root for installed paths).
 # Must be run from the repo root (or the script resolves it from its own location).
 
 set -euo pipefail
@@ -15,11 +22,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${REPO_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 UPSTREAM_REPO="${MATTPocOCK_REPO:-/Users/rom.iluz/Dev/mattpocock-skills}"
+PINNED_DEPS_JSON_ENV="${PINNED_DEPS_JSON:-}"
+INSTALLED_SKILLS_DIR_ENV="${INSTALLED_SKILLS_DIR:-}"
 
-# The local forks with known drift
-LOCAL_FORKS=(${LOCAL_FORK_NAMES:-code-review diagnosing-bugs})
+# The local forks with known drift (space-separated; empty = skip local-fork check)
+LOCAL_FORKS=(${LOCAL_FORK_NAMES-code-review diagnosing-bugs})
+# The pinned external dependencies (space-separated; empty = skip pinned-dep check)
+PINNED_DEPS=(${PINNED_DEP_NAMES-ask-matt})
 
-echo "=== Three-way drift check for local forks ==="
+echo "=== Drift check: local forks + pinned dependencies ==="
 echo "Repo root: $REPO_ROOT"
 echo "Upstream repo: $UPSTREAM_REPO"
 echo ""
@@ -107,9 +118,88 @@ for skill in "${LOCAL_FORKS[@]}"; do
 	rm -f "$base_file"
 done
 
+# ── Pinned external dependencies (ask-matt) ────────────────────────────────
+if [ ${#PINNED_DEPS[@]} -gt 0 ]; then
+	echo "=== Pinned dependencies ==="
+	echo ""
+
+	pinned_manifest="$REPO_ROOT/config/pinned-deps.json"
+	if [ -n "$PINNED_DEPS_JSON_ENV" ]; then
+		pinned_manifest="$PINNED_DEPS_JSON_ENV"
+	fi
+
+	if [ ! -f "$pinned_manifest" ]; then
+		echo "✗ pinned-deps manifest missing ($pinned_manifest)"
+		exit_code=1
+	else
+		for dep in "${PINNED_DEPS[@]}"; do
+			echo "--- $dep (pinned) ---"
+
+			# Parse the manifest entry via python3 (macOS ships it)
+			entry_json=$(python3 -c "
+import json
+with open('$pinned_manifest') as f:
+    data = json.load(f)
+if '$dep' not in data:
+    print('MISSING')
+else:
+    e = data['$dep']
+    print(e.get('installedPath',''))
+    print(e.get('sha256',''))
+    print(e.get('upstreamRepo',''))
+    print(e.get('upstreamPath',''))
+    print(e.get('baseCommit',''))
+" 2>/dev/null) || entry_json=""
+
+			if [ -z "$entry_json" ] || [ "$entry_json" = "MISSING" ]; then
+				echo "  ✗ no manifest entry for $dep"
+				exit_code=1
+				continue
+			fi
+
+			# Read the entry fields (line-separated)
+			installed_path=$(echo "$entry_json" | sed -n '1p')
+			recorded_sha=$(echo "$entry_json" | sed -n '2p')
+
+			# Resolve ~ in the installed path, unless INSTALLED_SKILLS_DIR overrides
+			if [ -n "$INSTALLED_SKILLS_DIR_ENV" ]; then
+				resolved_installed="$INSTALLED_SKILLS_DIR_ENV/$dep/SKILL.md"
+			else
+				resolved_installed="${installed_path/#\~/$HOME}"
+			fi
+
+			if [ ! -f "$resolved_installed" ]; then
+				echo "  ✗ installed file missing ($resolved_installed)"
+				exit_code=1
+				continue
+			fi
+
+			# Compute SHA-256 of the installed file
+			actual_sha=$(shasum -a 256 "$resolved_installed" | awk '{print $1}')
+
+			if [ -z "$recorded_sha" ]; then
+				echo "  ✗ no sha256 recorded in manifest for $dep"
+				exit_code=1
+				continue
+			fi
+
+			if [ "$actual_sha" = "$recorded_sha" ]; then
+				echo "  ✓ installed SHA matches pinned SHA ($actual_sha)"
+			else
+				echo "  ⚠ installed SHA differs from pinned SHA"
+				echo "    recorded: $recorded_sha"
+				echo "    actual:   $actual_sha"
+				echo "    The running version is not what we pinned. Review upstream changes and update the manifest if desired."
+				exit_code=1
+			fi
+		done
+		echo ""
+	fi
+fi
+
 echo ""
 if [ "$exit_code" -eq 0 ]; then
-	echo "✓ All local forks have provenance. Drift is intentional and tracked. No upstream skill-file changes require manual review."
+	echo "✓ All local forks have provenance + all pinned deps match. No drift requires manual review."
 else
 	echo "✗ Drift issues detected — see above."
 fi
