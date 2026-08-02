@@ -2193,3 +2193,182 @@ test("v0.4: no Coach entry prompt still pins a workflow orchestrator (the 6 are 
 		);
 	}
 });
+
+// ─── v0.4 T4: orchestration-layer unique phases ──────────────────────────────
+
+// Check: orchestration-layer has all 4 unique auto-pi phases
+test("v0.4 T4: orchestration-layer has all 4 unique auto-pi phases (ship, review-disposition, verification, security)", () => {
+	const content = readWorkflowSkill("orchestration-layer");
+	// Phase headers
+	assert.ok(
+		/## Phase:\s*ship\b/im.test(content),
+		"layer should have a '## Phase: ship' header",
+	);
+	assert.ok(
+		/## Phase:\s*review-disposition\b/im.test(content),
+		"layer should have a '## Phase: review-disposition' header",
+	);
+	assert.ok(
+		/## Phase:\s*verification\b/im.test(content),
+		"layer should have a '## Phase: verification' header",
+	);
+	assert.ok(
+		/## Phase:\s*security\b/im.test(content),
+		"layer should have a '## Phase: security' header",
+	);
+});
+
+// Check: ship phase has entry conditions + specialist reads + evidence gates + human-controlled stop
+test("v0.4 T4: ship phase has entry conditions, specialist reads, evidence gates, and human-controlled stop", () => {
+	const content = readWorkflowSkill("orchestration-layer");
+	// Extract the ship phase section
+	const shipMatch = content.match(
+		/## Phase:\s*ship\b([\s\S]*?)(?=\n## (?:Phase:|Rules|$))/i,
+	);
+	assert.ok(shipMatch, "ship phase section should exist");
+	const shipSection = shipMatch![1];
+	// Entry conditions
+	assert.ok(
+		/entry condition/i.test(shipSection),
+		"ship phase should mention entry conditions",
+	);
+	// Specialist reads (verification-before-completion, diff-driven-docs, commit, github)
+	assert.ok(
+		shipSection.includes("verification-before-completion"),
+		"ship phase should read verification-before-completion",
+	);
+	assert.ok(
+		shipSection.includes("diff-driven-docs"),
+		"ship phase should read diff-driven-docs",
+	);
+	assert.ok(shipSection.includes("commit"), "ship phase should read commit");
+	assert.ok(
+		shipSection.includes("github"),
+		"ship phase should read github (conditional)",
+	);
+	// Evidence gates
+	assert.ok(
+		/evidence/i.test(shipSection),
+		"ship phase should have evidence gates",
+	);
+	assert.ok(
+		/commit hash|pr url|ci status/i.test(shipSection),
+		"ship phase should require commit hash/PR URL/CI status as evidence",
+	);
+	// Human-controlled stop (ship is terminal — "Ship complete" or "Next: type")
+	assert.ok(
+		/Next:\s*type|Ship complete/i.test(shipSection),
+		"ship phase should have a human-controlled stop ('Next: type /X' or 'Ship complete')",
+	);
+});
+
+// Check: review-disposition phase has the 4 dispositions + specialist read + human-controlled stop
+test("v0.4 T4: review-disposition phase has 4 dispositions, reads receiving-code-review, and human-controlled stop", () => {
+	const content = readWorkflowSkill("orchestration-layer");
+	const dispMatch = content.match(
+		/## Phase:\s*review-disposition\b([\s\S]*?)(?=\n## (?:Phase:|Rules|$))/i,
+	);
+	assert.ok(dispMatch, "review-disposition phase section should exist");
+	const dispSection = dispMatch![1];
+	// The 4 dispositions
+	assert.ok(
+		/verified-fix/i.test(dispSection),
+		"review-disposition should define 'verified-fix'",
+	);
+	assert.ok(
+		/verified-defer/i.test(dispSection),
+		"review-disposition should define 'verified-defer'",
+	);
+	assert.ok(
+		/rejected/i.test(dispSection),
+		"review-disposition should define 'rejected'",
+	);
+	assert.ok(
+		/needs-user-decision/i.test(dispSection),
+		"review-disposition should define 'needs-user-decision'",
+	);
+	// Specialist read
+	assert.ok(
+		dispSection.includes("receiving-code-review"),
+		"review-disposition should read receiving-code-review",
+	);
+	// Human-controlled stop
+	assert.ok(
+		/Next:\s*type/i.test(dispSection),
+		"review-disposition should have a human-controlled stop",
+	);
+	// Review-only (no apply)
+	assert.ok(
+		/do not apply|review-only/i.test(dispSection),
+		"review-disposition should be review-only (do not apply)",
+	);
+});
+
+// Check: verification phase reads verification-before-completion + applied at build-complete AND ship
+test("v0.4 T4: verification gate reads verification-before-completion and is applied at build-complete and ship", () => {
+	const content = readWorkflowSkill("orchestration-layer");
+	const verifyMatch = content.match(
+		/## Phase:\s*verification\b([\s\S]*?)(?=\n## (?:Phase:|Rules|$))/i,
+	);
+	assert.ok(verifyMatch, "verification phase section should exist");
+	const verifySection = verifyMatch![1];
+	// Reads the specialist
+	assert.ok(
+		verifySection.includes("verification-before-completion"),
+		"verification phase should read verification-before-completion",
+	);
+	// Applied at build-complete AND ship
+	assert.ok(
+		/build.complete/i.test(verifySection),
+		"verification gate should apply at build-complete",
+	);
+	assert.ok(
+		/ship/i.test(verifySection),
+		"verification gate should apply at ship",
+	);
+	// Evidence block format
+	assert.ok(
+		/evidence block|exit code|exact command/i.test(verifySection),
+		"verification gate should require the evidence block format",
+	);
+});
+
+// Check: security phase defines the 3rd review axis with a smell catalog + references security-review specialist
+test("v0.4 T4: security phase defines 3rd review axis with smell categories and references security-review specialist", () => {
+	const content = readWorkflowSkill("orchestration-layer");
+	const secMatch = content.match(
+		/## Phase:\s*security\b([\s\S]*?)(?=\n## (?:Phase:|Rules|$))/i,
+	);
+	assert.ok(secMatch, "security phase section should exist");
+	const secSection = secMatch![1];
+	// Smell categories (at least 5 of the 8)
+	const categories = [
+		"injection",
+		"auth",
+		"secret",
+		"deserialization",
+		"ssrf",
+		"path traversal",
+		"unsafe",
+	];
+	const found = categories.filter((c) => new RegExp(c, "i").test(secSection));
+	assert.ok(
+		found.length >= 5,
+		`security phase should mention at least 5 smell categories, found: ${found.join(", ")}`,
+	);
+	// References security-review specialist (created in T6)
+	assert.ok(
+		/security-review/i.test(secSection),
+		"security phase should reference the security-review specialist",
+	);
+	// Fresh context / anti-anchored
+	assert.ok(
+		/fresh context|anti.anchored|diff.only/i.test(secSection),
+		"security phase should require fresh context (anti-anchored)",
+	);
+	// Human-controlled stop
+	assert.ok(
+		/Next:\s*type/i.test(secSection),
+		"security phase should have a human-controlled stop",
+	);
+});
