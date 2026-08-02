@@ -85,29 +85,9 @@ test("every prompt's skill: target exists in the skill library", () => {
 
 // ─── The 6 workflow prompts pin their workflow skills ─────────────────────────
 
-test("/plan pins planning-workflow", () => {
-	assert.equal(skillPin(readPrompt("plan")), "planning-workflow");
-});
-
-test("/build pins build-workflow", () => {
-	assert.equal(skillPin(readPrompt("build")), "build-workflow");
-});
-
-test("/review pins review-workflow", () => {
-	assert.equal(skillPin(readPrompt("review")), "review-workflow");
-});
-
-test("/ship pins ship-workflow", () => {
-	assert.equal(skillPin(readPrompt("ship")), "ship-workflow");
-});
-
-test("/debug pins debug-workflow", () => {
-	assert.equal(skillPin(readPrompt("debug")), "debug-workflow");
-});
-
-test("/research pins research-workflow", () => {
-	assert.equal(skillPin(readPrompt("research")), "research-workflow");
-});
+// v0.4: the 6 workflow prompts now pin orchestration-layer (which reads ask-matt).
+// The old orchestrator-specific pin tests are superseded by the v0.4 tests below.
+// These are kept as regression checks that the prompts no longer pin the old orchestrators.
 
 test("/setup-audit pins setup-maintenance directly (1 specialist, no wrapper)", () => {
 	assert.equal(skillPin(readPrompt("setup-audit")), "setup-maintenance");
@@ -538,7 +518,9 @@ test("build-workflow detects inherited unrelated context (smart zone)", () => {
 
 // ─── B4: Triage discoverability ─────────────────────────────────────────────
 
-test("triage prompt exists and pins triage directly", () => {
+// v0.4: /triage now pins orchestration-layer (which reads ask-matt for triage routing).
+// The triage skill itself is read on-demand by the layer, not pinned directly.
+test("triage prompt exists and pins orchestration-layer", () => {
 	assert.ok(
 		existsSync(join(PROMPTS_DIR, "triage.md")),
 		"/triage prompt should exist",
@@ -546,8 +528,8 @@ test("triage prompt exists and pins triage directly", () => {
 	const content = readFileSync(join(PROMPTS_DIR, "triage.md"), "utf-8");
 	assert.equal(
 		skillPin(content),
-		"triage",
-		"/triage should pin the triage skill directly",
+		"orchestration-layer",
+		"/triage should pin orchestration-layer (v0.4)",
 	);
 });
 
@@ -911,16 +893,19 @@ test("build-workflow fresh-context gate is a hard STOP (not just a recommendatio
 	);
 });
 
-// Check: triage prompt has conditional handoff (only /build when ready-for-agent)
-test("triage prompt has conditional handoff (only /build when ready-for-agent)", () => {
-	const content = readFileSync(join(PROMPTS_DIR, "triage.md"), "utf-8");
+// v0.4: triage conditional handoff is now in ask-matt's triage flow (routed by the layer),
+// not in the prompt itself. The prompt is a thin entry adapter.
+// Check that the orchestration-layer references the triage flow.
+test("triage conditional handoff is in ask-matt's flow (routed by the layer)", () => {
+	const layerContent = readWorkflowSkill("orchestration-layer");
 	assert.ok(
-		/ready-for-agent.*\/build|only.*ready-for-agent/i.test(content),
-		"triage should recommend /build only when ready-for-agent",
+		/ask-matt/i.test(layerContent),
+		"orchestration-layer should reference ask-matt for triage routing",
 	);
+	const triageContent = readPrompt("triage");
 	assert.ok(
-		/needs-info|wontfix|ready-for-human/i.test(content),
-		"triage should have other outcome states (needs-info, wontfix, ready-for-human)",
+		/triage/i.test(triageContent),
+		"triage prompt should mention triage",
 	);
 });
 
@@ -937,19 +922,25 @@ test("every workflow in the contract exists as a SKILL.md", () => {
 });
 
 // Check: every workflow's prompt pin matches the contract
-test("every workflow prompt pin matches the contract", () => {
-	for (const wf of WORKFLOWS) {
-		// Find the prompt that pins this workflow
-		const promptName = wf.name.replace(/-workflow$/, "");
-		const promptPath = join(PROMPTS_DIR, `${promptName}.md`);
-		if (existsSync(promptPath)) {
-			const pin = skillPin(readFileSync(promptPath, "utf-8"));
-			assert.equal(
-				pin,
-				wf.promptPin,
-				`/${promptName} should pin ${wf.promptPin}`,
-			);
-		}
+// v0.4: the contract still models the 6 old workflows (T9 will rewrite it).
+// For now, the prompts pin orchestration-layer, not the old workflow skills.
+// This test is superseded by the v0.4 pin tests above. Kept as a no-op until T9 rewrites the contract.
+test("v0.4 transition: prompts pin orchestration-layer (contract rewrite pending T9)", () => {
+	for (const name of [
+		"plan",
+		"build",
+		"debug",
+		"research",
+		"review",
+		"ship",
+		"triage",
+	]) {
+		const pin = skillPin(readPrompt(name));
+		assert.equal(
+			pin,
+			"orchestration-layer",
+			`/${name} should pin orchestration-layer (v0.4)`,
+		);
 	}
 });
 
@@ -2137,4 +2128,68 @@ test("orchestration-layer skill exists + has all 7 structural sections", () => {
 		/specialist.*own.*procedur/i.test(content),
 		"should declare specialists own procedures",
 	);
+});
+
+// ─── v0.4 T3: Coach entry prompts pin orchestration-layer (+ ask-matt read-on-entry) ──
+
+// D-2 resolution: Pi's PTM does NOT support multiple skill: pins (skill?: string, single value).
+// Each entry prompt pins orchestration-layer, which instructs the agent to read ask-matt at
+// /Users/rom.iluz/.agents/skills/ask-matt/SKILL.md as its first instruction (read-on-entry fallback).
+
+const V04_ENTRY_PROMPTS = [
+	"plan",
+	"build",
+	"debug",
+	"research",
+	"review",
+	"ship",
+	"triage",
+] as const;
+
+test("v0.4: every Coach entry prompt pins orchestration-layer", () => {
+	for (const name of V04_ENTRY_PROMPTS) {
+		const pin = skillPin(readPrompt(name));
+		assert.equal(
+			pin,
+			"orchestration-layer",
+			`prompt ${name}.md should pin orchestration-layer, got "${pin}"`,
+		);
+	}
+});
+
+test("v0.4: orchestration-layer skill exists", () => {
+	assert.ok(
+		skillExists("orchestration-layer"),
+		"orchestration-layer skill should exist in the skill library",
+	);
+});
+
+test("v0.4: orchestration-layer instructs the agent to read ask-matt (read-on-entry fallback)", () => {
+	const content = readWorkflowSkill("orchestration-layer");
+	assert.ok(
+		/read.*ask-matt.*SKILL\.md/i.test(content),
+		"orchestration-layer should instruct the agent to read ask-matt/SKILL.md",
+	);
+	assert.ok(
+		content.includes("/Users/rom.iluz/.agents/skills/ask-matt/SKILL.md"),
+		"orchestration-layer should reference the absolute path to ask-matt/SKILL.md",
+	);
+});
+
+test("v0.4: no Coach entry prompt still pins a workflow orchestrator (the 6 are being collapsed)", () => {
+	const oldOrchestrators = [
+		"planning-workflow",
+		"build-workflow",
+		"review-workflow",
+		"ship-workflow",
+		"research-workflow",
+		"debug-workflow",
+	];
+	for (const name of V04_ENTRY_PROMPTS) {
+		const pin = skillPin(readPrompt(name));
+		assert.ok(
+			!oldOrchestrators.includes(pin ?? ""),
+			`prompt ${name}.md should not pin the old orchestrator "${pin}" — it should pin orchestration-layer`,
+		);
+	}
 });

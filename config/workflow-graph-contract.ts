@@ -541,6 +541,21 @@ export const REACHABILITY_ENTRIES: ReachabilityEntry[] = [
 		shadowedRuntimePaths: [],
 	},
 	{
+		skill: "orchestration-layer",
+		invocationSurfaces: ["workflow-prompt-pin"],
+		productRole: "orchestrator",
+		discoveryRoute: "Coach menu + prompt pin (v0.4)",
+		rationale:
+			"v0.4 orchestration layer — pinned by every Coach entry prompt alongside ask-matt (read-on-entry). Wraps ask-matt with state blocks, evidence gates, compaction recovery, human-controlled stops.",
+		sourcePaths: ["skills/orchestration-layer/SKILL.md"],
+		runtimePhysicalPaths: [
+			"/Users/rom.iluz/.agents/skills/orchestration-layer/SKILL.md",
+		],
+		selectedRuntimePath:
+			"/Users/rom.iluz/.agents/skills/orchestration-layer/SKILL.md",
+		shadowedRuntimePaths: [],
+	},
+	{
 		skill: "agents-sdk",
 		invocationSurfaces: ["catalog-only"],
 		productRole: "community-on-demand",
