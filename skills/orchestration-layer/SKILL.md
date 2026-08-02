@@ -65,6 +65,17 @@ Reread after compaction (if you detect the context was lost):
 2. Re-read ask-matt at `/Users/rom.iluz/.agents/skills/ask-matt/SKILL.md`.
 3. Reconstruct the state block from conversation artifacts (spec URL, ticket refs, commit hash, test output). Do not guess — if artifacts are missing, STOP and tell the user.
 
+## Decision persistence during planning (decision-hold-lifecycle)
+
+During the planning phase (brainstorming, grilling, spec, tickets), when an unresolved decision is discovered that belongs to the user, persist it to `~/.pi/agent/decisions.json` per `decision-hold-lifecycle` (read `/Users/rom.iluz/.agents/skills/decision-hold-lifecycle/SKILL.md` if needed). Surface open decisions in the next state block. Decisions evaporate between sessions and across compaction — persisting them to disk is the structural fix.
+
+## Standalone utilities
+
+These skills are not part of the SDLC flow but are available as standalone utilities:
+
+- **`session-handoff`** (`/handoff`) — cross-session handoff. Write a handoff doc, save key decisions to memory, notify the target session via intercom. Use when a session is getting long and you want a fresh context. This is the compaction escape hatch (see compaction recovery below).
+- **`bearings`** (`/bearings`) — "pick up where I left off" status report across all active Pi sessions. The `/bearings` extension command (in `session-status.ts`) is the real implementation; the skill file is catalog-only. Use for morning brief, catch-up, or context reset.
+
 ## Compaction recovery
 
 Compaction is a residual risk. The state block is best-effort in normal context. If the state is lost:
@@ -125,7 +136,10 @@ These phases are entered when ask-matt routes the flow to them — they replace 
 - After github (if applicable): PR URL + CI status (`pass` / `fail` / `not-applicable`). If CI fails, return to the verify phase with the CI failure.
 
 **Human-controlled stop:**
-At the end of the ship phase, emit the state block and tell the user: `Ship complete. Commit: <hash>. PR: <url or N/A>. CI: <pass/fail/NA>.` The flow is complete — no next slash command unless the user wants to start a new flow.
+**Post-work memory hygiene (memory-compounding):**
+After the ship phase is complete, run `memory-compounding` (read `/Users/rom.iluz/.agents/skills/memory-compounding/SKILL.md`): review and sharpen persistent memory so it compounds instead of accumulating. Post-work memory hygiene — save durable learnings, prune stale entries, deduplicate repeated lessons. This is the final step before the flow is truly complete.
+
+At the end of the ship phase, emit the state block and tell the user: `Ship complete. Commit: <hash>. PR: <url or N/A>. CI: <pass/fail/NA>. Memory: <compounded or skipped>.` The flow is complete — no next slash command unless the user wants to start a new flow.
 
 ## Phase: review-disposition
 
@@ -154,6 +168,9 @@ At the end of the ship phase, emit the state block and tell the user: `Ship comp
 - Each finding has a disposition with a reason.
 - If any disposition is `needs-user-decision`, REMAIN in this phase until all user decisions are resolved. Do NOT go to complete with unresolved user decisions.
 - When all dispositions are resolved (no `needs-user-decision` remaining), the evidence gate is satisfied.
+
+**Decision persistence (decision-hold-lifecycle):**
+When a review finding surfaces an unresolved design or product decision that belongs to the user, persist it to `~/.pi/agent/decisions.json` per `decision-hold-lifecycle` (read `/Users/rom.iluz/.agents/skills/decision-hold-lifecycle/SKILL.md` if needed). Surface open decisions in the next state block so they are not lost across compaction or session restarts.
 
 **Human-controlled stop:**
 Emit the state block (with all dispositions). Tell the user: `Review complete. <N> findings. <disposition summary>. Next: type /build` to address the verified fixes.

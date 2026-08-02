@@ -2613,3 +2613,63 @@ test("T5 Pattern 1: codebase-hygiene says 'tell the user to run' not 'route thro
 		"codebase-hygiene should NOT say 'route the change through /build'",
 	);
 });
+
+// ─── T7: wire the 3 orphans — v0.4 ────────────────────────────────────────────
+
+test("T7: decision-hold-lifecycle is referenced by the layer's planning phase", () => {
+	const layer = readWorkflowSkill("orchestration-layer");
+	assert.ok(
+		/decision-hold-lifecycle/i.test(layer),
+		"orchestration-layer should reference decision-hold-lifecycle",
+	);
+	assert.ok(/planning/i.test(layer), "layer should have planning context");
+});
+
+test("T7: decision-hold-lifecycle is referenced by the layer's review phase", () => {
+	const layer = readWorkflowSkill("orchestration-layer");
+	// The layer must mention decision-hold-lifecycle in a review context
+	// (either in the review-disposition phase or a general review mention)
+	assert.ok(
+		/decision-hold-lifecycle/i.test(layer),
+		"orchestration-layer should reference decision-hold-lifecycle",
+	);
+	// Check it's in a review context (review-disposition phase or review mention)
+	assert.ok(
+		/review-disposition.*decision-hold|decision-hold.*review/i.test(layer) ||
+			/review/i.test(layer),
+		"layer should associate decision-hold-lifecycle with review",
+	);
+});
+
+test("T7: memory-compounding is referenced by the layer's ship-complete phase", () => {
+	const layer = readWorkflowSkill("orchestration-layer");
+	assert.ok(
+		/memory-compounding/i.test(layer),
+		"orchestration-layer should reference memory-compounding",
+	);
+	assert.ok(/ship/i.test(layer), "layer should have a ship phase");
+});
+
+test("T7: session-handoff is documented as standalone + mentioned in compaction recovery", () => {
+	const layer = readWorkflowSkill("orchestration-layer");
+	// Mentioned in compaction recovery
+	assert.ok(
+		/session-handoff|\/handoff/i.test(layer),
+		"orchestration-layer should mention session-handoff or /handoff",
+	);
+	// Mentioned as a compaction escape hatch
+	assert.ok(
+		/compaction.*handoff|handoff.*compaction|context.*degraded.*handoff|handoff.*fresh/i.test(
+			layer,
+		),
+		"layer should mention /handoff as a compaction escape hatch",
+	);
+});
+
+test("T7: bearings is documented as a standalone utility", () => {
+	const layer = readWorkflowSkill("orchestration-layer");
+	assert.ok(
+		/bearings/i.test(layer),
+		"orchestration-layer should mention bearings as a standalone utility",
+	);
+});
