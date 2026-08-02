@@ -1916,10 +1916,7 @@ function createPinnedDepFixture(
 	mkdirSync(join(installedDir, "ask-matt"), { recursive: true });
 	mkdirSync(manifestDir, { recursive: true });
 
-	writeFileSync(
-		join(installedDir, "ask-matt", "SKILL.md"),
-		installedContent,
-	);
+	writeFileSync(join(installedDir, "ask-matt", "SKILL.md"), installedContent);
 
 	const manifest = {
 		"ask-matt": {
@@ -2040,10 +2037,7 @@ test("pinned dep fixture 3: missing provenance manifest → exit 1", () => {
 // Check: the real ask-matt provenance manifest exists + SHA matches the actual installed file
 test("real ask-matt provenance manifest exists + SHA matches the installed file", () => {
 	const manifestPath = join(REPO_ROOT, "config", "pinned-deps.json");
-	assert.ok(
-		existsSync(manifestPath),
-		"config/pinned-deps.json should exist",
-	);
+	assert.ok(existsSync(manifestPath), "config/pinned-deps.json should exist");
 	const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
 	assert.ok(manifest["ask-matt"], "manifest should have an ask-matt entry");
 	const entry = manifest["ask-matt"];
@@ -2064,4 +2058,83 @@ test("real ask-matt provenance manifest exists + SHA matches the installed file"
 			"ask-matt sha256 in manifest should match the actual installed file",
 		);
 	}
+});
+
+// ─── v0.4 T2: orchestration-layer skeleton ────────────────────────────────────
+
+// Check: orchestration-layer skill exists + has all 7 structural sections
+test("orchestration-layer skill exists + has all 7 structural sections", () => {
+	const content = readWorkflowSkill("orchestration-layer");
+
+	// 1. State block schema (phase, evidence fields, artifact references)
+	assert.ok(
+		/state block/i.test(content),
+		"should have a state block schema section",
+	);
+	assert.ok(
+		/phase:/i.test(content),
+		"state block schema should define phase field",
+	);
+	assert.ok(
+		/evidence/i.test(content),
+		"state block schema should define evidence fields",
+	);
+
+	// 2. Evidence gate pattern ("Do NOT advance without [specific evidence]")
+	assert.ok(
+		/Do NOT advance without/i.test(content),
+		"should have evidence gate pattern ('Do NOT advance without')",
+	);
+
+	// 3. Reread-after-phase protocol (after each phase + after compaction)
+	assert.ok(
+		/[Rr]eread.*after each phase/i.test(content),
+		"should have reread-after-phase protocol",
+	);
+	assert.ok(
+		/[Rr]eread.*after compaction/i.test(content),
+		"should have reread-after-compaction protocol",
+	);
+
+	// 4. Compaction recovery protocol (re-read ask-matt + this layer; reconstruct from artifacts)
+	assert.ok(/compaction/i.test(content), "should mention compaction recovery");
+	assert.ok(
+		/reconstruct.*artifact/i.test(content),
+		"should say to reconstruct from artifacts",
+	);
+	assert.ok(
+		/ask-matt/i.test(content),
+		"compaction recovery should reference re-reading ask-matt",
+	);
+
+	// 5. Human-controlled stop rule (emit state → "Next: type /X" → STOP; do not auto-advance)
+	assert.ok(
+		/Next: type/i.test(content),
+		"should have human-controlled stop with 'Next: type /X' handoff",
+	);
+	assert.ok(/STOP/i.test(content), "should explicitly say STOP");
+	assert.ok(
+		/do not auto-advance/i.test(content),
+		"should say 'do not auto-advance'",
+	);
+
+	// 6. Specialist isolation (follow only the active phase's specialist; do not preload)
+	assert.ok(
+		/do not preload/i.test(content),
+		"should have specialist isolation rule ('do not preload')",
+	);
+
+	// 7. Routing ownership (ask-matt owns routing; this layer owns orchestration mechanics; specialists own procedures)
+	assert.ok(
+		/ask-matt owns.*rout/i.test(content),
+		"should declare ask-matt owns routing",
+	);
+	assert.ok(
+		/orchestration.*mechanic/i.test(content),
+		"should declare this layer owns orchestration mechanics",
+	);
+	assert.ok(
+		/specialist.*own.*procedur/i.test(content),
+		"should declare specialists own procedures",
+	);
 });
