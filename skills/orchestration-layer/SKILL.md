@@ -145,7 +145,9 @@ At the end of the ship phase, emit the state block and tell the user: `Ship comp
 - `rejected` — the finding is wrong; push back with a concrete reason. A dispute is valid ONLY if it carries a concrete `VERIFY_COMMAND` whose output PROVES the finding false.
 - `needs-user-decision` — the finding is ambiguous; ask the user.
 
-**Review-only policy:** Do NOT apply changes during review. The disposition phase verifies and records; fixes happen in `/build`. Override receiving-code-review's IMPLEMENT step — during review, replace it with disposition recording.
+**Review-only policy:** Do NOT apply changes during review. The disposition phase verifies and records; fixes happen in `/build`.
+
+**Override receiving-code-review's IMPLEMENT step:** When `receiving-code-review` says "6. IMPLEMENT: One item at a time, test each" — **skip it during review**. Replace the IMPLEMENT step with **disposition recording** (one of the 4 dispositions above per finding). The fix happens in `/build` (TDD), not during review. This is an explicit override of the specialist's step 6.
 
 **Evidence gates:**
 
@@ -228,7 +230,49 @@ Give the security reviewer fresh context — only the diff, not the builder's re
 **Human-controlled stop:**
 Security findings flow into the review-disposition phase. Emit the state block. If there are security findings, they will be dispositioned in review-disposition. Tell the user: `Security review complete. <N> findings or clean>. Next: type /review` (to proceed to disposition).
 
-## Rules
+## Phase: diagnose (build-on-RED and debug)
+
+**Entry conditions:**
+
+- During build: a TDD red test persists after 3 attempts (ask-matt's implement routes here).
+- During debug: the user typed `/debug` and ask-matt routed to the diagnosing-bugs on-ramp.
+
+**Specialist to read:**
+
+1. Read `/Users/rom.iluz/.agents/skills/diagnosing-bugs/SKILL.md` completely.
+2. **Follow the specialist's Phases 1–4** (establish the feedback loop, reproduce, form hypotheses, instrument). **Skip Phase 5** (Fix + regression test) — the fix + regression test happen in the tdd phase, not here. Do NOT execute the specialist's Phase 5.
+3. **Execute Phase 6 (Cleanup + post-mortem) AFTER the fix is applied in tdd** — not during diagnosis.
+
+**Phase 6 cleanup (carried into post-fix):**
+After the fix is applied in tdd, ensure:
+
+- All `[DEBUG-...]` instrumentation is removed (`grep` the prefix).
+- Throwaway prototypes are deleted (or moved to a clearly-marked debug location).
+- The original repro no longer reproduces (re-run the Phase 1 loop).
+- The correct hypothesis is stated in the commit / PR message.
+
+This applies to both the build-on-RED path (build-workflow) and the debug path — Phase 6 cleanup happens in tdd after the fix, not during diagnosis.
+
+**Evidence gates:**
+
+- The root cause is identified (the correct hypothesis is stated).
+- The causal chain is complete (no "somehow X leads to Y" gaps).
+- After the fix: Phase 6 cleanup evidence (grep output showing no [DEBUG-...] tags, original repro no longer reproduces).
+
+**Human-controlled stop:**
+Emit the state block with the root cause + cleanup evidence. Tell the user: `Diagnosis complete. Root cause: <summary>. Next: type /build` (to apply the fix in TDD) or `Fix complete. Next: type /review`.
+
+## Severity mapping (review axis → flat list)
+
+**The review produces findings from 3 axes:** Standards (from `code-review`), Spec (from `code-review`), and Security (from the security phase above). The review-disposition phase expects a flat `findings: [<severity + file:line + description>]` list.
+
+**Map each axis finding to a severity:**
+
+- **CRITICAL** — blocks shipping: the code doesn't work, a security vulnerability is exploitable, the spec is not implemented at all, or the code violates a hard standard.
+- **HIGH** — should fix before shipping: the code works but has a real quality issue (a spec deviation, a security smell that's likely exploitable, a standards violation that affects correctness or maintainability).
+- **LOW** — nice to have: cosmetic, style, minor optimization, non-blocking standards nit.
+
+**Transformation:** Take each axis report (Standards, Spec, Security) and assign one severity per finding. Merge into a single flat list: `findings: [CRITICAL: file:line: description, HIGH: file:line: description, LOW: file:line: description]`. The disposition phase then records one disposition per finding.
 
 - **ask-matt owns the routing.** This layer owns the orchestration mechanics + the unique phases above. Specialists own the procedures.
 - **Reread this layer skill** after each phase + after compaction.

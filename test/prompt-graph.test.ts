@@ -2372,3 +2372,244 @@ test("v0.4 T4: security phase defines 3rd review axis with smell categories and 
 		"security phase should have a human-controlled stop",
 	);
 });
+
+// ─── v0.4 T6: security-review specialist ─────────────────────────────────────
+
+function readRepoSkillFile(skillName: string): string {
+	const repoPath = join(REPO_ROOT, "skills", skillName, "SKILL.md");
+	return readFileSync(repoPath, "utf-8");
+}
+
+test("v0.4 T6: security-review specialist exists", () => {
+	assert.ok(
+		existsSync(join(REPO_ROOT, "skills", "security-review", "SKILL.md")),
+		"skills/security-review/SKILL.md should exist",
+	);
+});
+
+test("v0.4 T6: security-review has >=8 smell categories in a catalog", () => {
+	const content = readRepoSkillFile("security-review");
+	// Check for a smell catalog section
+	assert.ok(
+		/smell catalog|security smell|catalog/i.test(content),
+		"security-review should have a smell catalog section",
+	);
+	// The 8 required categories
+	const categories = [
+		"injection",
+		"auth",
+		"secret",
+		"deserialization",
+		"ssrf",
+		"path traversal",
+		"unsafe operation",
+		"dependency",
+	];
+	const found = categories.filter((c) => new RegExp(c, "i").test(content));
+	assert.ok(
+		found.length >= 8,
+		`security-review should mention all 8 smell categories, found ${found.length}/8: ${found.join(", ")}`,
+	);
+});
+
+test("v0.4 T6: security-review has a review brief (fresh context, diff-only, anti-anchored)", () => {
+	const content = readRepoSkillFile("security-review");
+	assert.ok(
+		/fresh context/i.test(content),
+		"security-review should mention 'fresh context'",
+	);
+	assert.ok(
+		/diff.only|diff only/i.test(content),
+		"security-review should mention 'diff-only'",
+	);
+	assert.ok(
+		/anti.anchored/i.test(content),
+		"security-review should mention 'anti-anchored'",
+	);
+});
+
+test("v0.4 T6: security-review has severity guidance (CRITICAL/HIGH/LOW)", () => {
+	const content = readRepoSkillFile("security-review");
+	assert.ok(
+		/CRITICAL/i.test(content),
+		"security-review should define CRITICAL severity",
+	);
+	assert.ok(
+		/HIGH/i.test(content),
+		"security-review should define HIGH severity",
+	);
+	assert.ok(/LOW/i.test(content), "security-review should define LOW severity");
+	// Should have a severity guidance section or mapping
+	assert.ok(
+		/severity/i.test(content),
+		"security-review should have severity guidance",
+	);
+});
+
+test("v0.4 T6: security-review declares auto-pi-original provenance", () => {
+	const content = readRepoSkillFile("security-review");
+	assert.ok(
+		/auto-pi.original|provenance:\s*auto-pi-original/i.test(content),
+		"security-review should declare provenance: auto-pi-original",
+	);
+});
+
+test("v0.4 T6: orchestration-layer SECURITY phase references the security-review specialist", () => {
+	const layer = readWorkflowSkill("orchestration-layer");
+	const secMatch = layer.match(
+		/## Phase:\s*security\b([\s\S]*?)(?=\n## (?:Phase:|Rules|$))/i,
+	);
+	assert.ok(secMatch, "layer should have a security phase");
+	const secSection = secMatch![1];
+	assert.ok(
+		/security-review/i.test(secSection),
+		"layer's security phase should reference the security-review specialist path",
+	);
+	// The reference should include a path to the repo skill
+	assert.ok(
+		/skills\/security-review\/SKILL\.md/i.test(secSection),
+		"layer's security phase should reference the repo path skills/security-review/SKILL.md",
+	);
+});
+
+// ─── v0.4 T5: audit defect regression tests ──────────────────────────────────
+
+// C-1: receiving-code-review IMPLEMENT vs review do-not-apply
+test("T5 C-1: layer overrides receiving-code-review's IMPLEMENT step during review", () => {
+	const layer = readWorkflowSkill("orchestration-layer");
+	// The layer must explicitly override the IMPLEMENT step
+	assert.ok(
+		/IMPLEMENT/i.test(layer),
+		"layer should mention receiving-code-review's IMPLEMENT step",
+	);
+	assert.ok(
+		/skip.*IMPLEMENT|override.*IMPLEMENT|replace.*IMPLEMENT/i.test(layer),
+		"layer should explicitly skip/override/replace the IMPLEMENT step during review",
+	);
+});
+
+// G-1: Phase 6 cleanup carried into post-fix
+test("T5 G-1: layer carries Phase 6 cleanup into post-fix (build + debug)", () => {
+	const layer = readWorkflowSkill("orchestration-layer");
+	// The layer must mention Phase 6 + DEBUG instrumentation + throwaway prototypes
+	assert.ok(
+		/Phase 6/i.test(layer),
+		"layer should mention Phase 6 (Cleanup + post-mortem)",
+	);
+	assert.ok(
+		/\[DEBUG/i.test(layer),
+		"layer should mention [DEBUG-...] instrumentation removal",
+	);
+	assert.ok(
+		/throwaway prot/i.test(layer),
+		"layer should mention throwaway prototypes",
+	);
+});
+
+// C-2: layer's diagnose path says follow Phases 1-4, skip Phase 5, execute Phase 6 after fix
+test("T5 C-2: layer's diagnose path skips Phase 5, defers Phase 6 to after the fix", () => {
+	const layer = readWorkflowSkill("orchestration-layer");
+	// Must say: follow Phases 1-4, skip Phase 5
+	assert.ok(
+		/Phase[s ]?1.?4|Phases 1–4|Phases 1-4/i.test(layer),
+		"layer should say follow Phases 1-4",
+	);
+	assert.ok(
+		/skip.*Phase 5|Phase 5.*skip|do NOT.*Phase 5/i.test(layer),
+		"layer should say skip Phase 5 (fix happens in tdd)",
+	);
+});
+
+// D-2: layer reads verification-before-completion in build-complete AND ship
+test("T5 D-2: layer reads verification-before-completion at build-complete AND ship", () => {
+	const layer = readWorkflowSkill("orchestration-layer");
+	// Both the verification phase AND the ship phase should reference it
+	const verifyPhase = layer.match(
+		/## Phase:\s*verification\b([\s\S]*?)(?=\n## (?:Phase:|Rules|$))/i,
+	);
+	const shipPhase = layer.match(
+		/## Phase:\s*ship\b([\s\S]*?)(?=\n## (?:Phase:|Rules|$))/i,
+	);
+	assert.ok(verifyPhase, "layer should have a verification phase");
+	assert.ok(shipPhase, "layer should have a ship phase");
+	assert.ok(
+		/verification-before-completion/i.test(verifyPhase![1]),
+		"verification phase should read verification-before-completion",
+	);
+	assert.ok(
+		/verification-before-completion/i.test(shipPhase![1]),
+		"ship phase should also read verification-before-completion (one source of truth)",
+	);
+});
+
+// O-2: layer owns the 4 disposition categories (receiving-code-review is the procedure, not the owner)
+test("T5 O-2: layer owns disposition categories; receiving-code-review is the driven procedure", () => {
+	const layer = readWorkflowSkill("orchestration-layer");
+	// All 4 dispositions must be in the layer
+	assert.ok(/verified-fix/i.test(layer), "layer should define verified-fix");
+	assert.ok(
+		/verified-defer/i.test(layer),
+		"layer should define verified-defer",
+	);
+	assert.ok(/rejected/i.test(layer), "layer should define rejected");
+	assert.ok(
+		/needs-user-decision/i.test(layer),
+		"layer should define needs-user-decision",
+	);
+});
+
+// O-3: layer defines the axis→severity transformation
+test("T5 O-3: layer defines the axis→severity transformation", () => {
+	const layer = readWorkflowSkill("orchestration-layer");
+	// The layer must define a mapping from Standards/Spec findings to CRITICAL/HIGH/LOW
+	assert.ok(/CRITICAL/i.test(layer), "layer should define CRITICAL severity");
+	assert.ok(/HIGH/i.test(layer), "layer should define HIGH severity");
+	assert.ok(/LOW/i.test(layer), "layer should define LOW severity");
+	// Must connect severity to the axes (Standards, Spec, Security)
+	assert.ok(
+		/Standard|Spec|Security/i.test(layer),
+		"layer should connect severity to the review axes",
+	);
+});
+
+// Pattern 1: specialists say "tell the user to run X" not "run X"
+test("T5 Pattern 1: code-review says 'tell the user to run' not 'run' slash commands", () => {
+	const content = readWorkflowSkill("code-review");
+	// The old "run /setup-matt-pocock-skills" should now say "tell the user to run"
+	assert.ok(
+		/tell the user to run.*setup-matt-pocock-skills/i.test(content),
+		"code-review should say 'tell the user to run /setup-matt-pocock-skills'",
+	);
+	// Should NOT say bare "run /setup-matt-pocock-skills" (without "tell the user")
+	assert.ok(
+		!/(?<!tell the user to )run \/setup-matt-pocock-skills/i.test(content),
+		"code-review should NOT say bare 'run /setup-matt-pocock-skills'",
+	);
+});
+
+test("T5 Pattern 1: diagnosing-bugs says 'tell the user to run' not 'hand off to'", () => {
+	const content = readWorkflowSkill("diagnosing-bugs");
+	assert.ok(
+		/tell the user to run.*improve-codebase-architecture/i.test(content),
+		"diagnosing-bugs should say 'tell the user to run /improve-codebase-architecture'",
+	);
+	// Should NOT say "hand off to the /improve-codebase-architecture skill"
+	assert.ok(
+		!/hand off to the/i.test(content),
+		"diagnosing-bugs should NOT say 'hand off to the /... skill'",
+	);
+});
+
+test("T5 Pattern 1: codebase-hygiene says 'tell the user to run' not 'route through'", () => {
+	const content = readWorkflowSkill("codebase-hygiene");
+	// Both instances (lines 8, 58) should use "tell the user to run" or similar
+	assert.ok(
+		/tell the user to run.*build|tell the user to run.*\/build/i.test(content),
+		"codebase-hygiene should say 'tell the user to run /build'",
+	);
+	// Should NOT say "route the change through /build" (bare route)
+	assert.ok(
+		!/\broute the change through\b/i.test(content),
+		"codebase-hygiene should NOT say 'route the change through /build'",
+	);
+});

@@ -5,7 +5,7 @@ description: Find semantic duplicates (same intent, different implementation) an
 
 # Codebase Hygiene
 
-Advisory and read-only. Diagnoses and proposes; does not refactor. Any actual change goes through `/build`.
+Advisory and read-only. Diagnoses and proposes; does not refactor. Any actual change: tell the user to run `/build`.
 
 ## Mode 1: Semantic duplicate detection
 
@@ -55,6 +55,6 @@ Deepen: collapse the wrapper into its caller, OR add real responsibility (valida
 
 ## Don't
 
-- Don't refactor from this skill — it's advisory. Propose, then route the change through `/build`.
+- Don't refactor from this skill — it's advisory. Propose, then tell the user to run `/build`.
 - Don't delete a duplicate without the 3 consolidation gates (tests + callers + re-run).
 - Don't trust name-based duplicate detection — read the implementations.
