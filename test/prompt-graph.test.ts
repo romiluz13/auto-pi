@@ -95,22 +95,6 @@ test("/setup-audit pins setup-maintenance directly (1 specialist, no wrapper)", 
 
 // ─── The 6 workflow skills exist ──────────────────────────────────────────────
 
-test("the 6 workflow skills exist in the repo", () => {
-	for (const skill of [
-		"planning-workflow",
-		"build-workflow",
-		"review-workflow",
-		"ship-workflow",
-		"research-workflow",
-		"debug-workflow",
-	]) {
-		assert.ok(
-			existsSync(join(REPO_SKILLS_DIR, skill, "SKILL.md")),
-			`workflow skill ${skill} not found in repo skills/`,
-		);
-	}
-});
-
 // ─── No prompt instructs the user to type internal skill commands ────────────
 
 test("no prompt says 'Next: type /skill:' (internal commands are not user-facing)", () => {
@@ -145,376 +129,17 @@ test("no prompt says 'Want me to invoke it?' (the agent can't run slash commands
 
 // ─── Structural: workflow skills have phases, reads, and state protocol ──────
 
-test("every workflow skill has a state protocol section", () => {
-	for (const skill of [
-		"planning-workflow",
-		"build-workflow",
-		"review-workflow",
-		"ship-workflow",
-		"research-workflow",
-		"debug-workflow",
-	]) {
-		const content = readWorkflowSkill(skill);
-		assert.ok(
-			/State protocol/i.test(content),
-			`${skill} should have a State protocol section`,
-		);
-		assert.ok(
-			/At entry.*initialize/i.test(content),
-			`${skill} should instruct initializing state at entry`,
-		);
-		assert.ok(
-			/Before every user wait.*emit/i.test(content),
-			`${skill} should instruct emitting state before user wait`,
-		);
-		assert.ok(
-			/continuation.*reconstruct/i.test(content),
-			`${skill} should instruct reconstructing state on continuation`,
-		);
-	}
-});
-
-test("every workflow skill has at least 2 phases", () => {
-	for (const skill of [
-		"planning-workflow",
-		"build-workflow",
-		"review-workflow",
-		"ship-workflow",
-		"research-workflow",
-		"debug-workflow",
-	]) {
-		const content = readWorkflowSkill(skill);
-		const phases = parsePhases(content);
-		assert.ok(
-			phases.length >= 2,
-			`${skill} should have at least 2 phases, got ${phases.length}: ${phases.join(", ")}`,
-		);
-	}
-});
-
-test("every workflow skill has a complete phase", () => {
-	for (const skill of [
-		"planning-workflow",
-		"build-workflow",
-		"review-workflow",
-		"ship-workflow",
-		"research-workflow",
-		"debug-workflow",
-	]) {
-		const content = readWorkflowSkill(skill);
-		const phases = parsePhases(content);
-		assert.ok(
-			phases.includes("complete"),
-			`${skill} should have a complete phase, got: ${phases.join(", ")}`,
-		);
-	}
-});
-
-test("every workflow skill uses absolute canonical skill paths (no ~)", () => {
-	for (const skill of [
-		"planning-workflow",
-		"build-workflow",
-		"review-workflow",
-		"ship-workflow",
-		"research-workflow",
-		"debug-workflow",
-	]) {
-		const content = readWorkflowSkill(skill);
-		// Should not use ~ in skill paths (the read tool doesn't expand ~)
-		assert.ok(
-			!/~\/.agents\/skills/i.test(content),
-			`${skill} should not use ~ paths (use absolute)`,
-		);
-		// Should use /Users/.../.agents/skills/ absolute paths
-		assert.ok(
-			/\/Users\/[^/]+\/.agents\/skills\//i.test(content),
-			`${skill} should use absolute canonical paths`,
-		);
-	}
-});
-
-test("every workflow skill has a reread instruction", () => {
-	for (const skill of [
-		"planning-workflow",
-		"build-workflow",
-		"review-workflow",
-		"ship-workflow",
-		"research-workflow",
-		"debug-workflow",
-	]) {
-		const content = readWorkflowSkill(skill);
-		assert.ok(
-			/Reread this workflow skill/i.test(content),
-			`${skill} should instruct rereading itself between phases`,
-		);
-	}
-});
-
-test("every workflow skill has compaction as a residual risk", () => {
-	for (const skill of [
-		"planning-workflow",
-		"build-workflow",
-		"review-workflow",
-		"ship-workflow",
-		"research-workflow",
-		"debug-workflow",
-	]) {
-		const content = readWorkflowSkill(skill);
-		assert.ok(
-			/compaction.*residual risk/i.test(content),
-			`${skill} should document compaction as a residual risk`,
-		);
-	}
-});
-
 // ─── Planning workflow structural tests ──────────────────────────────────────
-
-test("planning-workflow has bounded + foggy branches", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	const phases = parsePhases(content);
-	assert.ok(
-		phases.includes("classify"),
-		"planning-workflow should have a classify phase",
-	);
-	assert.ok(
-		phases.includes("brainstorm"),
-		"planning-workflow should have a brainstorm phase",
-	);
-	assert.ok(
-		phases.includes("spec"),
-		"planning-workflow should have a spec phase",
-	);
-	assert.ok(
-		phases.includes("tickets"),
-		"planning-workflow should have a tickets phase",
-	);
-	assert.ok(
-		phases.includes("wayfind"),
-		"planning-workflow should have a wayfind phase",
-	);
-});
-
-test("planning-workflow does not advance before design approval", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(/Do NOT advance before explicit design approval/i.test(content));
-});
-
-test("planning-workflow requires spec reference + ticket refs + frontier", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(/Do NOT advance without a spec reference/i.test(content));
-	assert.ok(
-		/Do NOT advance without published ticket references/i.test(content),
-	);
-});
-
-test("planning-workflow has a separate foggy state block with map + outcome", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/map:\s*pending/i.test(content),
-		"foggy state should have map field",
-	);
-	assert.ok(
-		/outcome:\s*map-charted|decision-resolved|ready-for-brainstorm|ready-for-spec/i.test(
-			content,
-		),
-		"foggy state should have outcome field",
-	);
-});
-
-test("planning-workflow foggy complete does not suggest /build", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	// Find the foggy complete section
-	const foggyCompleteMatch = content.match(
-		/Phase: complete \(foggy\)([\s\S]*?)(?=\n## |\nRules|$)/,
-	);
-	if (foggyCompleteMatch) {
-		const foggyComplete = foggyCompleteMatch[1];
-		assert.ok(
-			!/type.*\/build/i.test(foggyComplete),
-			"foggy complete should NOT suggest /build (a map is not an implementation ticket)",
-		);
-	}
-});
 
 // ─── Ship workflow structural tests ──────────────────────────────────────────
 
-test("ship-workflow has conditional github (not-applicable state)", () => {
-	const content = readWorkflowSkill("ship-workflow");
-	assert.ok(
-		/not-applicable/i.test(content),
-		"ship-workflow should support not-applicable for github",
-	);
-	assert.ok(
-		/conditional/i.test(content),
-		"ship-workflow should mark github as conditional",
-	);
-});
-
-test("ship-workflow allows none-needed for docs", () => {
-	const content = readWorkflowSkill("ship-workflow");
-	assert.ok(
-		/none-needed/i.test(content),
-		"ship-workflow should allow none-needed for doc disposition",
-	);
-});
-
-test("ship-workflow has ci state field", () => {
-	const content = readWorkflowSkill("ship-workflow");
-	assert.ok(
-		/ci:\s*pending.*not-applicable.*pass.*fail/i.test(content),
-		"ship-workflow should have ci state with pending/not-applicable/pass/fail",
-	);
-});
-
-test("ship-workflow commit is always authorized (no not-applicable for commit hash)", () => {
-	const content = readWorkflowSkill("ship-workflow");
-	assert.ok(
-		/authorizes commit|chose Ship/i.test(content),
-		"ship-workflow should state that /ship authorizes commit",
-	);
-	// commit hash state should NOT have not-applicable
-	const commitLine = content.match(/commit hash:\s*pending.*$/m);
-	if (commitLine) {
-		assert.ok(
-			!/not-applicable/.test(commitLine[0]),
-			"commit hash state should not have not-applicable (commit is always authorized)",
-		);
-	}
-});
-
 // ─── Build workflow structural tests ──────────────────────────────────────────
-
-test("build-workflow tracks acceptance criteria (not just one test)", () => {
-	const content = readWorkflowSkill("build-workflow");
-	assert.ok(
-		/acceptance criteria/i.test(content),
-		"build-workflow should track acceptance criteria",
-	);
-	assert.ok(
-		/Do NOT complete after a single green slice/i.test(content),
-		"build-workflow should not complete after one slice",
-	);
-});
-
-test("build-workflow returns from diagnosis to tdd on RED", () => {
-	const content = readWorkflowSkill("build-workflow");
-	const phases = parsePhases(content);
-	assert.ok(
-		phases.includes("diagnose"),
-		"build-workflow should have a diagnose phase",
-	);
-	assert.ok(phases.includes("tdd"), "build-workflow should have a tdd phase");
-	assert.ok(
-		/return to tdd/i.test(content),
-		"build-workflow should return to tdd after diagnosis",
-	);
-});
 
 // ─── Review workflow structural tests ─────────────────────────────────────────
 
-test("review-workflow skips disposition if clean", () => {
-	const content = readWorkflowSkill("review-workflow");
-	assert.ok(
-		/findings:\s*none.*skip disposition/i.test(content) ||
-			/If.*findings:\s*none.*skip/i.test(content),
-		"review-workflow should skip disposition if no findings",
-	);
-});
-
-test("review-workflow does not apply changes during review (verified-fix = queued for /build)", () => {
-	const content = readWorkflowSkill("review-workflow");
-	assert.ok(
-		/verified-fix.*queued for.*build/i.test(content) ||
-			/verified-fix.*Do NOT apply/i.test(content),
-		"verified-fix should mean queued for /build, not apply during review",
-	);
-	assert.ok(
-		/Do NOT apply changes during review/i.test(content),
-		"review-workflow should explicitly say do not apply changes during review",
-	);
-});
-
-test("review-workflow waits for needs-user-decision before completing", () => {
-	const content = readWorkflowSkill("review-workflow");
-	assert.ok(
-		/needs-user-decision.*REMAIN in disposition|needs-user-decision.*do not.*complete/i.test(
-			content,
-		),
-		"review-workflow should wait for needs-user-decision before completing",
-	);
-});
-
 // ─── All specialist skills referenced by workflows exist at the canonical path ─
 
-test("all specialist skills referenced by workflows exist at a known path", () => {
-	const allSpecialists = new Set<string>();
-	for (const skill of [
-		"planning-workflow",
-		"build-workflow",
-		"review-workflow",
-		"ship-workflow",
-		"research-workflow",
-		"debug-workflow",
-	]) {
-		const content = readWorkflowSkill(skill);
-		const reads = parseSkillReads(content);
-		for (const r of reads) {
-			allSpecialists.add(r);
-		}
-	}
-	for (const specialist of allSpecialists) {
-		const inAgents = existsSync(join(LIVE_SKILLS_DIR, specialist, "SKILL.md"));
-		const inPiAgent = existsSync(
-			join(homedir(), ".pi/agent/skills", specialist, "SKILL.md"),
-		);
-		assert.ok(
-			inAgents || inPiAgent,
-			`specialist skill "${specialist}" referenced by a workflow but not found at ~/.agents/skills/ or ~/.pi/agent/skills/`,
-		);
-	}
-});
-
 // ─── B1: Fresh-context-per-ticket invariants ──────────────────────────────
-
-test("planning-workflow complete (bounded) recommends fresh /build per ticket", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	const completeMatch = content.match(
-		/Phase: complete \(bounded\)([\s\S]*?)(?=\n## |\nRules|$)/,
-	);
-	if (completeMatch) {
-		const complete = completeMatch[1];
-		assert.ok(
-			/fresh.*\/build/i.test(complete) ||
-				/separate build session/i.test(complete),
-			"planning complete (bounded) should recommend fresh /build per ticket",
-		);
-	}
-});
-
-test("build-workflow entry invariant: one invocation accepts one ticket", () => {
-	const content = readWorkflowSkill("build-workflow");
-	assert.ok(
-		/one.*ticket.*one.*invocation|one invocation.*one.*ticket/i.test(content) ||
-			/exactly one ticket/i.test(content),
-		"build-workflow should enforce one-ticket-per-invocation at entry",
-	);
-});
-
-test("build-workflow entry invariant: refuses multiple tickets", () => {
-	const content = readWorkflowSkill("build-workflow");
-	assert.ok(
-		/refuse.*multiple|break.*apart|do not.*multiple tickets/i.test(content),
-		"build-workflow should refuse or break apart multiple tickets at entry",
-	);
-});
-
-test("build-workflow detects inherited unrelated context (smart zone)", () => {
-	const content = readWorkflowSkill("build-workflow");
-	assert.ok(
-		/inherited.*context|smart zone|fresh session.*handoff/i.test(content),
-		"build-workflow should detect inherited unrelated context and recommend fresh session/handoff",
-	);
-});
 
 // ─── B4: Triage discoverability ─────────────────────────────────────────────
 
@@ -552,121 +177,7 @@ test("triage skill exists at the canonical path", () => {
 
 // ─── B2: Planning staged routing (style + domain underlay) ──────────────────
 
-test("planning-workflow state block has style field", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/style:\s*brainstorming.*grilling/i.test(content),
-		"planning state block should have style field",
-	);
-});
-
-test("planning-workflow state block has domain capture field", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/domain capture:\s*on.*off/i.test(content),
-		"planning state block should have domain capture field",
-	);
-});
-
-test("planning-workflow defaults to brainstorming style", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/Default.*brainstorming|default.*style.*brainstorming/i.test(content),
-		"planning should default to brainstorming",
-	);
-});
-
-test("planning-workflow grilling requires explicit user consent (never silent escalation)", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/explicitly asks.*grill|ask permission.*once|Never silently.*grilling/i.test(
-			content,
-		),
-		"planning should require explicit user consent for grilling, never silent escalation",
-	);
-});
-
-test("planning-workflow has a setup phase for style + domain capture", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	const phases = parsePhases(content);
-	assert.ok(
-		phases.includes("setup"),
-		`planning should have a setup phase, got: ${phases.join(", ")}`,
-	);
-});
-
-test("planning-workflow domain-modeling underlay has triggers", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/ambiguous.*domain terms|CONTEXT.*ADRs.*constrain|cross-module.*contracts/i.test(
-			content,
-		),
-		"planning should have domain-modeling triggers",
-	);
-});
-
-test("planning-workflow domain-modeling no ceremony rule", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/No ceremony.*complex|glossary.*actually resolved|ADR.*hard-to-reverse.*surprising.*genuine/i.test(
-			content,
-		),
-		"planning should say no ceremony for domain-modeling (only when triggers genuinely apply)",
-	);
-});
-
-test("planning-workflow reads grilling + domain-modeling when triggered", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	const reads = parseSkillReads(content);
-	assert.ok(
-		reads.includes("grilling"),
-		`planning should read grilling, got: ${reads.join(", ")}`,
-	);
-	assert.ok(
-		reads.includes("domain-modeling"),
-		`planning should read domain-modeling, got: ${reads.join(", ")}`,
-	);
-});
-
 // ─── B3: Prototype detour (workflow-owned, consented interrupt) ───────────────
-
-test("planning-workflow has a prototype interrupt (not a phase, a transition)", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/Prototype interrupt/i.test(content),
-		"planning should have a Prototype interrupt section",
-	);
-	// It should be available from brainstorm or grill, not a standalone phase
-	assert.ok(
-		/available from brainstorm or grill/i.test(content),
-		"prototype interrupt should be available from the design phases",
-	);
-});
-
-test("planning-workflow prototype interrupt requires explicit user consent", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/ask permission.*once|explicit user consent/i.test(content),
-		"prototype interrupt should require explicit user consent (ask permission once)",
-	);
-});
-
-test("planning-workflow prototype declined: do not pretend resolved", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/decline.*record.*uncertainty|do not.*pretend.*resolved/i.test(content),
-		"prototype interrupt should say: if declined, record uncertainty, do not pretend it was resolved",
-	);
-});
-
-test("planning-workflow reads the prototype skill", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	const reads = parseSkillReads(content);
-	assert.ok(
-		reads.includes("prototype"),
-		`planning should read prototype, got: ${reads.join(", ")}`,
-	);
-});
 
 test("prototype skill exists at the canonical path", () => {
 	assert.ok(
@@ -761,22 +272,6 @@ test("code-review sequential awaits is a candidate, not an automatic finding", (
 // Check 4: Every slash handoff names an installed user-facing command (NOT internal skills)
 
 // Check 6: No phase specialist silently hijacks workflow routing
-test("every workflow skill has the 'workflow owns the routing' rule", () => {
-	for (const skill of [
-		"planning-workflow",
-		"build-workflow",
-		"review-workflow",
-		"ship-workflow",
-		"research-workflow",
-		"debug-workflow",
-	]) {
-		const content = readWorkflowSkill(skill);
-		assert.ok(
-			/workflow owns the routing|owns the routing/i.test(content),
-			`${skill} should have the "workflow owns the routing" rule`,
-		);
-	}
-});
 
 // Check 7: Every ask-matt route has an equivalence/disposition
 
@@ -820,78 +315,16 @@ test("no installed skill is a true orphan (all reachable by at least one means)"
 });
 
 // Check: planning wayfinder → ready-for-brainstorm goes through setup (not directly to brainstorm)
-test("planning wayfinder ready-for-brainstorm routes through setup (not directly to brainstorm)", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/ready-for-brainstorm.*setup|ready-for-brainstorm.*go to.*setup/i.test(
-			content,
-		),
-		"wayfinder ready-for-brainstorm should route through setup (not directly to brainstorm)",
-	);
-});
 
 // Check: planning state block has prototype fields
-test("planning state block has prototype fields (not-needed/proposed/declined/running/complete)", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/prototype:\s*not-needed.*proposed.*declined.*running.*complete/i.test(
-			content,
-		),
-		"planning state should have prototype fields",
-	);
-	assert.ok(
-		/prototype question:/i.test(content),
-		"planning state should have prototype question field",
-	);
-	assert.ok(
-		/prototype conclusion:/i.test(content),
-		"planning state should have prototype conclusion field",
-	);
-});
 
 // Check: planning state block has domain artifacts evidence field
-test("planning state block has domain artifacts evidence field", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/domain artifacts:/i.test(content),
-		"planning state should have domain artifacts evidence field",
-	);
-});
 
 // Check: planning does not preload brainstorming when grilling
-test("planning does not preload brainstorming when grilling (reads only the active style)", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/style: grilling.*read.*grilling|Do NOT preload both|read only the active style/i.test(
-			content,
-		),
-		"planning should read only the active style's skill (not preload both)",
-	);
-});
 
 // Check: build-workflow has explicit cadence (typecheck + single test + full suite)
-test("build-workflow has explicit cadence (typecheck regularly + single tests regularly + full suite at end)", () => {
-	const content = readWorkflowSkill("build-workflow");
-	assert.ok(
-		/typecheck.*regularly|typechecking regularly/i.test(content),
-		"build should have regular typecheck cadence",
-	);
-	assert.ok(
-		/full test suite.*end|full suite.*at the end/i.test(content),
-		"build should run the full test suite at the end",
-	);
-});
 
 // Check: build-workflow fresh-context gate is hard (STOP, not just recommend)
-test("build-workflow fresh-context gate is a hard STOP (not just a recommendation)", () => {
-	const content = readWorkflowSkill("build-workflow");
-	assert.ok(
-		/STOP.*contaminated|do not.*edit.*contaminated|STOP if violated/i.test(
-			content,
-		),
-		"build should STOP (not just recommend) when context is contaminated",
-	);
-});
 
 // v0.4: triage conditional handoff is now in ask-matt's triage flow (routed by the layer),
 // not in the prompt itself. The prompt is a thin entry adapter.
@@ -1081,13 +514,6 @@ test("no ask-matt disposition is a gap — all have an explicit classification",
 });
 
 // Check: planning has a grill-me branch (the genius's option b)
-test("planning-workflow has a grill-me branch for no-codebase grilling", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/grill-me/i.test(content),
-		"planning-workflow should reference grill-me (the no-codebase grilling branch)",
-	);
-});
 
 // ─── Contract v2: conditional outcomes, state constraints, interrupts ───────
 
@@ -1102,101 +528,14 @@ import {
 } from "../config/workflow-graph-contract.ts";
 
 // Check: every terminal phase has conditional outcomes (not a single handoff)
-test("every terminal phase has conditional outcomes (not a single arbitrary handoff)", () => {
-	for (const wf of WORKFLOWS_V2) {
-		for (const phase of wf.phases) {
-			if (phase.terminal) {
-				assert.ok(
-					phase.outcomes && phase.outcomes.length >= 1,
-					`${wf.name}: terminal phase "${phase.name}" should have outcomes (conditional handoffs), not a single handoff`,
-				);
-			}
-		}
-	}
-});
 
 // Check: every outcome has evidence fields
-test("every outcome has evidence fields (the state fields it requires)", () => {
-	for (const wf of WORKFLOWS_V2) {
-		for (const phase of wf.phases) {
-			if (!phase.outcomes) continue;
-			for (const outcome of phase.outcomes) {
-				assert.ok(
-					outcome.evidenceFields.length >= 1,
-					`${wf.name}: phase "${phase.name}" outcome "${outcome.predicate}" should have at least 1 evidence field`,
-				);
-			}
-		}
-	}
-});
 
 // Check: every outcome handoff is a valid user-facing command
-test("every outcome handoff is a valid user-facing command (not internal skills)", () => {
-	const validCommands = new Set<string>();
-	for (const p of PROMPT_NAMES) validCommands.add(p);
-	validCommands.add("handoff");
-	validCommands.add("palette");
-
-	for (const wf of WORKFLOWS_V2) {
-		for (const phase of wf.phases) {
-			if (!phase.outcomes) continue;
-			for (const outcome of phase.outcomes) {
-				if (!outcome.handoff) continue;
-				assert.ok(
-					validCommands.has(outcome.handoff.command),
-					`${wf.name}: outcome handoff "/${outcome.handoff.command}" is not a valid user-facing command`,
-				);
-			}
-		}
-	}
-});
 
 // Check: the prototype interrupt is in the planning-workflow contract
-test("planning-workflow contract has a prototype interrupt", () => {
-	const planning = WORKFLOWS_V2.find((w) => w.name === "planning-workflow");
-	assert.ok(planning?.interrupts, "planning-workflow should have interrupts");
-	const prototypeInterrupt = planning?.interrupts?.find(
-		(i) => i.name === "prototype",
-	);
-	assert.ok(
-		prototypeInterrupt,
-		"planning-workflow should have a prototype interrupt",
-	);
-	assert.equal(prototypeInterrupt?.specialist, "prototype");
-	assert.ok(
-		prototypeInterrupt?.resumePhase === "brainstorm",
-		"prototype interrupt should resume to brainstorm",
-	);
-});
 
 // Check: grill-me and grilling predicates are mutually exclusive
-test("grill-me and grilling predicates are mutually exclusive", () => {
-	const planning = WORKFLOWS_V2.find((w) => w.name === "planning-workflow");
-	const brainstorm = planning?.phases.find((p) => p.name === "brainstorm");
-	const grilling = brainstorm?.conditionalSpecialists?.find(
-		(s) => s.skill === "grilling",
-	);
-	const grillMe = brainstorm?.conditionalSpecialists?.find(
-		(s) => s.skill === "grill-me",
-	);
-	assert.ok(
-		grilling,
-		"brainstorm should have a grilling conditional specialist",
-	);
-	assert.ok(
-		grillMe,
-		"brainstorm should have a grill-me conditional specialist",
-	);
-	// grilling: hasCodebase; grill-me: !hasCodebase — mutually exclusive
-	assert.ok(
-		/grilling && hasCodebase|hasCodebase/i.test(grilling!.predicate),
-		"grilling predicate should include hasCodebase",
-	);
-	assert.ok(
-		/grill-me.*!hasCodebase|!hasCodebase/i.test(grillMe!.predicate),
-		"grill-me predicate should include !hasCodebase (mutually exclusive with grilling)",
-	);
-});
 
 // Check: research is in ASK_MATT_DISPOSITIONS
 test("research is in ASK_MATT_DISPOSITIONS (was missing)", () => {
@@ -1246,30 +585,8 @@ test("triage has explicit outcomes (6 outcome states with conditional handoffs)"
 });
 
 // Check: state constraints exist for the spec phase (requires design: approved)
-test("planning spec phase has state constraints (requires design: approved on entry)", () => {
-	const planning = WORKFLOWS_V2.find((w) => w.name === "planning-workflow");
-	const spec = planning?.phases.find((p) => p.name === "spec");
-	assert.ok(spec?.stateConstraints, "spec phase should have state constraints");
-	const designConstraint = spec?.stateConstraints?.find(
-		(c) => c.field === "design",
-	);
-	assert.ok(designConstraint, "spec should have a design state constraint");
-	assert.ok(
-		designConstraint?.requiredOnEntry?.includes("approved"),
-		"spec should require design: approved on entry",
-	);
-});
 
 // Check: build tdd phase has state constraints (requires one ticket)
-test("build tdd phase has state constraints (requires ticket on entry)", () => {
-	const build = WORKFLOWS_V2.find((w) => w.name === "build-workflow");
-	const tdd = build?.phases.find((p) => p.name === "tdd");
-	assert.ok(tdd?.stateConstraints, "tdd phase should have state constraints");
-	const ticketConstraint = tdd?.stateConstraints?.find(
-		(c) => c.field === "ticket",
-	);
-	assert.ok(ticketConstraint, "tdd should have a ticket state constraint");
-});
 
 // ─── Collision/shadow validation + source commit ─────────────────────────────
 
@@ -1644,20 +961,6 @@ test("drift integration: real auto-pi forks pass the drift check", () => {
 // ─── Contract v4: procedureScope, selected path validation ─────────────────
 
 // Check: diagnose phases have procedureScope (Phases 1-4, not Phase 5)
-test("diagnose phases have procedureScope (Phases 1-4, not Phase 5)", () => {
-	for (const wfName of ["build-workflow", "debug-workflow"]) {
-		const wf = WORKFLOWS_V2.find((w) => w.name === wfName);
-		const diagnose = wf?.phases.find((p) => p.name === "diagnose");
-		assert.ok(
-			diagnose?.procedureScope,
-			`${wfName}: diagnose phase should have procedureScope`,
-		);
-		assert.ok(
-			/Phases 1-4|not Phase 5/i.test(diagnose!.procedureScope!),
-			`${wfName}: diagnose procedureScope should say "Phases 1-4" and exclude Phase 5`,
-		);
-	}
-});
 
 // Check: every selected path is a runtime path (in ~/.agents/skills or ~/.pi/agent/skills)
 test("every reachability selected path is a runtime path (not a repo source path)", () => {
@@ -1671,28 +974,8 @@ test("every reachability selected path is a runtime path (not a repo source path
 });
 
 // Check: domain artifacts in planning SKILL.md allows not-applicable
-test("planning SKILL.md domain artifacts allows not-applicable", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/domain artifacts:.*not-applicable/i.test(content),
-		"planning SKILL.md domain artifacts should allow not-applicable",
-	);
-});
 
 // Check: setup style does not include grill-me (it's a conditional specialist, not a style)
-test("planning setup style does not include grill-me (it's a conditional specialist)", () => {
-	const planning = WORKFLOWS_V2.find((w) => w.name === "planning-workflow");
-	const setup = planning?.phases.find((p) => p.name === "setup");
-	const styleConstraint = setup?.stateConstraints?.find(
-		(c) => c.field === "style",
-	);
-	if (styleConstraint?.requiredOnExit) {
-		assert.ok(
-			!styleConstraint.requiredOnExit.includes("grill-me"),
-			"setup style allowed values should NOT include grill-me (it's a conditional specialist, not a style)",
-		);
-	}
-});
 
 // ─── Contract v5: stateDomains, SHA-256, triage evidence, shadow validation ──
 
@@ -1759,40 +1042,8 @@ test("session-handoff is classified as standalone-utility", () => {
 });
 
 // Check: planning has stateDomains
-test("planning workflow has stateDomains", () => {
-	const planning = WORKFLOWS_V2.find((w) => w.name === "planning-workflow");
-	assert.ok(planning?.stateDomains, "planning should have stateDomains");
-	assert.ok(
-		planning?.stateDomains?.["mode"],
-		"planning should have mode domain",
-	);
-	assert.ok(
-		planning?.stateDomains?.["prototype"],
-		"planning should have prototype domain",
-	);
-});
 
 // Check: state constraint values are valid members of state domains
-test("planning state constraint values are valid members of state domains", () => {
-	const planning = WORKFLOWS_V2.find((w) => w.name === "planning-workflow");
-	const domains = planning?.stateDomains;
-	if (!domains) return;
-	for (const phase of planning!.phases) {
-		if (!phase.stateConstraints) continue;
-		for (const constraint of phase.stateConstraints) {
-			const domain = domains[constraint.field];
-			if (!domain) continue;
-			if (constraint.requiredOnExit) {
-				for (const val of constraint.requiredOnExit) {
-					assert.ok(
-						domain.includes(val) || val.includes("<") || val === "approved",
-						`planning: constraint value "${val}" for field "${constraint.field}" not in domain ${JSON.stringify(domain)}`,
-					);
-				}
-			}
-		}
-	}
-});
 
 // Check: ASK_MATT_SOURCE has SHA-256
 test("ASK_MATT_SOURCE has a SHA-256 hash", () => {
@@ -1822,25 +1073,6 @@ test("triage outcomes have evidence fields", () => {
 });
 
 // Check: prototype state mutations are explicit in the SKILL.md
-test("planning SKILL.md has explicit prototype state mutations", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	assert.ok(
-		/prototype: proposed/i.test(content),
-		"should set prototype: proposed when asking permission",
-	);
-	assert.ok(
-		/prototype: declined/i.test(content),
-		"should set prototype: declined when user declines",
-	);
-	assert.ok(
-		/prototype: running/i.test(content),
-		"should set prototype: running when user approves",
-	);
-	assert.ok(
-		/prototype: complete/i.test(content),
-		"should set prototype: complete when prototype is done",
-	);
-});
 
 // ─── Contract v6: full SHA-256 + prototype state reset ───────────────────────
 
@@ -1868,28 +1100,8 @@ test("ASK_MATT_SOURCE.sha256 is a full 64-char hex digest matching the actual up
 });
 
 // Check: prototype completion resets resume phase + uncertainty
-test("planning SKILL.md resets resume phase + uncertainty on prototype completion", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	// On completion: set unresolved design uncertainty: none + resume phase: not-applicable after resuming
-	assert.ok(
-		/unresolved design uncertainty: none/i.test(content),
-		"prototype completion should set 'unresolved design uncertainty: none'",
-	);
-	assert.ok(
-		/resume phase: not-applicable/i.test(content),
-		"prototype completion should reset 'resume phase: not-applicable' after resuming",
-	);
-});
 
 // Check: prototype decline resets conclusion + resume phase
-test("planning SKILL.md resets conclusion + resume phase on prototype decline", () => {
-	const content = readWorkflowSkill("planning-workflow");
-	// On decline: set prototype conclusion: not-applicable + resume phase: not-applicable
-	assert.ok(
-		/prototype conclusion: not-applicable/i.test(content),
-		"prototype decline should set 'prototype conclusion: not-applicable'",
-	);
-});
 
 // ─── Pinned-dependency drift fixtures (ask-matt) — v0.4 T1 ────────────────────
 
@@ -2671,5 +1883,93 @@ test("T7: bearings is documented as a standalone utility", () => {
 	assert.ok(
 		/bearings/i.test(layer),
 		"orchestration-layer should mention bearings as a standalone utility",
+	);
+});
+
+// ─── v0.4 T8: collapse the 6 workflow orchestrators ──────────────────────────
+
+const COLLAPSED_WORKFLOWS = [
+	"planning-workflow",
+	"build-workflow",
+	"review-workflow",
+	"ship-workflow",
+	"research-workflow",
+	"debug-workflow",
+] as const;
+
+// Check: the 6 workflow orchestrator directories are removed
+test("v0.4 T8: the 6 workflow orchestrator directories are removed", () => {
+	for (const wf of COLLAPSED_WORKFLOWS) {
+		assert.ok(
+			!existsSync(join(REPO_ROOT, "skills", wf, "SKILL.md")),
+			`skills/${wf}/SKILL.md should NOT exist after collapse`,
+		);
+	}
+});
+
+// Check: config/agents.md does NOT reference the 6 orchestrators
+test("v0.4 T8: config/agents.md does not reference the 6 orchestrators", () => {
+	const content = readFileSync(join(REPO_ROOT, "config", "agents.md"), "utf-8");
+	for (const wf of COLLAPSED_WORKFLOWS) {
+		assert.ok(
+			!content.includes(wf),
+			`config/agents.md should not reference '${wf}' — it should describe the 3-layer architecture (Coach → ask-matt → orchestration-layer)`,
+		);
+	}
+});
+
+// Check: no prompt references the 6 orchestrators
+test("v0.4 T8: no prompt references the 6 orchestrators", () => {
+	const promptDir = join(REPO_ROOT, "prompts");
+	for (const f of readdirSync(promptDir)) {
+		if (!f.endsWith(".md")) continue;
+		const content = readFileSync(join(promptDir, f), "utf-8");
+		for (const wf of COLLAPSED_WORKFLOWS) {
+			assert.ok(
+				!content.includes(wf),
+				`prompts/${f} should not reference '${wf}'`,
+			);
+		}
+	}
+});
+
+// Check: extensions/coach.ts does NOT reference the 6 orchestrators
+test("v0.4 T8: extensions/coach.ts does not reference the 6 orchestrators", () => {
+	const content = readFileSync(
+		join(REPO_ROOT, "extensions", "coach.ts"),
+		"utf-8",
+	);
+	for (const wf of COLLAPSED_WORKFLOWS) {
+		assert.ok(
+			!content.includes(wf),
+			`extensions/coach.ts should not reference '${wf}' — the menu options should reference prompts (which pin orchestration-layer)`,
+		);
+	}
+});
+
+// Check: config/workflow-graph-contract.ts does NOT have WORKFLOWS with the 6 entries
+test("v0.4 T8: contract WORKFLOWS array is empty or removed (6 orchestrators gone)", () => {
+	for (const wf of WORKFLOWS) {
+		assert.ok(
+			!COLLAPSED_WORKFLOWS.includes(wf.name as any),
+			`contract WORKFLOWS should not contain '${wf.name}' — the 6 orchestrators are collapsed`,
+		);
+	}
+});
+
+// Check: config/agents.md describes the 3-layer architecture
+test("v0.4 T8: config/agents.md describes the 3-layer architecture", () => {
+	const content = readFileSync(join(REPO_ROOT, "config", "agents.md"), "utf-8");
+	assert.ok(
+		/ask-matt/i.test(content),
+		"agents.md should mention ask-matt (the routing brain)",
+	);
+	assert.ok(
+		/orchestration-layer/i.test(content),
+		"agents.md should mention orchestration-layer (the mechanics)",
+	);
+	assert.ok(
+		/Coach/i.test(content),
+		"agents.md should mention Coach (the entry)",
 	);
 });

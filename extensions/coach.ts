@@ -154,35 +154,37 @@ const WORKFLOW_OPTIONS: WorkflowOption[] = [
 		label: "/build — Build with TDD (red → green → prove it)",
 		command: '/build "$TASK"',
 		description:
-			"Implement + test, with diagnosis on RED. Pins build-workflow.",
+			"Implement + test, with diagnosis on RED. Pins orchestration-layer (routes via ask-matt).",
 	},
 	{
 		label: "/debug — Debug an issue (feedback loop, root cause)",
 		command: '/debug "$TASK"',
 		description:
-			"Build a repro loop, find root cause, or resolve merge conflicts. Pins debug-workflow.",
+			"Build a repro loop, find root cause, or resolve merge conflicts. Pins orchestration-layer (routes via ask-matt).",
 	},
 	{
 		label: "/plan — Plan a feature (design → spec → tickets, orchestrated)",
 		command: '/plan "$TASK"',
 		description:
-			"Brainstorming → to-spec → to-tickets (bounded) or wayfinder (foggy). Pins planning-workflow.",
+			"Brainstorming → to-spec → to-tickets (bounded) or wayfinder (foggy). Pins orchestration-layer (routes via ask-matt).",
 	},
 	{
 		label: "/research — Research a topic (parallel fan-out)",
 		command: '/research "$TASK"',
 		description:
-			"Web, GitHub, codebase, memory. Pins research-workflow (routes to the right specialist).",
+			"Web, GitHub, codebase, memory. Pins orchestration-layer (routes via ask-matt).",
 	},
 	{
 		label: "/review — Review current diff (standards + spec + security)",
 		command: "/review",
-		description: "Two-axis review + disposition. Pins review-workflow.",
+		description:
+			"Two-axis review + disposition. Pins orchestration-layer (routes via ask-matt).",
 	},
 	{
 		label: "/ship — Ship (verify, document, commit, PR)",
 		command: "/ship",
-		description: "Verify → docs → commit → github. Pins ship-workflow.",
+		description:
+			"Verify → docs → commit → github. Pins orchestration-layer (routes via ask-matt).",
 	},
 	{
 		label: "/triage — Triage incoming issues/PRs (categorise, verify, brief)",

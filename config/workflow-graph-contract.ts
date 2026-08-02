@@ -61,395 +61,10 @@ export interface WorkflowDef {
 	interrupts?: Interrupt[];
 }
 
-// ─── The 6 workflows + triage ──────────────────────────────────────────────
-
-export const WORKFLOWS: WorkflowDef[] = [
-	{
-		name: "planning-workflow",
-		promptPin: "planning-workflow",
-		stateFields: [
-			"workflow",
-			"mode",
-			"phase",
-			"design",
-			"style",
-			"domain capture",
-			"domain artifacts",
-			"prototype",
-			"prototype question",
-			"prototype conclusion",
-			"unresolved design uncertainty",
-			"resume phase",
-			"spec",
-			"tickets",
-			"frontier",
-			"map",
-			"wayfind frontier",
-			"outcome",
-		],
-		stateDomains: {
-			mode: ["bounded", "foggy"],
-			design: ["pending", "approved", "not-applicable"],
-			style: ["brainstorming", "grilling", "not-applicable"],
-			"domain capture": ["off", "on", "not-applicable"],
-			"domain artifacts": ["none", "none-needed", "not-applicable"],
-			prototype: ["not-needed", "proposed", "declined", "running", "complete"],
-			"resume phase": ["not-applicable", "brainstorm"],
-		},
-		interrupts: [
-			{
-				name: "prototype",
-				availableFrom: ["brainstorm"],
-				specialist: "prototype",
-				transitions: [
-					{ from: "proposed", to: "declined" },
-					{ from: "proposed", to: "running" },
-					{ from: "running", to: "complete" },
-				],
-				resumePhase: "brainstorm",
-			},
-		],
-		phases: [
-			{
-				name: "classify",
-				specialists: [],
-				next: ["setup", "wayfind"],
-			},
-			{
-				name: "setup",
-				specialists: [],
-				next: ["brainstorm"],
-				stateConstraints: [
-					{
-						field: "style",
-						requiredOnExit: ["brainstorming", "grilling", "not-applicable"],
-					},
-					{
-						field: "domain capture",
-						requiredOnExit: ["off", "on", "not-applicable"],
-					},
-				],
-			},
-			{
-				name: "brainstorm",
-				specialists: [],
-				conditionalSpecialists: [
-					{ skill: "brainstorming", predicate: "style=brainstorming" },
-					{ skill: "grilling", predicate: "style=grilling && hasCodebase" },
-					{ skill: "grill-me", predicate: "style=grilling && !hasCodebase" },
-					{ skill: "domain-modeling", predicate: "domain capture=on" },
-				],
-				next: ["spec"],
-				stateConstraints: [{ field: "design", requiredOnExit: ["approved"] }],
-			},
-			{
-				name: "spec",
-				specialists: ["to-spec"],
-				next: ["tickets"],
-				stateConstraints: [
-					{ field: "design", requiredOnEntry: ["approved"] },
-					{ field: "spec", requiredOnExit: ["<tracker reference>"] },
-				],
-			},
-			{
-				name: "tickets",
-				specialists: ["to-tickets"],
-				next: ["complete"],
-				stateConstraints: [
-					{ field: "spec", requiredOnEntry: ["<tracker reference>"] },
-					{ field: "tickets", requiredOnExit: ["[<references>]"] },
-					{ field: "frontier", requiredOnExit: ["<first unblocked ticket>"] },
-				],
-			},
-			{
-				name: "wayfind",
-				specialists: ["wayfinder"],
-				next: ["complete", "setup", "spec"],
-			},
-			{
-				name: "complete",
-				specialists: [],
-				terminal: true,
-				outcomes: [
-					{
-						predicate: "mode=bounded",
-						handoff: {
-							command: "build",
-							argPlaceholder: "<frontier>",
-							argFromState: "frontier",
-						},
-						terminal: true,
-						evidenceFields: ["spec", "tickets", "frontier"],
-					},
-					{
-						predicate: "mode=foggy && outcome=map-charted",
-						handoff: {
-							command: "plan",
-							argPlaceholder: "<map>",
-							argFromState: "map",
-						},
-						terminal: true,
-						evidenceFields: ["map", "wayfind frontier", "outcome"],
-					},
-					{
-						predicate: "mode=foggy && outcome=decision-resolved",
-						handoff: {
-							command: "plan",
-							argPlaceholder: "<map>",
-							argFromState: "map",
-						},
-						terminal: true,
-						evidenceFields: ["map", "wayfind frontier", "outcome"],
-					},
-				],
-			},
-		],
-	},
-	{
-		name: "build-workflow",
-		promptPin: "build-workflow",
-		stateFields: [
-			"workflow",
-			"phase",
-			"ticket",
-			"acceptance criteria",
-			"slices completed",
-			"slices remaining",
-			"red",
-			"root cause",
-			"verification",
-		],
-		phases: [
-			{
-				name: "tdd",
-				specialists: ["tdd"],
-				conditionalSpecialists: [
-					{ skill: "uv", predicate: "project is Python" },
-				],
-				next: ["diagnose", "complete"],
-				stateConstraints: [
-					{ field: "ticket", requiredOnEntry: ["<one ticket>"] },
-				],
-			},
-			{
-				name: "diagnose",
-				specialists: ["diagnosing-bugs"],
-				next: ["tdd"],
-				procedureScope: "Phases 1-4 (not Phase 5 — fix happens in tdd)",
-			},
-			{
-				name: "complete",
-				specialists: [],
-				terminal: true,
-				outcomes: [
-					{
-						predicate: "all acceptance criteria met",
-						handoff: { command: "review" },
-						terminal: true,
-						evidenceFields: ["verification"],
-					},
-				],
-			},
-		],
-	},
-	{
-		name: "review-workflow",
-		promptPin: "review-workflow",
-		stateFields: ["workflow", "phase", "findings", "dispositions"],
-		phases: [
-			{
-				name: "review",
-				specialists: ["code-review"],
-				next: ["disposition", "complete"],
-			},
-			{
-				name: "disposition",
-				specialists: ["receiving-code-review"],
-				next: ["complete"],
-			},
-			{
-				name: "complete",
-				specialists: [],
-				terminal: true,
-				outcomes: [
-					{
-						predicate: "findings exist",
-						handoff: { command: "build" },
-						terminal: true,
-						evidenceFields: ["findings", "dispositions"],
-					},
-					{
-						predicate: "findings=none",
-						handoff: { command: "ship" },
-						terminal: true,
-						evidenceFields: ["findings"],
-					},
-				],
-			},
-		],
-	},
-	{
-		name: "ship-workflow",
-		promptPin: "ship-workflow",
-		stateFields: [
-			"workflow",
-			"phase",
-			"verification",
-			"doc disposition",
-			"commit hash",
-			"pr url",
-			"ci",
-		],
-		phases: [
-			{
-				name: "verify",
-				specialists: ["verification-before-completion"],
-				next: ["docs"],
-				stateConstraints: [
-					{
-						field: "verification",
-						requiredOnExit: ["<command + exit code + output>"],
-					},
-				],
-			},
-			{
-				name: "docs",
-				specialists: ["diff-driven-docs"],
-				next: ["commit"],
-			},
-			{
-				name: "commit",
-				specialists: ["commit"],
-				next: ["github"],
-				stateConstraints: [
-					{ field: "commit hash", requiredOnExit: ["<hash>"] },
-				],
-			},
-			{
-				name: "github",
-				specialists: [],
-				conditionalSpecialists: [
-					{ skill: "github", predicate: "GitHub remote + user intent to push" },
-				],
-				next: ["complete"],
-			},
-			{
-				name: "complete",
-				specialists: [],
-				terminal: true,
-				outcomes: [
-					{
-						predicate: "pr url != not-applicable",
-						terminal: true,
-						evidenceFields: ["commit hash", "pr url", "ci"],
-					},
-					{
-						predicate: "pr url=not-applicable",
-						terminal: true,
-						evidenceFields: ["commit hash", "pr url"],
-					},
-				],
-			},
-		],
-	},
-	{
-		name: "research-workflow",
-		promptPin: "research-workflow",
-		stateFields: ["workflow", "phase", "research type", "findings", "sources"],
-		phases: [
-			{
-				name: "classify",
-				specialists: [],
-				next: ["investigate"],
-			},
-			{
-				name: "investigate",
-				specialists: [],
-				conditionalSpecialists: [
-					{ skill: "research", predicate: "research type=general" },
-					{ skill: "octocode-research", predicate: "research type=code" },
-					{ skill: "live-research", predicate: "research type=deep-brief" },
-				],
-				next: ["complete"],
-			},
-			{
-				name: "complete",
-				specialists: [],
-				terminal: true,
-				outcomes: [
-					{
-						predicate: "findings suggest planning",
-						handoff: { command: "plan" },
-						terminal: true,
-						evidenceFields: ["findings", "sources"],
-					},
-					{
-						predicate: "findings suggest building",
-						handoff: { command: "build" },
-						terminal: true,
-						evidenceFields: ["findings", "sources"],
-					},
-					{
-						predicate: "research complete, no next action",
-						terminal: true,
-						evidenceFields: ["findings", "sources"],
-					},
-				],
-			},
-		],
-	},
-	{
-		name: "debug-workflow",
-		promptPin: "debug-workflow",
-		stateFields: [
-			"workflow",
-			"phase",
-			"issue type",
-			"root cause",
-			"conflict resolved",
-		],
-		phases: [
-			{
-				name: "classify",
-				specialists: [],
-				next: ["diagnose", "resolve-conflict"],
-			},
-			{
-				name: "diagnose",
-				specialists: ["diagnosing-bugs"],
-				next: ["complete"],
-				procedureScope: "Phases 1-4 (not Phase 5 — fix happens in /build)",
-			},
-			{
-				name: "resolve-conflict",
-				specialists: ["resolving-merge-conflicts"],
-				next: ["complete"],
-			},
-			{
-				name: "complete",
-				specialists: [],
-				terminal: true,
-				outcomes: [
-					{
-						predicate: "issue type=bug",
-						handoff: {
-							command: "build",
-							argPlaceholder: "<fix>",
-							argFromState: "root cause",
-						},
-						terminal: true,
-						evidenceFields: ["root cause"],
-					},
-					{
-						predicate: "issue type=merge-conflict",
-						terminal: true,
-						evidenceFields: ["conflict resolved"],
-					},
-				],
-			},
-		],
-	},
-];
+// ─── Workflows (v0.4: the 6 orchestrators are collapsed into ask-matt + orchestration-layer) ──
+// T9 will rewrite this to model ask-matt's graph + the layer's phases.
+// For now, WORKFLOWS is empty — the 6 orchestrators are removed.
+export const WORKFLOWS: WorkflowDef[] = [];
 
 // ─── Triage (direct-pinned state machine, not a workflow skill) ─────────────
 
@@ -647,20 +262,6 @@ export const REACHABILITY_ENTRIES: ReachabilityEntry[] = [
 		shadowedRuntimePaths: [],
 	},
 	{
-		skill: "build-workflow",
-		invocationSurfaces: ["workflow-prompt-pin"],
-		productRole: "orchestrator",
-		discoveryRoute: "Coach menu + prompt pin",
-		rationale: "auto-pi workflow orchestrator",
-		sourcePaths: ["skills/build-workflow/SKILL.md"],
-		runtimePhysicalPaths: [
-			"/Users/rom.iluz/.agents/skills/build-workflow/SKILL.md",
-		],
-		selectedRuntimePath:
-			"/Users/rom.iluz/.agents/skills/build-workflow/SKILL.md",
-		shadowedRuntimePaths: [],
-	},
-	{
 		skill: "claude-handoff",
 		invocationSurfaces: ["catalog-only"],
 		productRole: "superseded",
@@ -805,20 +406,6 @@ export const REACHABILITY_ENTRIES: ReachabilityEntry[] = [
 			"/Users/rom.iluz/.pi/agent/skills/data-feeds/SKILL.md",
 		],
 		selectedRuntimePath: "/Users/rom.iluz/.pi/agent/skills/data-feeds/SKILL.md",
-		shadowedRuntimePaths: [],
-	},
-	{
-		skill: "debug-workflow",
-		invocationSurfaces: ["workflow-prompt-pin"],
-		productRole: "orchestrator",
-		discoveryRoute: "Coach menu + prompt pin",
-		rationale: "auto-pi workflow orchestrator",
-		sourcePaths: ["skills/debug-workflow/SKILL.md"],
-		runtimePhysicalPaths: [
-			"/Users/rom.iluz/.agents/skills/debug-workflow/SKILL.md",
-		],
-		selectedRuntimePath:
-			"/Users/rom.iluz/.agents/skills/debug-workflow/SKILL.md",
 		shadowedRuntimePaths: [],
 	},
 	{
@@ -1411,20 +998,6 @@ export const REACHABILITY_ENTRIES: ReachabilityEntry[] = [
 		shadowedRuntimePaths: [],
 	},
 	{
-		skill: "planning-workflow",
-		invocationSurfaces: ["workflow-prompt-pin"],
-		productRole: "orchestrator",
-		discoveryRoute: "Coach menu + prompt pin",
-		rationale: "auto-pi workflow orchestrator",
-		sourcePaths: ["skills/planning-workflow/SKILL.md"],
-		runtimePhysicalPaths: [
-			"/Users/rom.iluz/.agents/skills/planning-workflow/SKILL.md",
-		],
-		selectedRuntimePath:
-			"/Users/rom.iluz/.agents/skills/planning-workflow/SKILL.md",
-		shadowedRuntimePaths: [],
-	},
-	{
 		skill: "port-api-blueprint-creation",
 		invocationSurfaces: ["catalog-only"],
 		productRole: "community-on-demand",
@@ -1514,20 +1087,6 @@ export const REACHABILITY_ENTRIES: ReachabilityEntry[] = [
 		shadowedRuntimePaths: [],
 	},
 	{
-		skill: "research-workflow",
-		invocationSurfaces: ["workflow-prompt-pin"],
-		productRole: "orchestrator",
-		discoveryRoute: "Coach menu + prompt pin",
-		rationale: "auto-pi workflow orchestrator",
-		sourcePaths: ["skills/research-workflow/SKILL.md"],
-		runtimePhysicalPaths: [
-			"/Users/rom.iluz/.agents/skills/research-workflow/SKILL.md",
-		],
-		selectedRuntimePath:
-			"/Users/rom.iluz/.agents/skills/research-workflow/SKILL.md",
-		shadowedRuntimePaths: [],
-	},
-	{
 		skill: "resolving-merge-conflicts",
 		invocationSurfaces: ["workflow-phase-read"],
 		productRole: "conditional-specialist",
@@ -1539,20 +1098,6 @@ export const REACHABILITY_ENTRIES: ReachabilityEntry[] = [
 		],
 		selectedRuntimePath:
 			"/Users/rom.iluz/.agents/skills/resolving-merge-conflicts/SKILL.md",
-		shadowedRuntimePaths: [],
-	},
-	{
-		skill: "review-workflow",
-		invocationSurfaces: ["workflow-prompt-pin"],
-		productRole: "orchestrator",
-		discoveryRoute: "Coach menu + prompt pin",
-		rationale: "auto-pi workflow orchestrator",
-		sourcePaths: ["skills/review-workflow/SKILL.md"],
-		runtimePhysicalPaths: [
-			"/Users/rom.iluz/.agents/skills/review-workflow/SKILL.md",
-		],
-		selectedRuntimePath:
-			"/Users/rom.iluz/.agents/skills/review-workflow/SKILL.md",
 		shadowedRuntimePaths: [],
 	},
 	{
@@ -1672,20 +1217,6 @@ export const REACHABILITY_ENTRIES: ReachabilityEntry[] = [
 		],
 		selectedRuntimePath:
 			"/Users/rom.iluz/.agents/skills/setup-ts-deep-modules/SKILL.md",
-		shadowedRuntimePaths: [],
-	},
-	{
-		skill: "ship-workflow",
-		invocationSurfaces: ["workflow-prompt-pin"],
-		productRole: "orchestrator",
-		discoveryRoute: "Coach menu + prompt pin",
-		rationale: "auto-pi workflow orchestrator",
-		sourcePaths: ["skills/ship-workflow/SKILL.md"],
-		runtimePhysicalPaths: [
-			"/Users/rom.iluz/.agents/skills/ship-workflow/SKILL.md",
-		],
-		selectedRuntimePath:
-			"/Users/rom.iluz/.agents/skills/ship-workflow/SKILL.md",
 		shadowedRuntimePaths: [],
 	},
 	{
@@ -2040,7 +1571,7 @@ export const ASK_MATT_DISPOSITIONS: AskMattDisposition[] = [
 		artifacts: "approved design + CONTEXT.md/ADR",
 		exit: "spec phase",
 		autoPiRoute:
-			"planning-workflow setup + brainstorm (grilling + domain-modeling)",
+			"orchestration-layer + ask-matt: setup + brainstorm (grilling + domain-modeling)",
 		rationale:
 			"Decomposed — loading grill-with-docs would re-couple the dimensions we separated.",
 	},
@@ -2052,7 +1583,7 @@ export const ASK_MATT_DISPOSITIONS: AskMattDisposition[] = [
 		invariants: "throwaway, one command, no persistence",
 		artifacts: "answer captured",
 		exit: "resume design phase",
-		autoPiRoute: "planning-workflow prototype interrupt",
+		autoPiRoute: "orchestration-layer + ask-matt: prototype interrupt",
 		rationale: "Workflow-owned, consented interrupt.",
 	},
 	{
@@ -2063,7 +1594,7 @@ export const ASK_MATT_DISPOSITIONS: AskMattDisposition[] = [
 		invariants: "seam confirmation",
 		artifacts: "spec reference",
 		exit: "tickets phase",
-		autoPiRoute: "planning-workflow spec phase",
+		autoPiRoute: "orchestration-layer + ask-matt: spec phase",
 		rationale: "Direct equivalent.",
 	},
 	{
@@ -2074,7 +1605,7 @@ export const ASK_MATT_DISPOSITIONS: AskMattDisposition[] = [
 		invariants: "ticket-breakdown approval",
 		artifacts: "ticket refs + frontier",
 		exit: "complete → /build",
-		autoPiRoute: "planning-workflow tickets phase",
+		autoPiRoute: "orchestration-layer + ask-matt: tickets phase",
 		rationale: "Direct equivalent.",
 	},
 	{
@@ -2085,7 +1616,7 @@ export const ASK_MATT_DISPOSITIONS: AskMattDisposition[] = [
 		invariants: "tdd red-green, fresh context per ticket, review before commit",
 		artifacts: "verification evidence, commit hash",
 		exit: "review → ship",
-		autoPiRoute: "build-workflow + review-workflow + ship-workflow",
+		autoPiRoute: "orchestration-layer: build + review + ship phases",
 		rationale:
 			"Decomposed for independent observability. Invariants preserved.",
 	},
@@ -2097,7 +1628,7 @@ export const ASK_MATT_DISPOSITIONS: AskMattDisposition[] = [
 		invariants: "red-green one slice at a time",
 		artifacts: "passing test",
 		exit: "diagnose or complete",
-		autoPiRoute: "build-workflow tdd phase",
+		autoPiRoute: "orchestration-layer + ask-matt: tdd phase",
 		rationale: "Direct equivalent.",
 	},
 	{
@@ -2108,7 +1639,7 @@ export const ASK_MATT_DISPOSITIONS: AskMattDisposition[] = [
 		invariants: "standards + spec (+ security)",
 		artifacts: "findings with file:line",
 		exit: "disposition or complete",
-		autoPiRoute: "review-workflow review phase",
+		autoPiRoute: "orchestration-layer: review phase",
 		rationale: "Direct equivalent + Security axis.",
 	},
 	{
@@ -2130,7 +1661,7 @@ export const ASK_MATT_DISPOSITIONS: AskMattDisposition[] = [
 		invariants: "feedback loop, root cause (Phases 1-4 only)",
 		artifacts: "root cause diagnosis",
 		exit: "/build (fix with TDD)",
-		autoPiRoute: "debug-workflow (diagnose) + build-workflow (fix)",
+		autoPiRoute: "orchestration-layer: diagnose (debug) + fix (build)",
 		rationale: "Split — diagnosis only, fix in /build via TDD.",
 	},
 	{
@@ -2141,7 +1672,7 @@ export const ASK_MATT_DISPOSITIONS: AskMattDisposition[] = [
 		invariants: "decisions, not deliverables",
 		artifacts: "map reference + outcome",
 		exit: "resume or route",
-		autoPiRoute: "planning-workflow wayfind phase",
+		autoPiRoute: "orchestration-layer + ask-matt: wayfind phase",
 		rationale: "Direct equivalent.",
 	},
 	{
@@ -2163,7 +1694,7 @@ export const ASK_MATT_DISPOSITIONS: AskMattDisposition[] = [
 		invariants: "glossary when resolved, ADR when hard-to-reverse",
 		artifacts: "CONTEXT.md/ADR",
 		exit: "resume planning",
-		autoPiRoute: "planning-workflow domain-modeling underlay",
+		autoPiRoute: "orchestration-layer + ask-matt: domain-modeling underlay",
 		rationale: "Trigger-based underlay.",
 	},
 	{
@@ -2207,7 +1738,7 @@ export const ASK_MATT_DISPOSITIONS: AskMattDisposition[] = [
 		invariants: "stateless, saves nothing locally",
 		artifacts: "sharpened plan",
 		exit: "resume planning",
-		autoPiRoute: "planning-workflow no-codebase grilling branch",
+		autoPiRoute: "orchestration-layer + ask-matt: no-codebase grilling branch",
 		rationale: "Direct equivalent (no-codebase branch).",
 	},
 	{
@@ -2218,7 +1749,7 @@ export const ASK_MATT_DISPOSITIONS: AskMattDisposition[] = [
 		invariants: "high-trust primary sources",
 		artifacts: "cited markdown file",
 		exit: "/plan or /build",
-		autoPiRoute: "research-workflow",
+		autoPiRoute: "orchestration-layer + ask-matt: research",
 		rationale: "Direct equivalent.",
 	},
 	{

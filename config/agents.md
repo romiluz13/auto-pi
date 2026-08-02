@@ -14,20 +14,26 @@ Single source of truth for every AI coding tool on this machine (Pi, Claude Code
 
 ## Autonomous workflow
 
-When given a task, follow this flow. Each step is a user-facing workflow — type the slash command, the `skill:` pin fires the workflow skill, and the workflow skill orchestrates the internal phases by reading specialists in turn. The user never types internal skill commands.
+Three layers drive every workflow:
+
+1. **Coach** — the deterministic entry. A fixed 9-option menu (plan, build, debug, research, review, ship, triage, palette). The user picks one; Coach transforms input into the matching slash command. The workflow selection is NEVER delegated to the LLM.
+2. **ask-matt** — the routing brain. A pinned external skill (Matt Pocock's) that routes through the SDLC: grill → spec → tickets → implement (tdd + code-review) → commit. On-ramps: triage, diagnosing-bugs, wayfinder. The layer reads ask-matt on entry.
+3. **orchestration-layer** — the mechanics. auto-pi's thin wrapper that adds state blocks, evidence gates, reread-after-phase protocol, compaction recovery, human-controlled stops, and the unique auto-pi phases (ship, review disposition, verification, security). ask-matt owns the routing; the layer owns the orchestration; specialists own the procedures.
+
+When given a task, follow this flow. Each step is a user-facing slash command — type it, the `skill:` pin fires `orchestration-layer`, which reads `ask-matt` for routing and adds the orchestration mechanics. The user never types internal skill commands.
 
 1. **Understand (ORIENT).** If the user wants to understand (not change), explain inline. Do NOT fall through to build. If the user wants to change something: read repo AGENTS.md, relevant files, existing patterns. Search memory. If ambiguous, ask ONE clarifying question.
-2. **Plan** → type `/plan`. Pins `planning-workflow`, which classifies bounded vs foggy, then orchestrates brainstorming → to-spec → to-tickets (bounded) or wayfinder (foggy). The workflow reads each specialist in turn, rereads itself between phases, and requires evidence at each phase (design approval, spec reference, ticket refs + frontier).
-3. **Build** → type `/build <ticket>`. Pins `build-workflow`, which orchestrates tdd (red → green, one slice at a time), with diagnosing-bugs on persistent RED. Complete only when all acceptance criteria have evidence + test/lint/typecheck pass.
-4. **Debug** → type `/debug <issue>`. Pins `debug-workflow`, which routes to diagnosing-bugs (bugs) or resolving-merge-conflicts (merge/rebase). Diagnosis only — the fix happens in `/build`.
-5. **Research** → type `/research <topic>`. Pins `research-workflow`, which routes among research, octocode-research, live-research based on task fit. Returns cited findings.
-6. **Review** → type `/review`. Pins `review-workflow`, which orchestrates code-review (standards + spec + security, parallel reviewers) → receiving-code-review (verify before implementing, push back if wrong).
-7. **Ship** → type `/ship`. Pins `ship-workflow`, which orchestrates verification → diff-driven-docs → commit → github (conditional). Evidence at each phase. Never commit secrets or push main.
-8. **Document.** The ship workflow handles diff-driven-docs. Durable gotcha → update AGENTS.md. Architecture decision → ADR in `docs/adr/`. Specs and tickets → GitHub Issues.
+2. **Plan** → type `/plan`. Pins `orchestration-layer` (which reads `ask-matt`). Routes: brainstorming → to-spec → to-tickets (bounded) or wayfinder (foggy). Evidence gates: design approval, spec reference, ticket refs + frontier.
+3. **Build** → type `/build <ticket>`. Pins `orchestration-layer`. Routes: tdd (red → green, one slice at a time) with diagnosing-bugs on persistent RED. Complete only when all acceptance criteria have evidence + test/lint/typecheck pass.
+4. **Debug** → type `/debug <issue>`. Pins `orchestration-layer`. Routes: diagnosing-bugs (bugs) or resolving-merge-conflicts (merge/rebase). Diagnosis only — the fix happens in `/build`.
+5. **Research** → type `/research <topic>`. Pins `orchestration-layer`. Routes: research, octocode-research, live-research. Returns cited findings.
+6. **Review** → type `/review`. Pins `orchestration-layer`. Routes: code-review (standards + spec + security, parallel reviewers) → receiving-code-review (verify before implementing, push back if wrong).
+7. **Ship** → type `/ship`. Pins `orchestration-layer`. Routes: verification → diff-driven-docs → commit → github (conditional). Evidence at each phase. Never commit secrets or push main.
+8. **Document.** The ship phase handles diff-driven-docs. Durable gotcha → update AGENTS.md. Architecture decision → ADR in `docs/adr/`. Specs and tickets → GitHub Issues.
 9. **Remember.** Save decisions, gotchas, failures to memory. If memory contradicts current code, trust the code.
 10. **Handoff.** Session getting long → `/handoff` to create continuation doc.
 
-**Workflow skills own the routing.** Each workflow skill reads specialists in turn (using `read` on the specialist's SKILL.md), rereads itself between phases, and tracks a compact state block. The user answers questions and approves inside the workflow — the user never types internal skill commands. Specialist skills own the procedure; the workflow owns the routing.
+**ask-matt owns the routing. orchestration-layer owns the mechanics.** The layer reads ask-matt for routing, reads specialists in turn (using `read` on the specialist's SKILL.md), rereads itself between phases, and tracks a compact state block. The user answers questions and approves inside the workflow — the user never types internal skill commands. Specialist skills own the procedure; ask-matt owns the routing; the layer owns the orchestration.
 
 **Compaction is a residual risk.** The state block is best-effort in normal context. If the state is lost, reconstruct from conversation artifacts (spec URL, commit hash, test output). Do not guess.
 
@@ -36,18 +42,26 @@ When given a task, follow this flow. Each step is a user-facing workflow — typ
 ## Skill flow graph
 
 ```
-MAIN FLOW: idea → ship
-  /plan ==planning-workflow==> setup (style + domain capture) → brainstorming → to-spec → to-tickets (bounded)
-                                  wayfinder (foggy) → ready-for-brainstorm → setup
-  /build ==build-workflow==> tdd (full cadence) → diagnosing-bugs on RED → tdd
-  /debug ==debug-workflow==> diagnosing-bugs | resolving-merge-conflicts
-  /research ==research-workflow==> research | octocode-research | live-research
-  /review ==review-workflow==> code-review → receiving-code-review
-  /ship ==ship-workflow==> verification → diff-driven-docs → commit → github (conditional)
-  /setup-audit ==setup-maintenance==> (direct pin — 1 specialist)
-  /triage ==triage==> (direct pin — incoming issues/PRs, on-ramp)
+3 LAYERS: Coach (entry) → ask-matt (routing) → orchestration-layer (mechanics)
 
-The workflow skill reads each specialist in turn; the user types one slash command.
+MAIN FLOW: idea → ship (routed by ask-matt, orchestrated by the layer)
+  /plan → orchestration-layer → ask-matt → brainstorming → to-spec → to-tickets (bounded)
+                                            → wayfinder (foggy)
+  /build → orchestration-layer → ask-matt → tdd → diagnosing-bugs on RED → tdd
+  /debug → orchestration-layer → ask-matt → diagnosing-bugs | resolving-merge-conflicts
+  /research → orchestration-layer → ask-matt → research | octocode-research | live-research
+  /review → orchestration-layer → ask-matt → code-review → receiving-code-review (disposition)
+  /ship → orchestration-layer → (layer's unique phase) → verification → diff-driven-docs → commit → github
+  /setup-audit → setup-maintenance (direct pin)
+  /triage → triage (direct pin — incoming issues/PRs, on-ramp)
+
+The layer reads ask-matt for routing, reads each specialist in turn; the user types one slash command.
+
+LAYER'S UNIQUE PHASES (not in ask-matt):
+  ship — verify → docs → commit → github (conditional)
+  review-disposition — verified-fix | verified-defer | rejected | needs-user-decision
+  verification — evidence-block discipline
+  security — 3rd review axis (security-review specialist)
 
 VOCABULARY (on-demand, not always-on):
   domain-modeling — domain language (planning underlay when triggered)
@@ -164,6 +178,6 @@ Skip only for: pure utility libs with stable APIs (date-fns, zod, lodash). When 
 ## Pi harness (non-obvious infrastructure — don't reinvent what these do)
 
 - **Coach** is the DEFAULT user interface — don't second-guess a steered input; it was routed intentionally.
-- **The skill pin only fires when a HUMAN types the slash command.** The agent cannot run slash commands. Each workflow skill orchestrates the internal phases by reading specialists in turn — the user never types internal skill commands.
+- **The skill pin only fires when a HUMAN types the slash command.** The agent cannot run slash commands. Each entry prompt pins `orchestration-layer`, which reads `ask-matt` for routing and reads specialists in turn — the user never types internal skill commands.
 - **Context sidecar** — retrieve oversized output via `context_search` / `context_get`; don't re-run the expensive command.
 - **Observability** dashboard is for the user to watch, not for you to drive.
