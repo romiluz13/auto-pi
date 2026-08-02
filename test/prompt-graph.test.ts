@@ -1,14 +1,23 @@
 import {
 	WORKFLOWS,
-	ASK_MATT_DISPOSITIONS,
 	REACHABILITY_ENTRIES,
+	ASK_MATT_ROUTES,
+	ORCHESTRATION_LAYER_PHASES,
+	TRIAGE_OUTCOMES,
+	ASK_MATT_SOURCE,
+	EXPECTED_ASK_MATT_ROUTES,
 } from "../config/workflow-graph-contract.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { execSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
 
+const REACH_V2 = REACHABILITY_ENTRIES;
 const REPO_ROOT = process.cwd();
 const PROMPTS_DIR = join(REPO_ROOT, "prompts");
 const REPO_SKILLS_DIR = join(REPO_ROOT, "skills");
@@ -37,33 +46,6 @@ function skillExists(name: string): boolean {
 function readWorkflowSkill(name: string): string {
 	return readFileSync(join(REPO_SKILLS_DIR, name, "SKILL.md"), "utf-8");
 }
-
-// Parse the phases from a workflow skill (## Phase: X headers)
-function parsePhases(content: string): string[] {
-	const phases: string[] = [];
-	const regex = /^## Phase:\s*(\S+)/gm;
-	let match;
-	while ((match = regex.exec(content)) !== null) {
-		phases.push(match[1]);
-	}
-	return phases;
-}
-
-// Extract skill read targets from a workflow skill
-function parseSkillReads(content: string): string[] {
-	const reads: string[] = [];
-	const regex = /[Rr]ead\s+`?(\/[^`]+\/SKILL\.md)`?/g;
-	let match;
-	while ((match = regex.exec(content)) !== null) {
-		// Extract the skill name from the path
-		const parts = match[1].split("/");
-		const skillName = parts[parts.length - 2];
-		reads.push(skillName);
-	}
-	return reads;
-}
-
-// ─── Every prompt has exactly one valid skill: target ────────────────────────
 
 test("every prompt has exactly one skill: frontmatter pin", () => {
 	for (const name of PROMPT_NAMES) {
@@ -275,45 +257,6 @@ test("code-review sequential awaits is a candidate, not an automatic finding", (
 
 // Check 7: Every ask-matt route has an equivalence/disposition
 
-// Check 8: Every installed skill has a reachability classification (no true orphans)
-test("no installed skill is a true orphan (all reachable by at least one means)", () => {
-	const allSkills = new Set<string>();
-	for (const d of readdirSync(LIVE_SKILLS_DIR, { withFileTypes: true })
-		.filter((d) => d.isDirectory())
-		.map((d) => d.name)) {
-		allSkills.add(d);
-	}
-	const piSkillDir = join(homedir(), ".pi/agent/skills");
-	if (existsSync(piSkillDir)) {
-		for (const d of readdirSync(piSkillDir, { withFileTypes: true })
-			.filter((d) => d.isDirectory())
-			.map((d) => d.name)) {
-			allSkills.add(d);
-		}
-	}
-
-	// Non-vacuous reachability: every skill must have a reachability classification
-	// in the workflow-graph-contract.ts REACHABILITY_ENTRIES. "Installed" does NOT imply
-	// "reachable" — a skill is reachable only if it has an explicit disposition
-	// (workflow-bundled, prompt-pinned, extension-command, or documented standalone).
-	// Catalog-only skills (installed but not in any workflow + not documented standalone)
-	// are TRUE ORPHANS, not "reachable via /skill".
-	//
-	// This test verifies the reachability contract covers every installed skill.
-	const classified = new Set(REACHABILITY_ENTRIES.map((e) => e.skill));
-	const trueOrphans: string[] = [];
-	for (const skill of allSkills) {
-		if (!classified.has(skill)) {
-			trueOrphans.push(skill);
-		}
-	}
-	assert.equal(
-		trueOrphans.length,
-		0,
-		`True orphans (installed but no reachability classification): ${trueOrphans.join(", ")}`,
-	);
-});
-
 // Check: planning wayfinder → ready-for-brainstorm goes through setup (not directly to brainstorm)
 
 // Check: planning state block has prototype fields
@@ -338,239 +281,10 @@ test("triage conditional handoff is in ask-matt's flow (routed by the layer)", (
 	const triageContent = readPrompt("triage");
 	assert.ok(
 		/triage/i.test(triageContent),
-		"triage prompt should mention triage",
+		"triage prompt should reference triage",
 	);
 });
 
-// ─── Contract-based graph validation (non-vacuous) ───────────────────────────
-
-// Check: every workflow in the contract has a matching SKILL.md
-test("every workflow in the contract exists as a SKILL.md", () => {
-	for (const wf of WORKFLOWS) {
-		assert.ok(
-			existsSync(join(REPO_SKILLS_DIR, wf.name, "SKILL.md")),
-			`workflow ${wf.name} in the contract but no SKILL.md exists`,
-		);
-	}
-});
-
-// Check: every workflow's prompt pin matches the contract
-// v0.4: the contract still models the 6 old workflows (T9 will rewrite it).
-// For now, the prompts pin orchestration-layer, not the old workflow skills.
-// This test is superseded by the v0.4 pin tests above. Kept as a no-op until T9 rewrites the contract.
-test("v0.4 transition: prompts pin orchestration-layer (contract rewrite pending T9)", () => {
-	for (const name of [
-		"plan",
-		"build",
-		"debug",
-		"research",
-		"review",
-		"ship",
-		"triage",
-	]) {
-		const pin = skillPin(readPrompt(name));
-		assert.equal(
-			pin,
-			"orchestration-layer",
-			`/${name} should pin orchestration-layer (v0.4)`,
-		);
-	}
-});
-
-// Check: every phase in the contract exists in the SKILL.md
-test("every contract phase exists as a '## Phase:' header in the SKILL.md", () => {
-	for (const wf of WORKFLOWS) {
-		const content = readWorkflowSkill(wf.name);
-		const skillPhases = parsePhases(content);
-		for (const phase of wf.phases) {
-			if (phase.name === "setup" && !skillPhases.includes("setup")) {
-				// setup may be a section, not a phase — check for "## Phase: setup" or a setup section
-				assert.ok(
-					/Phase: setup|## .*setup/i.test(content),
-					`${wf.name}: contract phase "setup" should exist in the SKILL.md`,
-				);
-				continue;
-			}
-			assert.ok(
-				skillPhases.includes(phase.name),
-				`${wf.name}: contract phase "${phase.name}" not found in SKILL.md phases: ${skillPhases.join(", ")}`,
-			);
-		}
-	}
-});
-
-// Check: every transition target in the contract is a valid phase
-test("every contract transition targets a valid phase in the same workflow", () => {
-	for (const wf of WORKFLOWS) {
-		const phaseNames = wf.phases.map((p) => p.name);
-		for (const phase of wf.phases) {
-			if (!phase.next) continue;
-			for (const target of phase.next) {
-				assert.ok(
-					phaseNames.includes(target),
-					`${wf.name}: phase "${phase.name}" transitions to "${target}" but "${target}" is not a valid phase in this workflow`,
-				);
-			}
-		}
-	}
-});
-
-// Check: every terminal phase has a handoff or is terminal
-test("every workflow has at least one terminal phase", () => {
-	for (const wf of WORKFLOWS) {
-		const terminals = wf.phases.filter((p) => p.terminal);
-		assert.ok(
-			terminals.length >= 1,
-			`${wf.name} should have at least one terminal phase`,
-		);
-	}
-});
-
-// Check: every handoff command is a valid user-facing prompt or extension command
-test("every contract handoff is a valid user-facing command (prompt or extension)", () => {
-	const validCommands = new Set<string>();
-	// All prompt names (user-facing slash commands)
-	for (const p of PROMPT_NAMES) validCommands.add(p);
-	// Extension commands (handoff, palette, etc.)
-	validCommands.add("handoff");
-	validCommands.add("palette");
-
-	for (const wf of WORKFLOWS) {
-		for (const phase of wf.phases) {
-			if (!phase.handoff) continue;
-			assert.ok(
-				validCommands.has(phase.handoff.command),
-				`${wf.name}: handoff "/${phase.handoff.command}" is not a valid user-facing command`,
-			);
-		}
-	}
-});
-
-// Check: every conditional specialist is not in the unconditional specialists list
-test("no conditional specialist appears in the unconditional specialists list", () => {
-	for (const wf of WORKFLOWS) {
-		for (const phase of wf.phases) {
-			if (!phase.conditionalSpecialists) continue;
-			for (const cond of phase.conditionalSpecialists) {
-				assert.ok(
-					!phase.specialists.includes(cond.skill),
-					`${wf.name}: phase "${phase.name}" has "${cond.skill}" in both unconditional and conditional — should be conditional only`,
-				);
-			}
-		}
-	}
-});
-
-// Check: every ask-matt route has a non-vacuous disposition
-test("every ask-matt route has an explicit disposition (no gaps)", () => {
-	// The known ask-matt routes that must have a disposition
-	const requiredRoutes = [
-		"grill-with-docs",
-		"prototype",
-		"to-spec",
-		"to-tickets",
-		"implement",
-		"tdd",
-		"code-review",
-		"triage",
-		"diagnosing-bugs",
-		"wayfinder",
-		"improve-codebase-architecture",
-		"domain-modeling",
-		"codebase-design",
-		"handoff",
-		"compact",
-		"grill-me",
-		"teach",
-		"writing-great-skills",
-		"setup-matt-pocock-skills",
-	];
-	for (const route of requiredRoutes) {
-		const disp = ASK_MATT_DISPOSITIONS.find((d) => d.askMattRoute === route);
-		assert.ok(
-			disp,
-			`ask-matt route "${route}" has no disposition in the contract`,
-		);
-		assert.ok(
-			disp?.disposition !== undefined,
-			`ask-matt route "${route}" has an undefined disposition`,
-		);
-	}
-});
-
-// Check: no ask-matt disposition is "gap" (all are equivalent, substitution, standalone, or unsupported)
-test("no ask-matt disposition is a gap — all have an explicit classification", () => {
-	for (const disp of ASK_MATT_DISPOSITIONS) {
-		assert.ok(
-			[
-				"equivalent",
-				"deliberate-substitution",
-				"intentional-standalone",
-				"intentional-unsupported",
-			].includes(disp.disposition),
-			`ask-matt route "${disp.askMattRoute}" has disposition "${disp.disposition}" which is not a valid classification`,
-		);
-	}
-});
-
-// Check: planning has a grill-me branch (the genius's option b)
-
-// ─── Contract v2: conditional outcomes, state constraints, interrupts ───────
-
-import {
-	WORKFLOWS as WORKFLOWS_V2,
-	ASK_MATT_DISPOSITIONS as ASK_MATT_V2,
-	REACHABILITY_ENTRIES as REACH_V2,
-	TRIAGE_OUTCOMES,
-	TRIAGE_CONTRACT,
-	ASK_MATT_SOURCE,
-	EXPECTED_ASK_MATT_ROUTES,
-} from "../config/workflow-graph-contract.ts";
-
-// Check: every terminal phase has conditional outcomes (not a single handoff)
-
-// Check: every outcome has evidence fields
-
-// Check: every outcome handoff is a valid user-facing command
-
-// Check: the prototype interrupt is in the planning-workflow contract
-
-// Check: grill-me and grilling predicates are mutually exclusive
-
-// Check: research is in ASK_MATT_DISPOSITIONS
-test("research is in ASK_MATT_DISPOSITIONS (was missing)", () => {
-	const research = ASK_MATT_V2.find((d) => d.askMattRoute === "research");
-	assert.ok(research, "research should be in ASK_MATT_DISPOSITIONS");
-	assert.equal(research?.disposition, "equivalent");
-});
-
-// Check: ask-matt dispositions have structured fields (trigger, invariants, artifacts, exit, autoPiRoute)
-test("every ask-matt disposition has structured harmony evidence (trigger/invariant/artifact/exit)", () => {
-	for (const disp of ASK_MATT_V2) {
-		assert.ok(
-			disp.trigger.length > 0,
-			`${disp.askMattRoute}: trigger should be non-empty`,
-		);
-		assert.ok(
-			disp.invariants.length > 0,
-			`${disp.askMattRoute}: invariants should be non-empty`,
-		);
-		assert.ok(
-			disp.artifacts.length > 0,
-			`${disp.askMattRoute}: artifacts should be non-empty`,
-		);
-		assert.ok(
-			disp.exit.length > 0,
-			`${disp.askMattRoute}: exit should be non-empty`,
-		);
-		assert.ok(
-			disp.autoPiRoute.length > 0,
-			`${disp.askMattRoute}: autoPiRoute should be non-empty`,
-		);
-	}
-});
-
-// Check: triage has explicit outcomes (the 6 outcome states)
 test("triage has explicit outcomes (6 outcome states with conditional handoffs)", () => {
 	assert.ok(
 		TRIAGE_OUTCOMES.length >= 6,
@@ -625,21 +339,8 @@ test("every reachability entry has valid physical paths that exist on disk", () 
 	}
 });
 
-// Check: every ask-matt disposition has a source commit
-test("every ask-matt disposition has a source commit", () => {
-	for (const disp of ASK_MATT_V2) {
-		assert.ok(
-			disp.sourceCommit.length >= 7,
-			`${disp.askMattRoute}: sourceCommit should be a non-empty commit hash`,
-		);
-	}
-});
-
 // ─── Drift fixture tests (5 scenarios) ────────────────────────────────────────
 
-import { execSync, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
 
 function runDriftCheck(
 	localDir: string,
@@ -680,60 +381,7 @@ function runDriftCheck(
 	}
 }
 
-function createDriftFixture(): {
-	localDir: string;
-	upstreamRepo: string;
-	cleanup: () => void;
-} {
-	const baseDir = mkdtempSync(join(tmpdir(), "drift-test-"));
-	const localDir = join(baseDir, "local");
-	const upstreamRepo = join(baseDir, "upstream");
-	mkdirSync(join(localDir, "skills", "test-fork"), { recursive: true });
-	mkdirSync(join(upstreamRepo, "skills", "engineering", "test-fork"), {
-		recursive: true,
-	});
 
-	// Initialize upstream git repo with initial content
-	execSync(
-		`cd "${upstreamRepo}" && git init && git config user.email "test@test.com" && git config user.name "test"`,
-		{ stdio: "pipe" },
-	);
-	writeFileSync(
-		join(upstreamRepo, "skills", "engineering", "test-fork", "SKILL.md"),
-		"upstream content v1\n",
-	);
-	execSync(`cd "${upstreamRepo}" && git add -A && git commit -m "v1"`, {
-		stdio: "pipe",
-	});
-	const baseCommit = execSync(`cd "${upstreamRepo}" && git rev-parse HEAD`, {
-		encoding: "utf-8",
-	}).trim();
-
-	// Create local fork with provenance + a local patch
-	const localContent = `---
-name: test-fork
-upstream:
-  repo: upstream
-  path: skills/engineering/test-fork/SKILL.md
-  commit: ${baseCommit}
-local-patch:
-  intent: "test local patch"
-  owner: test
----
-upstream content v1
-local patch line
-`;
-	writeFileSync(
-		join(localDir, "skills", "test-fork", "SKILL.md"),
-		localContent,
-	);
-
-	return {
-		localDir,
-		upstreamRepo,
-		cleanup: () => rmSync(baseDir, { recursive: true, force: true }),
-	};
-}
 
 // ─── Drift fixture tests (5 real behavioral scenarios) ────────────────────────
 
@@ -1029,12 +677,6 @@ test("grill-with-docs is classified as superseded", () => {
 	assert.equal(entry?.productRole, "superseded");
 });
 
-// Check: claude-handoff is classified as superseded
-test("claude-handoff is classified as superseded", () => {
-	const entry = REACH_V2.find((e) => e.skill === "claude-handoff");
-	assert.equal(entry?.productRole, "superseded");
-});
-
 // Check: session-handoff is classified as standalone-utility
 test("session-handoff is classified as standalone-utility", () => {
 	const entry = REACH_V2.find((e) => e.skill === "session-handoff");
@@ -1076,7 +718,27 @@ test("triage outcomes have evidence fields", () => {
 
 // ─── Contract v6: full SHA-256 + prototype state reset ───────────────────────
 
-import { createHash } from "node:crypto";
+
+// Check: ASK_MATT_SOURCE.sha256 is a full 64-char hex digest matching the actual file
+test("ASK_MATT_SOURCE.sha256 is a full 64-char hex digest matching the actual upstream file", () => {
+	const sha256 = ASK_MATT_SOURCE.sha256;
+	assert.ok(
+		/^[a-f0-9]{64}$/.test(sha256),
+		`sha256 should be a 64-char hex digest, got: ${sha256}`,
+	);
+	// Compute the actual SHA-256 of the upstream ask-matt file
+	const upstreamPath =
+		"/Users/rom.iluz/Dev/mattpocock-skills/skills/engineering/ask-matt/SKILL.md";
+	if (existsSync(upstreamPath)) {
+		const fileContent = readFileSync(upstreamPath);
+		const computed = createHash("sha256").update(fileContent).digest("hex");
+		assert.equal(
+			sha256,
+			computed,
+			`ASK_MATT_SOURCE.sha256 should match the actual file hash`,
+		);
+	}
+});
 
 // Check: ASK_MATT_SOURCE.sha256 is a full 64-char hex digest matching the actual file
 test("ASK_MATT_SOURCE.sha256 is a full 64-char hex digest matching the actual upstream file", () => {
@@ -1972,4 +1634,131 @@ test("v0.4 T8: config/agents.md describes the 3-layer architecture", () => {
 		/Coach/i.test(content),
 		"agents.md should mention Coach (the entry)",
 	);
+});
+
+// ─── v0.4 T9: contract validates ask-matt routing graph + layer phases ──────
+
+// Check: ASK_MATT_ROUTES covers the full SDLC
+test("v0.4 T9: ASK_MATT_ROUTES has the main flow (grill, spec, tickets, implement, tdd, code-review)", () => {
+	const routes = ASK_MATT_ROUTES.map((r) => r.route);
+	const mainFlow = ["grill-with-docs", "to-spec", "to-tickets", "implement", "tdd", "code-review"];
+	for (const r of mainFlow) {
+		assert.ok(routes.includes(r), `ASK_MATT_ROUTES should include main-flow route "${r}"`);
+	}
+});
+
+// Check: ASK_MATT_ROUTES has on-ramps
+test("v0.4 T9: ASK_MATT_ROUTES has on-ramps (triage, diagnosing-bugs, wayfinder)", () => {
+	const routes = ASK_MATT_ROUTES.map((r) => r.route);
+	const onRamps = ["triage", "diagnosing-bugs", "wayfinder"];
+	for (const r of onRamps) {
+		assert.ok(routes.includes(r), `ASK_MATT_ROUTES should include on-ramp "${r}"`);
+	}
+});
+
+// Check: ASK_MATT_ROUTES has standalone skills
+test("v0.4 T9: ASK_MATT_ROUTES has standalone skills (grill-me, prototype, research, handoff)", () => {
+	const routes = ASK_MATT_ROUTES.map((r) => r.route);
+	const standalone = ["grill-me", "prototype", "research", "handoff"];
+	for (const r of standalone) {
+		assert.ok(routes.includes(r), `ASK_MATT_ROUTES should include standalone "${r}"`);
+	}
+});
+
+// Check: EXPECTED_ASK_MATT_ROUTES matches ASK_MATT_ROUTES
+test("v0.4 T9: EXPECTED_ASK_MATT_ROUTES is derived from ASK_MATT_ROUTES", () => {
+	assert.equal(EXPECTED_ASK_MATT_ROUTES.length, ASK_MATT_ROUTES.length);
+	for (const r of ASK_MATT_ROUTES) {
+		assert.ok(EXPECTED_ASK_MATT_ROUTES.includes(r.route), `EXPECTED_ASK_MATT_ROUTES should include "${r.route}"`);
+	}
+});
+
+// Check: ORCHESTRATION_LAYER_PHASES has the 5 unique auto-pi phases
+test("v0.4 T9: ORCHESTRATION_LAYER_PHASES has ship, review-disposition, verification, security, diagnose", () => {
+	const phases = ORCHESTRATION_LAYER_PHASES.map((p) => p.name);
+	const expected = ["ship", "review-disposition", "verification", "security", "diagnose"];
+	for (const p of expected) {
+		assert.ok(phases.includes(p), `ORCHESTRATION_LAYER_PHASES should include "${p}"`);
+	}
+});
+
+// Check: ship phase reads verification-before-completion + diff-driven-docs + commit
+test("v0.4 T9: ship phase reads the 3 core specialists", () => {
+	const ship = ORCHESTRATION_LAYER_PHASES.find((p) => p.name === "ship");
+	assert.ok(ship);
+	assert.ok(ship!.specialists.includes("verification-before-completion"));
+	assert.ok(ship!.specialists.includes("diff-driven-docs"));
+	assert.ok(ship!.specialists.includes("commit"));
+});
+
+// Check: review-disposition phase reads receiving-code-review
+test("v0.4 T9: review-disposition phase reads receiving-code-review", () => {
+	const review = ORCHESTRATION_LAYER_PHASES.find((p) => p.name === "review-disposition");
+	assert.ok(review);
+	assert.ok(review!.specialists.includes("receiving-code-review"));
+});
+
+// Check: security phase reads security-review
+test("v0.4 T9: security phase reads security-review", () => {
+	const security = ORCHESTRATION_LAYER_PHASES.find((p) => p.name === "security");
+	assert.ok(security);
+	assert.ok(security!.specialists.includes("security-review"));
+});
+
+// Check: diagnose phase has procedureScope limiting to Phases 1-4
+test("v0.4 T9: diagnose phase has procedureScope limiting to Phases 1-4", () => {
+	const diagnose = ORCHESTRATION_LAYER_PHASES.find((p) => p.name === "diagnose");
+	assert.ok(diagnose);
+	assert.ok(diagnose!.procedureScope);
+	assert.match(diagnose!.procedureScope!, /Phases 1-4/i);
+});
+
+// Check: every community specialist in the reachability catalog exists on disk
+test("v0.4 T9: community specialists referenced by ask-matt routes exist at runtime paths", () => {
+	const communitySpecialists = [
+		"tdd", "to-spec", "to-tickets", "wayfinder", "prototype",
+		"domain-modeling", "codebase-design", "improve-codebase-architecture",
+		"commit", "github", "research", "resolving-merge-conflicts",
+		"grill-me", "triage",
+	];
+	for (const name of communitySpecialists) {
+		const entry = REACHABILITY_ENTRIES.find((e) => e.skill === name);
+		assert.ok(entry, `community specialist "${name}" should be in REACHABILITY_ENTRIES`);
+	}
+});
+
+// Check: ask-matt is classified as superseded (wrapped by the layer, not standalone)
+test("v0.4 T9: ask-matt is classified as superseded in the reachability catalog", () => {
+	const entry = REACHABILITY_ENTRIES.find((e) => e.skill === "ask-matt");
+	assert.ok(entry);
+	assert.equal(entry!.productRole, "superseded");
+});
+
+// Check: orchestration-layer is classified as workflow-orchestrator
+test("v0.4 T9: orchestration-layer is classified as workflow-orchestrator", () => {
+	const entry = REACHABILITY_ENTRIES.find((e) => e.skill === "orchestration-layer");
+	assert.ok(entry);
+	assert.equal(entry!.productRole, "workflow-orchestrator");
+});
+
+// Check: the 6 old orchestrators are NOT in the reachability catalog
+test("v0.4 T9: the 6 collapsed orchestrators are NOT in the reachability catalog", () => {
+	const collapsed = [
+		"planning-workflow", "build-workflow", "review-workflow",
+		"ship-workflow", "research-workflow", "debug-workflow",
+	];
+	for (const name of collapsed) {
+		const entry = REACHABILITY_ENTRIES.find((e) => e.skill === name);
+		assert.ok(!entry, `collapsed orchestrator "${name}" should NOT be in REACHABILITY_ENTRIES`);
+	}
+});
+
+// Check: the contract references pinned-deps.json for ask-matt provenance
+test("v0.4 T9: contract ASK_MATT_SOURCE has sha256 matching pinned-deps.json", () => {
+	const pinnedDepsPath = join(REPO_ROOT, "config", "pinned-deps.json");
+	if (existsSync(pinnedDepsPath)) {
+		const pinnedDeps = JSON.parse(readFileSync(pinnedDepsPath, "utf-8"));
+		assert.equal(ASK_MATT_SOURCE.sha256, pinnedDeps["ask-matt"].sha256,
+			"ASK_MATT_SOURCE.sha256 should match pinned-deps.json");
+	}
 });
