@@ -239,12 +239,31 @@ export default function coachExtension(pi: ExtensionAPI): void {
 			// LLM failed — skip skillHints, still show the menu.
 		}
 
-		// Show the fixed workflow menu.
+		// Show the fixed workflow menu with a 20s auto-pick timeout.
+		// If the user doesn't pick within 20 seconds, auto-select the first
+		// option ("Just do it" — raw agent, no workflow) and send the input.
 		const title = `Coach — pick a workflow for: "${text.slice(0, 80)}${text.length > 80 ? "…" : ""}"${skillHint ? ` — ${skillHint}` : ""}`;
-		const choice = await ctx.ui.select(
-			title,
-			WORKFLOW_OPTIONS.map((o) => o.label),
+		const AUTO_PICK_MS = 20_000;
+		const autoPickPromise = new Promise<{ choice: string | undefined; auto: boolean }>(
+			(resolve) =>
+				setTimeout(
+					() => resolve({ choice: WORKFLOW_OPTIONS[0].label, auto: true }),
+					AUTO_PICK_MS,
+				),
 		);
+		const selectPromise = ctx.ui
+			.select(title, WORKFLOW_OPTIONS.map((o) => o.label))
+			.then((c) => ({ choice: c, auto: false }));
+		const { choice, auto } = await Promise.race([
+			selectPromise,
+			autoPickPromise,
+		]);
+		if (auto) {
+			ctx.ui.notify(
+				`Coach: no pick in 20s — auto-selected "${WORKFLOW_OPTIONS[0].label}"`,
+				"info",
+			);
+		}
 
 		if (choice === undefined) {
 			// Esc / cancel = just do it (still inject skill hints).
