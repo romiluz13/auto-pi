@@ -265,10 +265,6 @@ test("code-review sequential awaits is a candidate, not an automatic finding", (
 
 // Check: planning does not preload brainstorming when grilling
 
-// Check: build-workflow has explicit cadence (typecheck + single test + full suite)
-
-// Check: build-workflow fresh-context gate is hard (STOP, not just recommend)
-
 // v0.4: triage conditional handoff is now in ask-matt's triage flow (routed by the layer),
 // not in the prompt itself. The prompt is a thin entry adapter.
 // Check that the orchestration-layer references the triage flow.

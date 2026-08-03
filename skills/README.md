@@ -1,54 +1,45 @@
 # Skills
 
-Skills are installed by `scripts/install.sh` from these sources:
+auto-pi v0.4. Three layers: **Coach** (entry) → **ask-matt** (routing) → **orchestration-layer** (mechanics).
 
-## Bundled (11 — repo-authored, 3 adapted from Superpowers)
+## auto-pi repo skills (16)
 
-Repo-original skills (local convention, workflow, and memory hygiene):
+| Skill | Role |
+| ------- | ------ |
+| `orchestration-layer` | The thin wrapper around ask-matt. State blocks, evidence gates, reread protocol, compaction recovery, human-controlled stops, + the 4 unique phases (ship, review-disposition, verification, security). |
+| `security-review` | The 3rd review axis (injection, auth/authz, secrets, unsafe deserialization, SSRF, path traversal, unsafe operations, dependency confusion). auto-pi original. |
+| `brainstorming` | Design before code (read by ask-matt's grill flow). |
+| `grilling` | Relentless plan interview (read by ask-matt's grill flow). |
+| `code-review` | Two-axis (Standards + Spec) parallel review. Local fork of Matt Pocock (provenance + drift automation). |
+| `diagnosing-bugs` | Hard-bug diagnosis loop. Local fork of Matt Pocock (provenance + drift automation). |
+| `receiving-code-review` | Verify before implementing review feedback. |
+| `verification-before-completion` | Evidence-block discipline (read by the layer's verification gate + ship). |
+| `diff-driven-docs` | Classify doc impact before writing (read by the layer's ship phase). |
+| `decision-hold-lifecycle` | Persist unresolved decisions (wired into the layer's planning + review). |
+| `memory-compounding` | Post-work memory hygiene (wired into the layer's ship-complete). |
+| `session-handoff` | Cross-session handoff (standalone via `/handoff`; the layer's compaction escape hatch). |
+| `bearings` | "Where did I leave off" status report (standalone via `/bearings`). |
+| `codebase-hygiene` | Semantic duplicates + shallow-module detection (standalone). |
+| `setup-maintenance` | Monthly `/setup-audit` runner. |
+| `setup-matt-pocock-skills` | One-time repo scaffolding for Matt's skills. |
 
-- `brainstorming` — design before code, transitions to /to-spec + /to-tickets
-- `code-review` — two-axis (standards + spec) parallel review
-- `codebase-hygiene` — semantic duplicates and shallow-module detection
-- `diagnosing-bugs` — hard-bug diagnosis loop with tight feedback loops
-- `diff-driven-docs` — classify doc impact before writing
-- `grilling` — relentless plan interview
-- `memory-compounding` — prune/merge persistent memory
-- `receiving-code-review` — verify before implementing review feedback
-- `setup-maintenance` — monthly /setup-audit runner
-- `setup-matt-pocock-skills` — one-time repo scaffolding for Pocock skills
-- `verification-before-completion` — evidence before claims
+## ask-matt (pinned external dependency)
 
-These are included in the repo (`skills/` directory) and copied by the installer.
-Superpowers-specific references were removed from the 3 adapted skills; all
-others are original to this repo. Transitions point to Matt Pocock skills where
-applicable.
+The routing brain. Installed from `mattpocock/skills`. Pinned in `config/pinned-deps.json` with provenance (commit `ed37663`, SHA-256). Drift checked by `scripts/check-drift.sh`. ask-matt owns the SDLC graph (main flow: grill → spec → tickets → implement; on-ramps: triage, diagnosing-bugs, wayfinder; standalone: grill-me, prototype, research, handoff). The orchestration-layer wraps it.
 
-## Installed from external sources
+## External specialists (ask-matt routes to these)
 
-| Source | Skills | Count |
-| -------- | -------- | ------- |
-| **Matt Pocock** (mattpocock/skills) | tdd, handoff, prototype, grill-with-docs, to-spec, to-tickets, triage, implement, code-review, research, wayfinder, codebase-design, domain-modeling, diagnosing-bugs, resolving-merge-conflicts, writing-great-skills, teach, improve-codebase-architecture | 18 |
-| **MongoDB** (mongodb/agent-skills) | mongodb-schema-design, mongodb-search-and-ai, mongodb-query-optimizer, mongodb-connection, mongodb-mcp-setup, mongodb-natural-language-querying, mongodb-atlas-stream-processing | 7 |
-| **Vercel** (vercel-labs/agent-skills + vercel-labs/agent-browser) | vercel-react-best-practices, vercel-composition-patterns, deploy-to-vercel, web-design-guidelines, agent-browser | 5 |
-| **Bright Data** (brightdata/skills) | search, scrape, discover-api, data-feeds, live-research, brightdata-cli | 6 |
-| **Octocode** (bgauryy/octocode) | octocode, octocode-research, octocode-brainstorming, octocode-rfc-generator, octocode-roast | 5 |
-| **Python/OSS** (mitsuhiko/agent-stuff) | uv, github, commit | 3 |
+| Source | Skills |
+| -------- | -------- |
+| **Matt Pocock** | tdd, handoff, prototype, grill-with-docs, to-spec, to-tickets, triage, implement, research, wayfinder, codebase-design, domain-modeling, resolving-merge-conflicts, writing-great-skills, teach, improve-codebase-architecture |
+| **MongoDB** | mongodb-schema-design, mongodb-search-and-ai, mongodb-query-optimizer, mongodb-connection, mongodb-mcp-setup, mongodb-natural-language-querying, mongodb-atlas-stream-processing |
+| **Vercel** | vercel-react-best-practices, vercel-composition-patterns, deploy-to-vercel, web-design-guidelines, agent-browser |
+| **Bright Data** | search, scrape, discover-api, data-feeds, live-research, brightdata-cli |
+| **Octocode** | octocode, octocode-research, octocode-brainstorming, octocode-rfc-generator, octocode-roast |
+| **Python/OSS** | uv, github, commit |
 
-## Skill selection methodology
+## Provenance + drift automation
 
-Every skill was compared prompt-by-prompt against alternatives. Matt Pocock
-Auto-pi repo forks win all 5 conflicts with Superpowers (tdd, debugging, code-review, writing-skills,
-planning). 3 unique Superpowers skills were adapted and bundled.
-
-## What was rejected
-
-- `agent-onboarding` — one-time setup, already done
-- `python-sdk-best-practices` / `js-sdk-best-practices` — for building WITH Bright Data SDK
-- `proxy` — Bright Data proxy network code gen, niche
-- `rag-pipeline` — niche (kept only if you build RAG with Bright Data)
-- `bright-data-best-practices` — reference for Bright Data APIs, model-invoked only
-- `vercel-cli-with-tokens` — overlaps with deploy-to-vercel
-- `vercel-react-native-skills` — only if you build React Native
-- `writing-guidelines` — Vercel's internal writing style
-- `higgsfield-generate` — AI video/image generation, not coding
-- 15 Matt Pocock skills removed (deprecated, one-time, non-coding, or redundant)
+- `config/pinned-deps.json` — ask-matt provenance (commit + SHA-256).
+- `scripts/check-drift.sh` — verifies local forks (code-review, diagnosing-bugs) + pinned deps (ask-matt). Run before any release.
+- `code-review` + `diagnosing-bugs` declare upstream provenance in their frontmatter (commit `ed37663`).
