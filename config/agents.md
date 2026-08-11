@@ -1,6 +1,6 @@
-# Global AI Agent Rules
+# Pi Agent Rules (auto-pi)
 
-Single source of truth for every AI coding tool on this machine (Pi, Claude Code, Codex).
+Pi-specific rules for the auto-pi harness. Claude Code + Codex get the lean agent-agnostic rules at `~/.ai/AGENTS.md`; this file is Pi-only (Coach, orchestration-layer, ask-matt, the workflow graph).
 
 - Keep this file under 200 lines total — every line is a token cost on every session.
 - Append only what the agent gets wrong without being told. If an instruction is obvious from the code, delete it.
@@ -9,8 +9,8 @@ Single source of truth for every AI coding tool on this machine (Pi, Claude Code
 ## Environment
 
 - macOS, zsh shell. Node via `mise`.
-- This file is the single source of truth. Each agent loads it differently (Pi: `~/.pi/agent/AGENTS.md` symlink, Claude Code: `@~/.ai/AGENTS.md` import, Codex: `~/.codex/AGENTS.md` symlink).
-- `~/.agents/skills/` is for third-party skill installs, shared across all agents.
+- This file is Pi-only. Claude Code + Codex use `~/.ai/AGENTS.md` (agent-agnostic). Do NOT symlink this file into `~/.ai/AGENTS.md` — it contains Pi machinery (Coach, prompt pins) those agents don't have.
+- `~/.agents/skills/` is the shared skills pool, symlinked into each agent's skills dir.
 
 ## Autonomous workflow
 

@@ -244,15 +244,20 @@ export default function coachExtension(pi: ExtensionAPI): void {
 		// option ("Just do it" — raw agent, no workflow) and send the input.
 		const title = `Coach — pick a workflow for: "${text.slice(0, 80)}${text.length > 80 ? "…" : ""}"${skillHint ? ` — ${skillHint}` : ""}`;
 		const AUTO_PICK_MS = 20_000;
-		const autoPickPromise = new Promise<{ choice: string | undefined; auto: boolean }>(
-			(resolve) =>
-				setTimeout(
-					() => resolve({ choice: WORKFLOW_OPTIONS[0].label, auto: true }),
-					AUTO_PICK_MS,
-				),
+		const autoPickPromise = new Promise<{
+			choice: string | undefined;
+			auto: boolean;
+		}>((resolve) =>
+			setTimeout(
+				() => resolve({ choice: WORKFLOW_OPTIONS[0].label, auto: true }),
+				AUTO_PICK_MS,
+			),
 		);
 		const selectPromise = ctx.ui
-			.select(title, WORKFLOW_OPTIONS.map((o) => o.label))
+			.select(
+				title,
+				WORKFLOW_OPTIONS.map((o) => o.label),
+			)
 			.then((c) => ({ choice: c, auto: false }));
 		const { choice, auto } = await Promise.race([
 			selectPromise,
