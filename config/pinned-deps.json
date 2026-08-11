@@ -3,8 +3,8 @@
     "installedPath": "~/.agents/skills/ask-matt/SKILL.md",
     "upstreamRepo": "/Users/rom.iluz/Dev/mattpocock-skills",
     "upstreamPath": "skills/engineering/ask-matt/SKILL.md",
-    "baseCommit": "ed37663",
-    "repoHeadChecked": "2ab9580",
-    "sha256": "b1a134ada29cbfded84bc9a7f93356ab7a3d7f800edf1f541a2a964118ad45a7"
+    "baseCommit": "84fdeff",
+    "repoHeadChecked": "84fdeff",
+    "sha256": "3d38910535f5f01e15bc5fd7f6ca8880d628cd248741f08e6780dd7c1828e832"
   }
 }

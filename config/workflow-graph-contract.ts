@@ -184,9 +184,14 @@ export const ASK_MATT_ROUTES: AskMattRoute[] = [
 	{ route: "handoff", category: "standalone", description: "bridge context windows" },
 	{ route: "compact", category: "standalone", description: "summarize in-place (built-in)" },
 	{ route: "grill-me", category: "standalone", description: "stateless relentless interview (no codebase)" },
+	{ route: "grilling", category: "standalone", description: "the direct interview primitive (rounds + design-tree frontier)" },
 	{ route: "research", category: "standalone", description: "delegate reading legwork to a background agent" },
+	{ route: "resolving-merge-conflicts", category: "standalone", description: "resolve an in-progress merge or rebase by intent" },
+	{ route: "to-questionnaire", category: "standalone", description: "write a questionnaire for missing human input" },
 	{ route: "teach", category: "standalone", description: "learn a concept over multiple sessions" },
-	{ route: "writing-great-skills", category: "standalone", description: "reference for writing skills" },
+	{ route: "wait-what", category: "standalone", description: "re-pitch an explanation that did not land" },
+	{ route: "wizard", category: "standalone", description: "generate a human-in-the-loop setup procedure" },
+	{ route: "writing-for-agents", category: "standalone", description: "reference for writing agent-facing documents" },
 	{ route: "setup-matt-pocock-skills", category: "precondition", description: "configure issue tracker + triage labels + doc layout" },
 ];
 
@@ -493,15 +498,15 @@ export const REACHABILITY_ENTRIES: ReachabilityEntry[] = [
 // ─── ask-matt source metadata (provenance + integrity) ──────────────────────
 
 export const ASK_MATT_SOURCE = {
-	repoHeadChecked: "2ab9580",
-	skillBaseCommit: "ed37663",
-	sha256: "b1a134ada29cbfded84bc9a7f93356ab7a3d7f800edf1f541a2a964118ad45a7",
+	repoHeadChecked: "84fdeff",
+	skillBaseCommit: "84fdeff",
+	sha256: "3d38910535f5f01e15bc5fd7f6ca8880d628cd248741f08e6780dd7c1828e832",
 	repo: "https://github.com/mattpocock/skills.git",
 	path: "skills/engineering/ask-matt/SKILL.md",
 };
 
 // The exact set of ask-matt routes expected from the upstream skill content
-// at commit ed37663. If upstream adds a route, this set must be updated.
+// at commit 84fdeff. If upstream adds a route, this set must be updated.
 export const EXPECTED_ASK_MATT_ROUTES = ASK_MATT_ROUTES.map((r) => r.route);
 
 // ─── Helper (path resolution) ───────────────────────────────────────────────

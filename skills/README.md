@@ -2,16 +2,15 @@
 
 auto-pi v0.4. Three layers: **Coach** (entry) → **ask-matt** (routing) → **orchestration-layer** (mechanics).
 
-## auto-pi repo skills (16)
+## auto-pi repo skills (14)
 
 | Skill | Role |
 | ------- | ------ |
 | `orchestration-layer` | The thin wrapper around ask-matt. State blocks, evidence gates, reread protocol, compaction recovery, human-controlled stops, + the 4 unique phases (ship, review-disposition, verification, security). |
 | `security-review` | The 3rd review axis (injection, auth/authz, secrets, unsafe deserialization, SSRF, path traversal, unsafe operations, dependency confusion). auto-pi original. |
 | `brainstorming` | Design before code (read by ask-matt's grill flow). |
-| `grilling` | Relentless plan interview (read by ask-matt's grill flow). |
-| `code-review` | Two-axis (Standards + Spec) parallel review. Local fork of Matt Pocock (provenance + drift automation). |
-| `diagnosing-bugs` | Hard-bug diagnosis loop. Local fork of Matt Pocock (provenance + drift automation). |
+| `code-review` | Two-axis (Standards + Spec) parallel review. Local fork of Matt Pocock (provenance + drift automation, rebased on 84fdeff). |
+| `diagnosing-bugs` | Hard-bug diagnosis loop. Local fork of Matt Pocock (provenance + drift automation, rebased on 84fdeff — includes Matt's Redact section + our AI-guards). |
 | `receiving-code-review` | Verify before implementing review feedback. |
 | `verification-before-completion` | Evidence-block discipline (read by the layer's verification gate + ship). |
 | `diff-driven-docs` | Classify doc impact before writing (read by the layer's ship phase). |
@@ -21,7 +20,6 @@ auto-pi v0.4. Three layers: **Coach** (entry) → **ask-matt** (routing) → **o
 | `bearings` | "Where did I leave off" status report (standalone via `/bearings`). |
 | `codebase-hygiene` | Semantic duplicates + shallow-module detection (standalone). |
 | `setup-maintenance` | Monthly `/setup-audit` runner. |
-| `setup-matt-pocock-skills` | One-time repo scaffolding for Matt's skills. |
 
 ## ask-matt (pinned external dependency)
 

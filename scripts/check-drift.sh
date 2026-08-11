@@ -64,7 +64,7 @@ for skill in "${LOCAL_FORKS[@]}"; do
 	fi
 
 	# Read the recorded upstream commit from the frontmatter
-	recorded_commit=$(grep "^  commit:" "$local_file" | head -1 | awk '{print $2}')
+	recorded_commit=$(awk '/^  commit:/{print $2; exit}' "$local_file")
 	if [ -z "$recorded_commit" ]; then
 		echo "  ✗ provenance commit not found in frontmatter"
 		exit_code=1
@@ -108,9 +108,9 @@ for skill in "${LOCAL_FORKS[@]}"; do
 		# Both changed — check for overlap
 		echo "  ⚠ both upstream and local changed since recorded commit — check for overlap:"
 		echo "    upstream changes (base → upstream-HEAD):"
-		diff "$base_file" "$upstream_head_file" | head -10 | sed 's/^/      /'
+		diff "$base_file" "$upstream_head_file" | head -10 | sed 's/^/      /' || true
 		echo "    local changes (base → local):"
-		diff "$base_file" "$local_file" | head -10 | sed 's/^/      /'
+		diff "$base_file" "$local_file" | head -10 | sed 's/^/      /' || true
 		echo "    If the upstream changes touch the same lines as the local patch, the local fork may be missing upstream improvements. Review and update the provenance commit after merging."
 		exit_code=1
 	fi
