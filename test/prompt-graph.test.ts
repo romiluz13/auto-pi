@@ -1,21 +1,23 @@
-import {
-	WORKFLOWS,
-	REACHABILITY_ENTRIES,
-	ASK_MATT_ROUTES,
-	ORCHESTRATION_LAYER_PHASES,
-	TRIAGE_OUTCOMES,
-	ASK_MATT_SOURCE,
-	EXPECTED_ASK_MATT_ROUTES,
-} from "../config/workflow-graph-contract.ts";
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, existsSync } from "node:fs";
-import { join } from "node:path";
-import { homedir } from "node:os";
 import { execSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { join } from "node:path";
+import { test } from "node:test";
+import {
+	ASK_MATT_SOURCE,
+	ORCHESTRATION_LAYER_PHASES,
+	REACHABILITY_ENTRIES,
+} from "../config/workflow-graph-contract.ts";
 
 const REACH_V2 = REACHABILITY_ENTRIES;
 const REPO_ROOT = process.cwd();
@@ -279,19 +281,6 @@ test("triage conditional handoff is in ask-matt's flow (routed by the layer)", (
 		/triage/i.test(triageContent),
 		"triage prompt should reference triage",
 	);
-});
-
-test("triage has explicit outcomes (6 outcome states with conditional handoffs)", () => {
-	assert.ok(
-		TRIAGE_OUTCOMES.length >= 6,
-		"triage should have at least 6 outcomes",
-	);
-	const readyForAgent = TRIAGE_OUTCOMES.find(
-		(o) => o.outcome === "ready-for-agent",
-	);
-	assert.ok(readyForAgent, "triage should have a ready-for-agent outcome");
-	assert.ok(readyForAgent?.handoff, "ready-for-agent should have a handoff");
-	assert.equal(readyForAgent?.handoff?.command, "build");
 });
 
 // Check: state constraints exist for the spec phase (requires design: approved)
@@ -692,21 +681,6 @@ test("ASK_MATT_SOURCE has a SHA-256 hash", () => {
 	);
 });
 
-// Check: triage outcomes have evidence fields
-test("triage outcomes have evidence fields", () => {
-	const readyForAgent = TRIAGE_OUTCOMES.find(
-		(o) => o.outcome === "ready-for-agent",
-	);
-	assert.ok(
-		readyForAgent?.evidenceFields,
-		"ready-for-agent should have evidence fields",
-	);
-	assert.ok(
-		readyForAgent!.evidenceFields!.includes("issue ref"),
-		"ready-for-agent should require issue ref evidence",
-	);
-});
-
 // Check: prototype state mutations are explicit in the SKILL.md
 
 // ─── Contract v6: full SHA-256 + prototype state reset ───────────────────────
@@ -919,14 +893,14 @@ test("real ask-matt provenance manifest exists + SHA matches the installed file"
 
 // ─── v0.4 T2: orchestration-layer skeleton ────────────────────────────────────
 
-// Check: orchestration-layer skill exists + has all 7 structural sections
-test("orchestration-layer skill exists + has all 7 structural sections", () => {
+// Check: orchestration-layer skill exposes the deterministic runtime contract
+test("orchestration-layer skill exposes the deterministic runtime contract", () => {
 	const content = readWorkflowSkill("orchestration-layer");
 
-	// 1. State block schema (phase, evidence fields, artifact references)
+	// 1. Runtime state schema (phase, evidence fields, artifact references)
 	assert.ok(
-		/state block/i.test(content),
-		"should have a state block schema section",
+		/runtime state schema/i.test(content),
+		"should have a runtime state schema section",
 	);
 	assert.ok(
 		/phase:/i.test(content),
@@ -964,15 +938,18 @@ test("orchestration-layer skill exists + has all 7 structural sections", () => {
 		"compaction recovery should reference re-reading ask-matt",
 	);
 
-	// 5. Human-controlled stop rule (emit state → "Next: type /X" → STOP; do not auto-advance)
+	// 5. Deterministic autonomous continuation (no public-command handoff)
 	assert.ok(
-		/Next: type/i.test(content),
-		"should have human-controlled stop with 'Next: type /X' handoff",
+		/workflow_transition/i.test(content),
+		"should require evidence-backed workflow_transition events",
 	);
-	assert.ok(/STOP/i.test(content), "should explicitly say STOP");
 	assert.ok(
-		/do not auto-advance/i.test(content),
-		"should say 'do not auto-advance'",
+		/durable dispatch|fresh top-level/i.test(content),
+		"should use durable fresh top-level dispatch between internal phases",
+	);
+	assert.ok(
+		!/Next:\s*type\s*\//i.test(content),
+		"should not emit public slash commands as internal transitions",
 	);
 
 	// 6. Specialist isolation (follow only the active phase's specialist; do not preload)
@@ -987,8 +964,10 @@ test("orchestration-layer skill exists + has all 7 structural sections", () => {
 		"should declare ask-matt owns routing",
 	);
 	assert.ok(
-		/orchestration.*mechanic/i.test(content),
-		"should declare this layer owns orchestration mechanics",
+		/workflow.*interpreter.*own.*transition|workflow machine.*transition authority/i.test(
+			content,
+		),
+		"should declare the workflow machine/interpreter owns transition mechanics",
 	);
 	assert.ok(
 		/specialist.*own.*procedur/i.test(content),
@@ -1084,8 +1063,8 @@ test("v0.4 T4: orchestration-layer has all 4 unique auto-pi phases (ship, review
 	);
 });
 
-// Check: ship phase has entry conditions + specialist reads + evidence gates + human-controlled stop
-test("v0.4 T4: ship phase has entry conditions, specialist reads, evidence gates, and human-controlled stop", () => {
+// Check: ship phase has entry conditions + specialist reads + evidence gates + terminal event
+test("workflow ship phase has entry conditions, specialist reads, evidence gates, and a terminal event", () => {
 	const content = readWorkflowSkill("orchestration-layer");
 	// Extract the ship phase section
 	const shipMatch = content.match(
@@ -1118,18 +1097,22 @@ test("v0.4 T4: ship phase has entry conditions, specialist reads, evidence gates
 		"ship phase should have evidence gates",
 	);
 	assert.ok(
-		/commit hash|pr url|ci status/i.test(shipSection),
-		"ship phase should require commit hash/PR URL/CI status as evidence",
+		/COMMIT_CREATED/i.test(shipSection) &&
+			/PUBLICATION_DONE/i.test(shipSection),
+		"ship phase should require commit and publication events",
 	);
-	// Human-controlled stop (ship is terminal — "Ship complete" or "Next: type")
 	assert.ok(
-		/Next:\s*type|Ship complete/i.test(shipSection),
-		"ship phase should have a human-controlled stop ('Next: type /X' or 'Ship complete')",
+		/terminal/i.test(shipSection),
+		"ship phase should end at a terminal state",
+	);
+	assert.ok(
+		!/Next:\s*type\s*\//i.test(shipSection),
+		"ship must not emit a public handoff command",
 	);
 });
 
-// Check: review-disposition phase has the 4 dispositions + specialist read + human-controlled stop
-test("v0.4 T4: review-disposition phase has 4 dispositions, reads receiving-code-review, and human-controlled stop", () => {
+// Check: review-disposition has the 4 dispositions + specialist read + autonomous remediation handoff
+test("workflow review-disposition has 4 dispositions and an autonomous remediation handoff", () => {
 	const content = readWorkflowSkill("orchestration-layer");
 	const dispMatch = content.match(
 		/## Phase:\s*review-disposition\b([\s\S]*?)(?=\n## (?:Phase:|Rules|$))/i,
@@ -1158,10 +1141,13 @@ test("v0.4 T4: review-disposition phase has 4 dispositions, reads receiving-code
 		dispSection.includes("receiving-code-review"),
 		"review-disposition should read receiving-code-review",
 	);
-	// Human-controlled stop
 	assert.ok(
-		/Next:\s*type/i.test(dispSection),
-		"review-disposition should have a human-controlled stop",
+		/remediate|advances internally to ship/i.test(dispSection),
+		"review-disposition should transition internally to remediation or ship",
+	);
+	assert.ok(
+		!/Next:\s*type\s*\//i.test(dispSection),
+		"review must not emit a public handoff command",
 	);
 	// Review-only (no apply)
 	assert.ok(
@@ -1232,10 +1218,13 @@ test("v0.4 T4: security phase defines 3rd review axis with smell categories and 
 		/fresh context|anti.anchored|diff.only/i.test(secSection),
 		"security phase should require fresh context (anti-anchored)",
 	);
-	// Human-controlled stop
 	assert.ok(
-		/Next:\s*type/i.test(secSection),
-		"security phase should have a human-controlled stop",
+		/merge cited findings|review report/i.test(secSection),
+		"security findings should flow into the review report",
+	);
+	assert.ok(
+		!/Next:\s*type\s*\//i.test(secSection),
+		"security must not emit a public handoff command",
 	);
 });
 
@@ -1567,7 +1556,7 @@ test("v0.4 T8: config/agents.md does not reference the 6 orchestrators", () => {
 	for (const wf of COLLAPSED_WORKFLOWS) {
 		assert.ok(
 			!content.includes(wf),
-			`config/agents.md should not reference '${wf}' — it should describe the 3-layer architecture (Coach → ask-matt → orchestration-layer)`,
+			`config/agents.md should not reference '${wf}' — it should describe the current four-layer architecture`,
 		);
 	}
 });
@@ -1601,26 +1590,20 @@ test("v0.4 T8: extensions/coach.ts does not reference the 6 orchestrators", () =
 	}
 });
 
-// Check: config/workflow-graph-contract.ts does NOT have WORKFLOWS with the 6 entries
-test("v0.4 T8: contract WORKFLOWS array is empty or removed (6 orchestrators gone)", () => {
-	for (const wf of WORKFLOWS) {
-		assert.ok(
-			!COLLAPSED_WORKFLOWS.includes(wf.name as any),
-			`contract WORKFLOWS should not contain '${wf.name}' — the 6 orchestrators are collapsed`,
-		);
-	}
-});
-
-// Check: config/agents.md describes the 3-layer architecture
-test("v0.4 T8: config/agents.md describes the 3-layer architecture", () => {
+// Check: config/agents.md describes the current four-layer architecture
+test("config/agents.md describes the deterministic four-layer architecture", () => {
 	const content = readFileSync(join(REPO_ROOT, "config", "agents.md"), "utf-8");
 	assert.ok(
 		/ask-matt/i.test(content),
 		"agents.md should mention ask-matt (the routing brain)",
 	);
 	assert.ok(
+		/workflow-machine|workflow machine/i.test(content),
+		"agents.md should mention the workflow machine (transition authority)",
+	);
+	assert.ok(
 		/orchestration-layer/i.test(content),
-		"agents.md should mention orchestration-layer (the mechanics)",
+		"agents.md should mention orchestration-layer (procedure glue)",
 	);
 	assert.ok(
 		/Coach/i.test(content),
@@ -1628,61 +1611,7 @@ test("v0.4 T8: config/agents.md describes the 3-layer architecture", () => {
 	);
 });
 
-// ─── v0.4 T9: contract validates ask-matt routing graph + layer phases ──────
-
-// Check: ASK_MATT_ROUTES covers the full SDLC
-test("v0.4 T9: ASK_MATT_ROUTES has the main flow (grill, spec, tickets, implement, tdd, code-review)", () => {
-	const routes = ASK_MATT_ROUTES.map((r) => r.route);
-	const mainFlow = [
-		"grill-with-docs",
-		"to-spec",
-		"to-tickets",
-		"implement",
-		"tdd",
-		"code-review",
-	];
-	for (const r of mainFlow) {
-		assert.ok(
-			routes.includes(r),
-			`ASK_MATT_ROUTES should include main-flow route "${r}"`,
-		);
-	}
-});
-
-// Check: ASK_MATT_ROUTES has on-ramps
-test("v0.4 T9: ASK_MATT_ROUTES has on-ramps (triage, diagnosing-bugs, wayfinder)", () => {
-	const routes = ASK_MATT_ROUTES.map((r) => r.route);
-	const onRamps = ["triage", "diagnosing-bugs", "wayfinder"];
-	for (const r of onRamps) {
-		assert.ok(
-			routes.includes(r),
-			`ASK_MATT_ROUTES should include on-ramp "${r}"`,
-		);
-	}
-});
-
-// Check: ASK_MATT_ROUTES has standalone skills
-test("v0.4 T9: ASK_MATT_ROUTES has standalone skills (grill-me, prototype, research, handoff)", () => {
-	const routes = ASK_MATT_ROUTES.map((r) => r.route);
-	const standalone = ["grill-me", "prototype", "research", "handoff"];
-	for (const r of standalone) {
-		assert.ok(
-			routes.includes(r),
-			`ASK_MATT_ROUTES should include standalone "${r}"`,
-		);
-	}
-});
-
-// Check: EXPECTED_ASK_MATT_ROUTES matches ASK_MATT_ROUTES
-test("v0.4 T9: EXPECTED_ASK_MATT_ROUTES is derived from ASK_MATT_ROUTES", () => {
-	assert.equal(EXPECTED_ASK_MATT_ROUTES.length, ASK_MATT_ROUTES.length);
-	for (const r of ASK_MATT_ROUTES) {
-		assert.ok(
-			EXPECTED_ASK_MATT_ROUTES.includes(r.route),
-			`EXPECTED_ASK_MATT_ROUTES should include "${r.route}"`,
-		);
-	}
-});
+// ─── Specialist metadata (routing remains in pinned ask-matt) ──────────────
 
 // Check: ORCHESTRATION_LAYER_PHASES has the 5 unique auto-pi phases
 test("v0.4 T9: ORCHESTRATION_LAYER_PHASES has ship, review-disposition, verification, security, diagnose", () => {
@@ -1816,10 +1745,14 @@ test("v0.4 T9: contract ASK_MATT_SOURCE has sha256 matching pinned-deps.json", (
 
 // ─── v0.4 T10: documentation consistency guards ──────────────────────────────
 
-test("v0.4 T10: config/agents.md describes the 3-layer architecture", () => {
+test("documentation describes the deterministic workflow architecture", () => {
 	const content = readFileSync(join(REPO_ROOT, "config", "agents.md"), "utf-8");
 	assert.ok(/Coach/i.test(content), "AGENTS.md should mention Coach");
 	assert.ok(/ask-matt/i.test(content), "AGENTS.md should mention ask-matt");
+	assert.ok(
+		/workflow machine/i.test(content),
+		"AGENTS.md should mention the workflow machine",
+	);
 	assert.ok(
 		/orchestration-layer/i.test(content),
 		"AGENTS.md should mention orchestration-layer",

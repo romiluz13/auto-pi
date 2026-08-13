@@ -27,9 +27,9 @@ You MUST create a task for each of these items and complete them in order:
 4. **Propose 2-3 approaches** — with trade-offs and your recommendation
 5. **Present design** — in sections scaled to their complexity, get user approval after each section
 6. **Self-review the approved design** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
-7. **Return the approved-design handoff** — a concise summary in the conversation; stop
+7. **Return the approved-design handoff** — a concise summary, then submit the planning evidence to the workflow interpreter
 
-Brainstorming does NOT publish the spec, commit anything, create tickets, or name the next command. The `/plan` prompt owns the human-visible navigation ("Next: type /spec").
+Brainstorming does NOT publish the spec, commit anything, create tickets, or name a next command. It returns the approved design to the deterministic workflow interpreter, which advances internally to specification when the evidence gate passes.
 
 ## Process Flow
 
@@ -41,7 +41,7 @@ digraph brainstorming {
     "Present design sections" [shape=box];
     "User approves design?" [shape=diamond];
     "Self-review" [shape=box];
-    "Return approved-design handoff + stop" [shape=doublecircle];
+    "Return approved-design handoff to workflow" [shape=doublecircle];
 
     "Explore project context" -> "Ask clarifying questions";
     "Ask clarifying questions" -> "Propose 2-3 approaches";
@@ -49,7 +49,7 @@ digraph brainstorming {
     "Present design sections" -> "User approves design?";
     "User approves design?" -> "Present design sections" [label="no, revise"];
     "User approves design?" -> "Self-review" [label="yes"];
-    "Self-review" -> "Return approved-design handoff + stop";
+    "Self-review" -> "Return approved-design handoff to workflow";
 }
 ```
 
@@ -107,7 +107,7 @@ Fix any issues inline. No need to re-review — just fix and move on.
 
 > Approved design: <one-line summary>. Key decisions: <the non-obvious ones>. Next: the `/plan` prompt tells you what to type.
 
-Then **stop**. Do not publish the spec, commit, create tickets, or name the next command. The prompts own the navigation.
+Then return control to the workflow interpreter. Do not publish the spec, commit, create tickets, or invent a public command; the machine owns the transition.
 
 ## Key Principles
 

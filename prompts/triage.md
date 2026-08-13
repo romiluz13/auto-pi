@@ -3,7 +3,17 @@ description: Triage incoming issues/PRs — categorise, verify, grill if needed,
 argument-hint: "<issue or PR to triage>"
 skill: orchestration-layer
 ---
-Triage the following issue or PR. The `orchestration-layer` skill will read `ask-matt` (the routing brain) and route to the triage flow (move issues through triage roles — categorise, verify, grill if needed, write agent-ready briefs). State blocks + evidence gates + human-controlled stops are handled by the layer.
+# Auto-Pi Workflow Goal
+
+[AUTO_PI_WORKFLOW]
+entry=triage
+terminal=triaged
+[/AUTO_PI_WORKFLOW]
+[AUTO_PI_SUBJECT]
+$@
+[/AUTO_PI_SUBJECT]
+
+Triage the following issue or PR autonomously. `orchestration-layer` reads `ask-matt`; the workflow interpreter requires a durable triage outcome and agent-ready brief when applicable. Stop only for a genuinely user-owned hard-to-reverse decision.
 
 Issue: $@
 

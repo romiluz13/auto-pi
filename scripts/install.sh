@@ -25,7 +25,7 @@ PI_AGENT_DIR="${HOME}/.pi/agent"
 AGENTS_SKILLS_DIR="${HOME}/.agents/skills"
 
 echo -e "${BOLD}auto-pi installer${RESET}"
-echo -e "A Pi coding agent config where the workflow decides what to do — auto-pi — 14 packages, 6 custom extensions (coach + loop engine + guardrails + trace), autonomous workflow.\n"
+echo -e "A Pi coding agent config where a deterministic workflow machine drives ask-matt-routed specialists to evidence-backed completion.\n"
 
 # ── Prerequisites ──────────────────────────────────────────────────────────
 
@@ -34,6 +34,8 @@ step "Checking prerequisites"
 command -v pi >/dev/null 2>&1 || error "Pi is not installed. Run: curl -fsSL https://pi.dev/install.sh | sh"
 command -v npm >/dev/null 2>&1 || error "npm is not installed. Install Node.js first."
 command -v git >/dev/null 2>&1 || error "git is not installed."
+command -v jq >/dev/null 2>&1 || error "jq is not installed."
+command -v gitleaks >/dev/null 2>&1 || error "gitleaks is required for commit secret scanning. Install with: brew install gitleaks"
 command -v mise >/dev/null 2>&1 || warn "mise not found — settings.json requires mise exec node@24 -- npm"
 command -v gh >/dev/null 2>&1 || warn "gh CLI not found — GitHub features will be limited."
 
@@ -99,7 +101,7 @@ PACKAGES=(
 	pi-lens
 	@narumitw/pi-statusline
 	pi-intercom
-	pi-prompt-template-model
+	pi-prompt-template-model@0.12.0
 	pi-btw
 	@juicesharp/rpiv-ask-user-question
 	pi-rewind
@@ -123,7 +125,7 @@ TARGET_DIR="$PI_AGENT_DIR/npm/node_modules/@mariozechner"
 mkdir -p "$TARGET_DIR"
 for shim in pi-coding-agent pi-tui; do
 	if [ -d "$LEGACY_SHIM_DIR/$shim" ]; then
-		rm -rf "$TARGET_DIR/$shim"
+		rm -rf "${TARGET_DIR:?}/$shim"
 		ln -sf "$LEGACY_SHIM_DIR/$shim" "$TARGET_DIR/$shim"
 		echo "  linked @mariozechner/$shim shim"
 	fi
@@ -156,11 +158,13 @@ else
 	info "web-search.json already exists — keeping your keys"
 fi
 
-# ── Custom Extensions ─────────────────────────────────────────────────────
+# ── Deterministic workflow runtime + custom extensions ─────────────────────
 
-step "Installing custom extensions (coach, loop, guardrails, palette, handoff, trace)"
+step "Installing deterministic workflow runtime and custom extensions"
 
-mkdir -p "$PI_AGENT_DIR/extensions"
+mkdir -p "$PI_AGENT_DIR/config" "$PI_AGENT_DIR/extensions"
+cp "$SCRIPT_DIR/config/workflow-machine.ts" "$PI_AGENT_DIR/config/workflow-machine.ts"
+echo "  installed workflow runtime: config/workflow-machine.ts"
 for ext in "$SCRIPT_DIR"/extensions/*.ts; do
 	[ -f "$ext" ] || continue
 	name=$(basename "$ext")
@@ -169,32 +173,14 @@ for ext in "$SCRIPT_DIR"/extensions/*.ts; do
 done
 # Copy the extensions README (documentation, not code)
 [ -f "$SCRIPT_DIR/extensions/README.md" ] && cp "$SCRIPT_DIR/extensions/README.md" "$PI_AGENT_DIR/extensions/README.md"
-info "Custom extensions installed — /reload in Pi to activate (Ctrl+Shift+K for palette, /handoff for session handoff, /trace-skills for activation audit)"
+info "Custom extensions installed — /reload in Pi to activate (/workflow status for workflow state)"
 
-# ── AGENTS.md (single source of truth across Pi + Claude Code + Codex) ──────
+# ── Pi-only AGENTS.md ──────────────────────────────────────────────────────
 
-step "Installing AGENTS.md (shared across Pi, Claude Code, Codex)"
+step "Installing Pi-only AGENTS.md"
 
-mkdir -p "${HOME}/.ai" "${HOME}/.codex" "${HOME}/.claude"
-# ~/.ai/AGENTS.md is the real file; the others symlink to it.
-if [ ! -f "${HOME}/.ai/AGENTS.md" ] || ! cmp -s "$SCRIPT_DIR/config/agents.md" "${HOME}/.ai/AGENTS.md"; then
-	cp "$SCRIPT_DIR/config/agents.md" "${HOME}/.ai/AGENTS.md"
-	echo "  installed ~/.ai/AGENTS.md"
-else
-	echo "  ~/.ai/AGENTS.md already up to date"
-fi
-ln -sf "${HOME}/.ai/AGENTS.md" "${PI_AGENT_DIR}/AGENTS.md"
-ln -sf "${HOME}/.ai/AGENTS.md" "${HOME}/.codex/AGENTS.md"
-# Claude Code uses an @import in CLAUDE.md.
-CLAUDE_MD="${HOME}/.claude/CLAUDE.md"
-touch "$CLAUDE_MD"
-if ! grep -q '@~/.ai/AGENTS.md' "$CLAUDE_MD" 2>/dev/null; then
-	printf '\n@~/.ai/AGENTS.md\n' >>"$CLAUDE_MD"
-	echo "  added @~/.ai/AGENTS.md import to ~/.claude/CLAUDE.md"
-else
-	echo "  ~/.claude/CLAUDE.md already imports AGENTS.md"
-fi
-info "AGENTS.md wired across Pi + Claude Code + Codex"
+cp "$SCRIPT_DIR/config/agents.md" "${PI_AGENT_DIR}/AGENTS.md"
+info "Pi AGENTS.md installed without modifying Claude Code or Codex rules"
 
 # ── Prompt Templates (the user-facing command surface) ──────────────────────
 
@@ -345,7 +331,7 @@ for skill_dir in "$SCRIPT_DIR"/skills/*/; do
 	[ -d "$skill_dir" ] || continue
 	name=$(basename "$skill_dir")
 	[ -n "$name" ] && [ "$name" != "/" ] || continue
-	rm -rf "$AGENTS_SKILLS_DIR/$name"
+	rm -rf "${AGENTS_SKILLS_DIR:?}/$name"
 	cp -R "$skill_dir" "$AGENTS_SKILLS_DIR/$name"
 done
 # ~/.pi/agent/skills is populated by installed npm packages + fetched skills.

@@ -6,7 +6,7 @@ auto-pi v0.4. Three layers: **Coach** (entry) → **ask-matt** (routing) → **o
 
 | Skill | Role |
 | ------- | ------ |
-| `orchestration-layer` | The thin wrapper around ask-matt. State blocks, evidence gates, reread protocol, compaction recovery, human-controlled stops, + the 4 unique phases (ship, review-disposition, verification, security). |
+| `orchestration-layer` | The model-side procedure layer around ask-matt. The typed workflow machine/interpreter owns transitions, durable evidence, private continuation, and bounded retries. |
 | `security-review` | The 3rd review axis (injection, auth/authz, secrets, unsafe deserialization, SSRF, path traversal, unsafe operations, dependency confusion). auto-pi original. |
 | `brainstorming` | Design before code (read by ask-matt's grill flow). |
 | `code-review` | Two-axis (Standards + Spec) parallel review. Local fork of Matt Pocock (provenance + drift automation, rebased on 84fdeff). |

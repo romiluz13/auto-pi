@@ -12,6 +12,11 @@ AGENTS_DIR="$HOME/.agents/skills"
 
 echo "Syncing auto-pi repo → live config..."
 
+# Deterministic workflow runtime (imported by workflow-interpreter.ts)
+mkdir -p "$PI_DIR/config"
+cp "$REPO_DIR/config/workflow-machine.ts" "$PI_DIR/config/workflow-machine.ts"
+echo "  ✓ config: workflow-machine.ts"
+
 # Extensions
 for f in "$REPO_DIR"/extensions/*.ts; do
 	[ -f "$f" ] || continue
@@ -32,7 +37,7 @@ done
 for d in "$REPO_DIR"/skills/*/; do
 	[ -d "$d" ] || continue
 	name=$(basename "$d")
-	rm -rf "$AGENTS_DIR/$name"
+	rm -rf "${AGENTS_DIR:?}/$name"
 	cp -R "$d" "$AGENTS_DIR/$name"
 	echo "  ✓ skill: $name"
 done

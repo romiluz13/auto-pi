@@ -1,7 +1,9 @@
 # ADR: Sub-Agent Loop Engine (--mode=agents)
 
 **Date:** 2026-07-12
-**Status:** Accepted
+**Status:** Superseded by ADR 0003
+
+ADR 0003 replaces this removed subprocess-based loop with a typed reducer, durable journal, and thin Pi interpreter while retaining pi-subagents as the execution substrate.
 
 ## Context
 

@@ -2,7 +2,7 @@
 
 > **Goal:** give my-pi a real bounded loop engine — the one structural capability
 > it lacks — in perfect harmony with the 12 installed packages and Pi ideology.
-> **Status:** DESIGN (read-only). Build only after user approval.
+> **Status:** SUPERSEDED by ADR 0003. Historical design only.
 > **Sources:** 4 research subagents (cc10x internals, Pi ecosystem loops, Pi API
 > surfaces, loop-design principles) + direct API verification.
 

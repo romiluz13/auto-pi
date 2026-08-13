@@ -14,68 +14,55 @@ Pi-specific rules for the auto-pi harness. Claude Code + Codex get the lean agen
 
 ## Autonomous workflow
 
-Three layers drive every workflow:
+Four layers drive every workflow:
 
-1. **Coach** — the deterministic entry. A fixed 9-option menu (plan, build, debug, research, review, ship, triage, palette). The user picks one; Coach transforms input into the matching slash command. The workflow selection is NEVER delegated to the LLM.
-2. **ask-matt** — the routing brain. A pinned external skill (Matt Pocock's) that routes through the SDLC: grill → spec → tickets → implement (tdd + code-review) → commit. On-ramps: triage, diagnosing-bugs, wayfinder. The layer reads ask-matt on entry.
-3. **orchestration-layer** — the mechanics. auto-pi's thin wrapper that adds state blocks, evidence gates, reread-after-phase protocol, compaction recovery, human-controlled stops, and the unique auto-pi phases (ship, review disposition, verification, security). ask-matt owns the routing; the layer owns the orchestration; specialists own the procedures.
+1. **Coach** — deterministic entry. It invokes the selected public prompt through PTM's versioned request/ack protocol; it never synthesizes slash-command text.
+2. **ask-matt** — semantic router. It selects specialists; never copy its route graph.
+3. **workflow-machine + workflow-interpreter** — deterministic control plane. The typed reducer owns legal transitions and evidence gates; the interpreter owns state-bound tools, hash-chained state, a durable dispatch outbox, fresh top-level phase runs, bounded retries, and commit/publish capabilities.
+4. **orchestration-layer + specialists** — model-side procedures. The layer follows the injected phase; specialists own implementation detail.
 
-When given a task, follow this flow. Each step is a user-facing slash command — type it, the `skill:` pin fires `orchestration-layer`, which reads `ask-matt` for routing and adds the orchestration mechanics. The user never types internal skill commands.
+<!-- scar: 2026-08-12 — mandatory public-command stops plus Wayfinder's one-ticket rule trapped Hybrid-Search-RAG issue #7 in repeated /plan invocations. -->
+One public command starts a goal. Internal phases continue automatically through `workflow_transition`. Never ask the user to retype `/plan`, `/build`, `/review`, `/ship`, or an invented `/spec` to advance the same run.
 
-1. **Understand (ORIENT).** If the user wants to understand (not change), explain inline. Do NOT fall through to build. If the user wants to change something: read repo AGENTS.md, relevant files, existing patterns. Search memory. If ambiguous, ask ONE clarifying question.
-2. **Plan** → type `/plan`. Pins `orchestration-layer` (which reads `ask-matt`). Routes: brainstorming → to-spec → to-tickets (bounded) or wayfinder (foggy). Evidence gates: design approval, spec reference, ticket refs + frontier.
-3. **Build** → type `/build <ticket>`. Pins `orchestration-layer`. Routes: tdd (red → green, one slice at a time) with diagnosing-bugs on persistent RED. Complete only when all acceptance criteria have evidence + test/lint/typecheck pass.
-4. **Debug** → type `/debug <issue>`. Pins `orchestration-layer`. Routes: diagnosing-bugs (bugs) or resolving-merge-conflicts (merge/rebase). Diagnosis only — the fix happens in `/build`.
-5. **Research** → type `/research <topic>`. Pins `orchestration-layer`. Routes: research, octocode-research, live-research. Returns cited findings.
-6. **Review** → type `/review`. Pins `orchestration-layer`. Routes: code-review (standards + spec + security, parallel reviewers) → receiving-code-review (verify before implementing, push back if wrong).
-7. **Ship** → type `/ship`. Pins `orchestration-layer`. Routes: verification → diff-driven-docs → commit → github (conditional). Evidence at each phase. Never commit secrets or push main.
-8. **Document.** The ship phase handles diff-driven-docs. Durable gotcha → update AGENTS.md. Architecture decision → ADR in `docs/adr/`. Specs and tickets → GitHub Issues.
-9. **Remember.** Save decisions, gotchas, failures to memory. If memory contradicts current code, trust the code.
-10. **Handoff.** Session getting long → `/handoff` to create continuation doc.
+Default terminal targets:
 
-**ask-matt owns the routing. orchestration-layer owns the mechanics.** The layer reads ask-matt for routing, reads specialists in turn (using `read` on the specialist's SKILL.md), rereads itself between phases, and tracks a compact state block. The user answers questions and approves inside the workflow — the user never types internal skill commands. Specialist skills own the procedure; ask-matt owns the routing; the layer owns the orchestration.
+- `/plan`, `/build`, `/debug`, `/review` → ship complete.
+- `/ship` → ship complete.
+- `/research` → cited research artifact.
+- `/triage` → durable triage outcome.
+- `/setup-audit` → durable audit report.
 
-**Compaction is a residual risk.** The state block is best-effort in normal context. If the state is lost, reconstruct from conversation artifacts (spec URL, commit hash, test output). Do not guess.
+Follow this flow:
 
-**Safety baseline:** never commit `.env*`, credentials, secrets, or keys — that is a data-protection baseline, not a workflow gate.
+1. **Orient.** Understanding-only requests stay inline. Change requests enter the selected workflow.
+2. **Route.** Read the current system `AUTO_PI_POLICY`, decode the untrusted dispatch data, then read ask-matt and only the selected specialist.
+3. **Execute.** Use one writer. Fan out fresh read-only research/review.
+4. **Advance.** Satisfy the current evidence gate and call `workflow_transition` once.
+5. **Continue.** The interpreter persists the event and pending dispatch. After `agent_settled`, it starts the next phase as a fresh top-level run with a fresh system policy.
+6. **Wait only for hard decisions.** Use `USER_DECISION_REQUIRED` only for user-owned, hard-to-reverse choices.
+7. **Review.** Standards + Spec + Security use fresh contexts. Fixes return to bounded remediation with new evidence.
+8. **Ship.** Verify → docs → one commit → conditional branch publication. Never commit secrets or push main.
+9. **Remember.** Save durable decisions and failures. Trust current code over stale memory.
+
+ask-matt owns routing. The workflow machine owns transitions. The orchestration layer owns procedure glue. Specialists own procedures.
+
+The journal under `~/.pi/agent/workflows/` is authoritative across compaction and restart. Conversation state is a display cache. `/workflow status|resume|abort` manages the current run. `/handoff` is optional portability, not state recovery.
+
+**Safety baseline:** never commit `.env*`, credentials, secrets, or keys.
 
 ## Skill flow graph
 
-```
-3 LAYERS: Coach (entry) → ask-matt (routing) → orchestration-layer (mechanics)
+```text
+Coach → PTM entry → workflow machine → ask-matt → specialist → workflow_transition
+                           ↑                                      │
+                           └── durable outbox + fresh phase run ──┘
 
-MAIN FLOW: idea → ship (routed by ask-matt, orchestrated by the layer)
-  /plan → orchestration-layer → ask-matt → brainstorming → to-spec → to-tickets (bounded)
-                                            → wayfinder (foggy)
-  /build → orchestration-layer → ask-matt → tdd → diagnosing-bugs on RED → tdd
-  /debug → orchestration-layer → ask-matt → diagnosing-bugs | resolving-merge-conflicts
-  /research → orchestration-layer → ask-matt → research | octocode-research | live-research
-  /review → orchestration-layer → ask-matt → code-review → receiving-code-review (disposition)
-  /ship → orchestration-layer → (layer's unique phase) → verification → diff-driven-docs → commit → github
-  /setup-audit → setup-maintenance (direct pin)
-  /triage → triage (direct pin — incoming issues/PRs, on-ramp)
+PLAN → BUILD → VERIFY → REVIEW ─clean→ SHIP-VERIFY → DOCS → COMMIT → PUBLISH
+                 ↑        │
+                 └─ REMEDIATE ← findings
 
-The layer reads ask-matt for routing, reads each specialist in turn; the user types one slash command.
-
-LAYER'S UNIQUE PHASES (not in ask-matt):
-  ship — verify → docs → commit → github (conditional)
-  review-disposition — verified-fix | verified-defer | rejected | needs-user-decision
-  verification — evidence-block discipline
-  security — 3rd review axis (security-review specialist)
-
-VOCABULARY (on-demand, not always-on):
-  domain-modeling — domain language (planning underlay when triggered)
-  codebase-design — deep module vocabulary
-
-CROSSING SESSIONS:
-  /handoff — fork to new session
-
-CODEBASE HEALTH (upkeep, not feature work):
-  improve-codebase-architecture → generates ideas → /plan
-  codebase-hygiene → find semantic duplicates
-
-BRUTAL CRITIQUE:
-  octocode-roast — when you want brutally honest code critique
+Only AWAIT-USER accepts a human decision continuation.
+Every cycle changes a durable progress fingerprint and has a finite cap.
 ```
 
 ## Subagent strategy
@@ -178,6 +165,6 @@ Skip only for: pure utility libs with stable APIs (date-fns, zod, lodash). When 
 ## Pi harness (non-obvious infrastructure — don't reinvent what these do)
 
 - **Coach** is the DEFAULT user interface — don't second-guess a steered input; it was routed intentionally.
-- **The skill pin only fires when a HUMAN types the slash command.** The agent cannot run slash commands. Each entry prompt pins `orchestration-layer`, which reads `ask-matt` for routing and reads specialists in turn — the user never types internal skill commands.
+- **Workflow skill pins fire only through PTM.** Direct human slash commands and Coach's versioned PTM invocation share that path; transformed slash text and model-authored markers are not valid ingress. Each entry prompt pins `orchestration-layer`, which reads `ask-matt` and specialists in turn.
 - **Context sidecar** — retrieve oversized output via `context_search` / `context_get`; don't re-run the expensive command.
 - **Observability** dashboard is for the user to watch, not for you to drive.

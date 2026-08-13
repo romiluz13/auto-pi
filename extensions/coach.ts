@@ -1,10 +1,10 @@
 /**
  * Coach — the system comes to you, you never remember a command.
  *
- * You type a task in plain English. Coach shows a fixed 9-option workflow menu.
- * You pick one. Coach transforms your input into the matching slash command.
- * Pi expands the prompt template, the `skill:` frontmatter pin fires, and the
- * skill content is mechanically injected. No improvisation. No orphans.
+ * You type a task in plain English. Coach shows a fixed 10-option workflow menu.
+ * You pick one. Coach invokes pi-prompt-template-model through its versioned
+ * request/ack event protocol, so direct commands and Coach use the same prompt
+ * renderer and `skill:` pin path. No synthetic slash text or second submit.
  *
  * The LLM is used ONLY for skillHints (optional domain skill activation notes
  * like MongoDB/UI/Python). If the LLM fails, the menu still shows — skillHints
@@ -23,6 +23,7 @@
  * - C1 fix: skips when the input is from an extension (avoid self-steer loops).
  */
 
+import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -88,7 +89,7 @@ async function getSkillHints(
 	if (!model) return [];
 
 	const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-	if (!auth?.apiKey) return [];
+	if (!auth.ok || !auth.apiKey) return [];
 
 	const systemPrompt = `You are a skill-hint extractor for the Pi coding agent. Given the user's task, identify which DOMAIN skills are relevant. Return ONLY valid JSON (no prose, no markdown fences):
 
@@ -100,14 +101,13 @@ Rules:
 - Keep it to 0-3 hints. Only include skills that are genuinely relevant to the task.`;
 
 	const messages: Message[] = [
-		{ role: "system", content: systemPrompt },
-		{ role: "user", content: text },
+		{ role: "user", content: text, timestamp: Date.now() },
 	];
 
 	try {
 		const response = await complete(
 			model,
-			{ messages },
+			{ systemPrompt, messages },
 			{ apiKey: auth.apiKey, headers: auth.headers, signal },
 		);
 		const content =
@@ -137,6 +137,58 @@ function hintFromSkills(skillHints: string[]): string | null {
 }
 
 // ─── Fixed workflow menu (no LLM routing — the user always picks) ───────────
+
+const PTM_INVOKE_EVENT = "prompt-template:prompt:invoke";
+const PTM_INVOKE_ACK_EVENT = "prompt-template:prompt:invoke:ack";
+const PTM_PROTOCOL_VERSION = 1;
+const WORKFLOW_STATUS_REQUEST_EVENT = "auto-pi:workflow:status:request";
+const WORKFLOW_STATUS_RESPONSE_EVENT = "auto-pi:workflow:status:response";
+
+function isWorkflowActive(pi: ExtensionAPI, sessionId: string): boolean {
+	const requestId = randomUUID();
+	let active = false;
+	const stop = pi.events.on(WORKFLOW_STATUS_RESPONSE_EVENT, (payload) => {
+		const response = payload as { requestId?: unknown; active?: unknown };
+		if (response.requestId === requestId) active = response.active === true;
+	});
+	pi.events.emit(WORKFLOW_STATUS_REQUEST_EVENT, { requestId, sessionId });
+	stop();
+	return active;
+}
+
+async function invokePromptTemplate(
+	pi: ExtensionAPI,
+	name: string,
+	args: string,
+): Promise<{ accepted: boolean; reason?: string }> {
+	const requestId = randomUUID();
+	return new Promise((resolve) => {
+		const timeout = setTimeout(() => {
+			stop();
+			resolve({ accepted: false, reason: "timeout" });
+		}, 5_000);
+		const stop = pi.events.on(PTM_INVOKE_ACK_EVENT, (payload) => {
+			const ack = payload as {
+				requestId?: unknown;
+				accepted?: unknown;
+				reason?: unknown;
+			};
+			if (ack.requestId !== requestId) return;
+			clearTimeout(timeout);
+			stop();
+			resolve({
+				accepted: ack.accepted === true,
+				reason: typeof ack.reason === "string" ? ack.reason : undefined,
+			});
+		});
+		pi.events.emit(PTM_INVOKE_EVENT, {
+			protocolVersion: PTM_PROTOCOL_VERSION,
+			requestId,
+			name,
+			args,
+		});
+	});
+}
 
 interface WorkflowOption {
 	label: string;
@@ -193,6 +245,11 @@ const WORKFLOW_OPTIONS: WorkflowOption[] = [
 			"For incoming raw issues/PRs you didn't create. Pins triage directly.",
 	},
 	{
+		label: "/setup-audit — Audit the Pi setup",
+		command: '/setup-audit "$TASK"',
+		description: "Run the deterministic setup-maintenance audit workflow.",
+	},
+	{
 		label: "Browse all commands (/palette)",
 		command: "/palette",
 		description: "Fuzzy-search every command, prompt, and skill.",
@@ -221,6 +278,10 @@ export default function coachExtension(pi: ExtensionAPI): void {
 		// Already a slash command: pass through.
 		if (text.startsWith("/")) return { action: "continue" };
 
+		if (isWorkflowActive(pi, ctx.sessionManager.getSessionId())) {
+			return { action: "continue" };
+		}
+
 		// Conversational responses → passthrough (no popup).
 		if (text.length < 30 && CONVERSATIONAL.test(text)) {
 			return { action: "continue" };
@@ -244,15 +305,16 @@ export default function coachExtension(pi: ExtensionAPI): void {
 		// option ("Just do it" — raw agent, no workflow) and send the input.
 		const title = `Coach — pick a workflow for: "${text.slice(0, 80)}${text.length > 80 ? "…" : ""}"${skillHint ? ` — ${skillHint}` : ""}`;
 		const AUTO_PICK_MS = 20_000;
+		let autoPickTimer: ReturnType<typeof setTimeout> | undefined;
 		const autoPickPromise = new Promise<{
 			choice: string | undefined;
 			auto: boolean;
-		}>((resolve) =>
-			setTimeout(
+		}>((resolve) => {
+			autoPickTimer = setTimeout(
 				() => resolve({ choice: WORKFLOW_OPTIONS[0].label, auto: true }),
 				AUTO_PICK_MS,
-			),
-		);
+			);
+		});
 		const selectPromise = ctx.ui
 			.select(
 				title,
@@ -263,6 +325,7 @@ export default function coachExtension(pi: ExtensionAPI): void {
 			selectPromise,
 			autoPickPromise,
 		]);
+		if (autoPickTimer) clearTimeout(autoPickTimer);
 		if (auto) {
 			ctx.ui.notify(
 				`Coach: no pick in 20s — auto-selected "${WORKFLOW_OPTIONS[0].label}"`,
@@ -286,16 +349,30 @@ export default function coachExtension(pi: ExtensionAPI): void {
 			return { action: "continue" };
 		}
 
-		// Transform the input into the chosen slash command.
-		const taskText = skillHint ? `${text} ${skillHint}` : text;
-		const command = picked.command.replace("$TASK", () =>
-			taskText.replace(/"/g, '\\"'),
-		);
-		if (ctx.mode === "tui") {
-			ctx.ui.setEditorText(command);
+		if (picked.command === "/palette") {
+			if (ctx.mode === "tui") ctx.ui.setEditorText("/palette");
+			else ctx.ui.notify("Coach: /palette is available in TUI mode.", "info");
 			return { action: "handled" };
 		}
-		return { action: "transform", text: command };
+
+		const templateName = picked.command.match(/^\/([^\s]+)/)?.[1];
+		if (!templateName) {
+			ctx.ui.notify("Coach: selected workflow has no template name.", "error");
+			return { action: "handled" };
+		}
+		const taskText = skillHint ? `${text} ${skillHint}` : text;
+		const result = await invokePromptTemplate(
+			pi,
+			templateName,
+			picked.command.includes("$TASK") ? taskText : "",
+		);
+		if (!result.accepted) {
+			ctx.ui.notify(
+				`Coach: ${templateName} was not accepted by PTM (${result.reason ?? "unknown"}).`,
+				"error",
+			);
+		}
+		return { action: "handled" };
 	});
 
 	// /coach command — toggle + status.

@@ -3,6 +3,16 @@ description: Research a topic — investigate against primary sources, capture f
 argument-hint: "<topic to research>"
 skill: orchestration-layer
 ---
-Research the following topic. The `orchestration-layer` skill will read `ask-matt` (the routing brain) and route among research, octocode-research, and live-research based on task fit; returns cited findings. State blocks + evidence gates + human-controlled stops are handled by the layer.
+# Auto-Pi Workflow Goal
+
+[AUTO_PI_WORKFLOW]
+entry=research
+terminal=researched
+[/AUTO_PI_WORKFLOW]
+[AUTO_PI_SUBJECT]
+$@
+[/AUTO_PI_SUBJECT]
+
+Research the following topic autonomously. `orchestration-layer` reads `ask-matt`; the workflow interpreter requires a durable cited research artifact before completion. Stop only for a genuinely user-owned hard-to-reverse decision.
 
 Topic: $@

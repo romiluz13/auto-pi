@@ -83,6 +83,15 @@ remember which command fits — Coach tells you which fits THIS task.
   is past the human instruction ceiling. Coach inverts the interface — the
   system surfaces the command, you don't recall it.
 
+### `workflow-interpreter.ts` + `workflow-store.ts` — deterministic workflow control
+
+Owns the workflow-transition axis. PTM-authenticated prompts submit goals; the interpreter creates or resumes one durable run, injects a system-level phase policy, validates state-bound `workflow_transition` events through `config/workflow-machine.ts`, hash-chains state under `~/.pi/agent/workflows/`, and records an idempotent dispatch outbox. `agent_settled` starts the next phase as a fresh top-level run instead of a streaming follow-up.
+
+- **Commands:** `/workflow status|resume [run-id]|abort`
+- **Tools:** `workflow_transition` and sandboxed `workflow_exec`; every call is bound to run ID, phase, sequence, and progress token
+- **Mechanical gates:** PTM ingress receipts, exact-sequence journal CAS, stale-call rejection, interpreter verification receipts, confined writes, duplicate-progress rejection, fresh reviewer IDs, bounded retries, commit only in `ship-commit`, push only in `ship-publish`
+- **Harmony contract:** ask-matt still owns semantic routing; specialists still own procedures; pi-subagents still owns child execution. The interpreter owns only lifecycle legality, persistence, and continuation.
+
 ### `trace.ts` — Activation observability (`/trace`, `/trace-skills`)
 
 The orphan-prevention mechanism. Logs what the workflow ACTUALLY activates at
@@ -177,6 +186,4 @@ rewind, not commit semantics). Do not install the `tomsej/pi-ext` bundle.
 
 ## Verification
 
-Both extensions load cleanly at Pi startup (Pi surfaces extension load failures
-to stderr as `Failed to load extension ...`; these two produce none). LSP
-diagnostics: 0 errors. Biome: clean.
+All extensions must load cleanly at Pi startup (Pi surfaces failures as `Failed to load extension ...`). The repository test suite, TypeScript check, focused LSP diagnostics, and a real Pi load canary are the release gates.

@@ -17,12 +17,12 @@
 
 import {
 	appendFileSync,
+	existsSync,
 	readFileSync,
 	writeFileSync,
-	existsSync,
 } from "node:fs";
-import { join } from "node:path";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import type {
 	ExtensionAPI,
 	ExtensionContext,
@@ -71,19 +71,14 @@ function getProject(cwd: string): string {
 // can't be targeted individually. We set a unique name on session_start
 // based on project + model, so intercom's turn_start syncPresenceIdentity
 // picks it up and registers it with the broker.
-function autoNameSession(ctx: ExtensionContext): void {
-	// Guard: getSessionName may not be available on all context shapes
-	// (session_start fires before the full context is wired). Use typeof
-	// check so it fails gracefully instead of throwing.
-	if (typeof ctx.getSessionName !== "function") return;
-	const existing = ctx.getSessionName();
+function autoNameSession(pi: ExtensionAPI, ctx: ExtensionContext): void {
+	const existing = pi.getSessionName();
 	if (existing && !existing.startsWith("subagent-chat-")) {
 		return; // already named (e.g. via --name flag) — don't override
 	}
 	const cwd = ctx.cwd ?? process.cwd();
 	const project = getProject(cwd);
-	const model = ctx.getModel();
-	const modelId = model?.id ?? "unknown";
+	const modelId = ctx.model?.id ?? "unknown";
 	// Append a short session-ID suffix so multiple sessions on the same
 	// project+model get UNIQUE intercom names. Without this, parallel SDR-AI
 	// sessions on FW-GLM-5.2 all get "SDR-AI-FW-GLM-5.2" and intercom can't
@@ -92,9 +87,7 @@ function autoNameSession(ctx: ExtensionContext): void {
 	const shortId = sessionId.slice(0, 8);
 	const autoName = `${project}-${modelId}-${shortId}`;
 	try {
-		if (typeof ctx.setSessionName === "function") {
-			ctx.setSessionName(autoName);
-		}
+		pi.setSessionName(autoName);
 	} catch {
 		// fail silently — naming is best-effort
 	}
@@ -102,7 +95,7 @@ function autoNameSession(ctx: ExtensionContext): void {
 
 export default function sessionStatusExtension(pi: ExtensionAPI): void {
 	pi.on("agent_start", async (_event, ctx) => {
-		autoNameSession(ctx);
+		autoNameSession(pi, ctx);
 		const sessionId = ctx.sessionManager.getSessionId();
 		const cwd = ctx.cwd ?? process.cwd();
 		writeStatus({
@@ -144,7 +137,9 @@ export default function sessionStatusExtension(pi: ExtensionAPI): void {
 					try {
 						const entry = JSON.parse(line) as StatusEntry;
 						latestBySession.set(entry.sessionId, entry);
-					} catch {}
+					} catch {
+						// Ignore stale or partially written status lines.
+					}
 				}
 				const sessions = [...latestBySession.values()];
 				const working = sessions.filter((s) => s.status === "working");
